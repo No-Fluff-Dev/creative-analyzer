@@ -1,0 +1,2453 @@
+import { useState, useRef, useEffect } from "react";
+
+const DIMS = [
+  { key: "visual_hierarchy", name: "Visual hierarchy" },
+  { key: "clarity_readability", name: "Clarity & readability" },
+  { key: "three_second_test", name: "3-second test" },
+  { key: "behavioural_triggers", name: "Behavioural triggers" },
+  { key: "cta_strength", name: "CTA strength" },
+  { key: "cognitive_load", name: "Cognitive load" },
+  { key: "emotional_resonance", name: "Emotional resonance" },
+  { key: "brand_consistency", name: "Brand consistency" },
+];
+const PLATFORMS = [
+  "Meta feed",
+  "Meta story/reel",
+  "Google display",
+  "Amazon",
+  "Landing page",
+  "YouTube",
+  "Email",
+];
+const LABELS = ["A", "B", "C", "D"];
+const LABEL_COLORS = ["#6366F1", "#F59E0B", "#10B981", "#EF4444"];
+
+function scoreColor(s) {
+  return s >= 75 ? "#22C55E" : s >= 50 ? "#F59E0B" : "#EF4444";
+}
+function scoreBg(s) {
+  if (s >= 75) return { bg: "#F0FDF4", text: "#15803D" };
+  if (s >= 50) return { bg: "#FFFBEB", text: "#B45309" };
+  return { bg: "#FEF2F2", text: "#B91C1C" };
+}
+function verdictText(s) {
+  if (s >= 80) return "Ready to test";
+  if (s >= 65) return "Minor fixes needed";
+  if (s >= 50) return "Needs work";
+  return "Rework recommended";
+}
+
+function toBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = () => rej(new Error("Read failed"));
+    r.readAsDataURL(file);
+  });
+}
+
+function toBase64Raw(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result.split(",")[1]);
+    r.onerror = () => rej(new Error("Read failed"));
+    r.readAsDataURL(file);
+  });
+}
+
+function RadialScore({ score, size = 72, color }) {
+  const r = size / 2 - 6,
+    circ = 2 * Math.PI * r;
+  const offset = circ - (score / 100) * circ,
+    c = color || scoreColor(score);
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={r}
+        fill="none"
+        stroke="#F0F0F0"
+        strokeWidth="5"
+      />
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={r}
+        fill="none"
+        stroke={c}
+        strokeWidth="5"
+        strokeDasharray={circ}
+        strokeDashoffset={offset}
+        strokeLinecap="round"
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        style={{ transition: "stroke-dashoffset 0.8s ease" }}
+      />
+      <text
+        x={size / 2}
+        y={size / 2 + 5}
+        textAnchor="middle"
+        fontSize="15"
+        fontWeight="700"
+        fill={c}
+      >
+        {score}
+      </text>
+    </svg>
+  );
+}
+
+function HeatmapCanvas({ dataUrl, zones }) {
+  const canvasRef = useRef();
+  useEffect(() => {
+    if (!canvasRef.current || !zones?.length || !dataUrl) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    const img = new Image();
+    img.onload = () => {
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      ctx.drawImage(img, 0, 0);
+      zones.forEach((zone) => {
+        const x = zone.x * img.naturalWidth,
+          y = zone.y * img.naturalHeight;
+        const w = zone.w * img.naturalWidth,
+          h = zone.h * img.naturalHeight;
+        const cx2 = x + w / 2,
+          cy2 = y + h / 2;
+        const grad = ctx.createRadialGradient(
+          cx2,
+          cy2,
+          0,
+          cx2,
+          cy2,
+          Math.max(w, h) * 0.65,
+        );
+        const col =
+          zone.priority === 1
+            ? "rgba(239,68,68,0.5)"
+            : zone.priority === 2
+              ? "rgba(251,146,60,0.4)"
+              : "rgba(250,204,21,0.3)";
+        grad.addColorStop(0, col);
+        grad.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = grad;
+        ctx.fillRect(x - w * 0.15, y - h * 0.15, w * 1.3, h * 1.3);
+        ctx.strokeStyle =
+          zone.priority === 1
+            ? "rgba(239,68,68,0.85)"
+            : zone.priority === 2
+              ? "rgba(251,146,60,0.75)"
+              : "rgba(202,138,4,0.7)";
+        ctx.lineWidth = Math.max(2, img.naturalWidth * 0.003);
+        ctx.setLineDash([6, 4]);
+        ctx.strokeRect(x, y, w, h);
+        ctx.setLineDash([]);
+        const labelText = `${zone.priority}. ${zone.label}`;
+        const fs = Math.max(12, img.naturalWidth * 0.016);
+        ctx.font = `bold ${fs}px system-ui`;
+        const tw = ctx.measureText(labelText).width;
+        const pad = 6,
+          bh = fs + pad * 2;
+        const bx = x,
+          by = Math.max(0, y - bh - 2);
+        ctx.fillStyle =
+          zone.priority === 1
+            ? "rgba(239,68,68,0.92)"
+            : zone.priority === 2
+              ? "rgba(251,146,60,0.92)"
+              : "rgba(202,138,4,0.92)";
+        ctx.beginPath();
+        ctx.roundRect(bx, by, tw + pad * 2, bh, 4);
+        ctx.fill();
+        ctx.fillStyle = "#fff";
+        ctx.textBaseline = "middle";
+        ctx.fillText(labelText, bx + pad, by + bh / 2);
+      });
+    };
+    img.src = dataUrl;
+  }, [dataUrl, zones]);
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{ width: "100%", display: "block", borderRadius: 10 }}
+    />
+  );
+}
+
+function loadBrands() {
+  try {
+    return JSON.parse(localStorage.getItem("nf_brands") || "{}");
+  } catch {
+    return {};
+  }
+}
+function saveBrands(b) {
+  try {
+    localStorage.setItem("nf_brands", JSON.stringify(b));
+  } catch {}
+}
+
+function BrandManager({ onSelect, selectedBrand, onClose, onUpdated }) {
+  const [brands, setBrands] = useState(loadBrands());
+  const [name, setName] = useState("");
+  const [notes, setNotes] = useState("");
+  const [editing, setEditing] = useState(null);
+  const commit = () => {
+    if (!name.trim()) return;
+    const updated = editing
+      ? (() => {
+          const u = { ...brands };
+          delete u[editing];
+          u[name.trim()] = { notes, updatedAt: Date.now() };
+          return u;
+        })()
+      : { ...brands, [name.trim()]: { notes, updatedAt: Date.now() } };
+    setBrands(updated);
+    saveBrands(updated);
+    onUpdated(updated);
+    if (editing && selectedBrand === editing) onSelect(name.trim(), notes);
+    setName("");
+    setNotes("");
+    setEditing(null);
+  };
+  const del = (n) => {
+    const u = { ...brands };
+    delete u[n];
+    setBrands(u);
+    saveBrands(u);
+    onUpdated(u);
+    if (selectedBrand === n) onSelect("", "");
+  };
+  const edit = (n) => {
+    setEditing(n);
+    setName(n);
+    setNotes(brands[n].notes);
+  };
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.45)",
+        zIndex: 100,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "1rem",
+      }}
+    >
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: 18,
+          padding: "1.5rem",
+          width: "100%",
+          maxWidth: 460,
+          maxHeight: "82vh",
+          overflowY: "auto",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "1.25rem",
+          }}
+        >
+          <h2
+            style={{ fontSize: 16, fontWeight: 600, color: "#111", margin: 0 }}
+          >
+            Brand guidelines
+          </h2>
+          <button
+            onClick={onClose}
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: "50%",
+              border: "1px solid #EFEFEF",
+              background: "#fff",
+              cursor: "pointer",
+              fontSize: 14,
+            }}
+          >
+            ✕
+          </button>
+        </div>
+        {Object.keys(brands).length > 0 && (
+          <div
+            style={{
+              marginBottom: "1.25rem",
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+            }}
+          >
+            {Object.entries(brands).map(([n, d]) => (
+              <div
+                key={n}
+                onClick={() => {
+                  onSelect(n, d.notes);
+                  onClose();
+                }}
+                style={{
+                  border: `2px solid ${selectedBrand === n ? "#6366F1" : "#F0F0F0"}`,
+                  borderRadius: 10,
+                  padding: "10px 14px",
+                  cursor: "pointer",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: selectedBrand === n ? "#6366F1" : "#222",
+                    }}
+                  >
+                    {n}
+                  </span>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        edit(n);
+                      }}
+                      style={{
+                        fontSize: 11,
+                        padding: "2px 8px",
+                        borderRadius: 6,
+                        border: "1px solid #EFEFEF",
+                        background: "#fff",
+                        cursor: "pointer",
+                        color: "#666",
+                      }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        del(n);
+                      }}
+                      style={{
+                        fontSize: 11,
+                        padding: "2px 8px",
+                        borderRadius: 6,
+                        border: "1px solid #FEECEC",
+                        background: "#FEF2F2",
+                        cursor: "pointer",
+                        color: "#B91C1C",
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+                <p
+                  style={{
+                    fontSize: 11,
+                    color: "#AAA",
+                    margin: "4px 0 0",
+                    lineHeight: 1.4,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {d.notes || "No notes"}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+        <div
+          style={{
+            background: "#FAFAFA",
+            borderRadius: 12,
+            padding: "1rem",
+            border: "1px solid #F0F0F0",
+          }}
+        >
+          <p
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              color: "#AAA",
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+              marginBottom: 10,
+            }}
+          >
+            {editing ? "Edit brand" : "Add new brand"}
+          </p>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Brand / client name"
+            style={{
+              width: "100%",
+              padding: "8px 12px",
+              border: "1px solid #EFEFEF",
+              borderRadius: 8,
+              fontSize: 13,
+              marginBottom: 8,
+              outline: "none",
+              background: "#fff",
+              boxSizing: "border-box",
+            }}
+          />
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Colours, fonts, tone, visual rules, messaging…"
+            rows={4}
+            style={{
+              width: "100%",
+              padding: "8px 12px",
+              border: "1px solid #EFEFEF",
+              borderRadius: 8,
+              fontSize: 13,
+              resize: "vertical",
+              fontFamily: "inherit",
+              outline: "none",
+              background: "#fff",
+              boxSizing: "border-box",
+            }}
+          />
+          <button
+            onClick={commit}
+            disabled={!name.trim()}
+            style={{
+              marginTop: 8,
+              width: "100%",
+              padding: "9px",
+              borderRadius: 8,
+              border: "none",
+              background: name.trim() ? "#111" : "#F0F0F0",
+              color: name.trim() ? "#fff" : "#AAA",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: name.trim() ? "pointer" : "not-allowed",
+            }}
+          >
+            {editing ? "Save changes" : "Save brand"}
+          </button>
+          {editing && (
+            <button
+              onClick={() => {
+                setEditing(null);
+                setName("");
+                setNotes("");
+              }}
+              style={{
+                marginTop: 6,
+                width: "100%",
+                padding: "8px",
+                borderRadius: 8,
+                border: "1px solid #EFEFEF",
+                background: "#fff",
+                fontSize: 13,
+                color: "#888",
+                cursor: "pointer",
+              }}
+            >
+              Cancel
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function UploadZone({ onFile, label, labelColor }) {
+  const ref = useRef();
+  const [drag, setDrag] = useState(false);
+  const handle = async (f) => {
+    if (!f) return;
+    const isVideo = f.type.startsWith("video");
+    const dataUrl = isVideo ? null : await toBase64(f);
+    onFile({
+      file: f,
+      type: isVideo ? "video" : "image",
+      dataUrl,
+      name: f.name,
+      mimeType: f.type,
+    });
+  };
+  return (
+    <div
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDrag(true);
+      }}
+      onDragLeave={() => setDrag(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDrag(false);
+        handle(e.dataTransfer.files[0]);
+      }}
+      onClick={() => ref.current.click()}
+      style={{
+        border: `1.5px dashed ${drag ? "#6366F1" : "#E0E0E0"}`,
+        borderRadius: 14,
+        padding: label ? "1.5rem 1rem" : "2.5rem 1rem",
+        textAlign: "center",
+        cursor: "pointer",
+        background: drag ? "#F5F3FF" : "#FAFAFA",
+        transition: "all 0.15s",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+        minHeight: label ? 140 : 180,
+      }}
+    >
+      {label ? (
+        <div
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: "50%",
+            background: labelColor + "20",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <span style={{ fontSize: 14, fontWeight: 800, color: labelColor }}>
+            {label}
+          </span>
+        </div>
+      ) : (
+        <svg
+          width="22"
+          height="22"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#AAA"
+          strokeWidth="1.8"
+        >
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="17 8 12 3 7 8" />
+          <line x1="12" y1="3" x2="12" y2="15" />
+        </svg>
+      )}
+      <p style={{ fontSize: 13, fontWeight: 500, color: "#555", margin: 0 }}>
+        {label ? `Add creative ${label}` : "Drop creative or click to upload"}
+      </p>
+      <p style={{ fontSize: 11, color: "#BBB", margin: 0 }}>
+        JPG · PNG · WEBP · MP4 · MOV
+      </p>
+      <input
+        ref={ref}
+        type="file"
+        style={{ display: "none" }}
+        accept="image/*,video/mp4,video/quicktime"
+        onChange={(e) => handle(e.target.files[0])}
+      />
+    </div>
+  );
+}
+
+function CreativePreview({ creative, onRemove, label, labelColor, compact }) {
+  if (!creative) return null;
+  const h = compact ? 140 : 260;
+  return (
+    <div
+      style={{
+        position: "relative",
+        border: "1px solid #EFEFEF",
+        borderRadius: 14,
+        overflow: "hidden",
+        background: "#F5F5F5",
+      }}
+    >
+      {label && (
+        <div
+          style={{
+            position: "absolute",
+            top: 8,
+            left: 8,
+            zIndex: 2,
+            width: 24,
+            height: 24,
+            borderRadius: "50%",
+            background: labelColor,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <span style={{ fontSize: 10, fontWeight: 800, color: "#fff" }}>
+            {label}
+          </span>
+        </div>
+      )}
+      {onRemove && (
+        <button
+          onClick={onRemove}
+          style={{
+            position: "absolute",
+            top: 8,
+            right: 8,
+            zIndex: 2,
+            width: 26,
+            height: 26,
+            borderRadius: "50%",
+            background: "rgba(0,0,0,0.5)",
+            border: "none",
+            color: "#fff",
+            cursor: "pointer",
+            fontSize: 12,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          ✕
+        </button>
+      )}
+      {creative.type === "video" ? (
+        <div
+          style={{
+            height: h,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "#111",
+            color: "#888",
+            fontSize: 13,
+          }}
+        >
+          🎬 {creative.name}
+        </div>
+      ) : (
+        <img
+          src={creative.dataUrl}
+          alt=""
+          style={{
+            width: "100%",
+            height: h,
+            objectFit: "contain",
+            display: "block",
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+export default function App() {
+  const [mode, setMode] = useState("single");
+  const [showBrandMgr, setShowBrandMgr] = useState(false);
+  const [brands, setBrands] = useState(loadBrands());
+  const [selectedBrand, setSelectedBrand] = useState("");
+  const [brandNotes, setBrandNotes] = useState("");
+  const [client, setClient] = useState("");
+  const [platform, setPlatform] = useState("");
+  const [threshold, setThreshold] = useState(65);
+  const [error, setError] = useState(null);
+
+  // Single
+  const [single, setSingle] = useState(null);
+  const [singleResult, setSingleResult] = useState(null);
+  const [singleAnalysing, setSingleAnalysing] = useState(false);
+
+  // AB
+  const [creatives, setCreatives] = useState([null, null]);
+  const [abAnalysing, setAbAnalysing] = useState(null);
+
+  const buildSystem = (
+    isVideo,
+  ) => `You are a senior creative strategist at No Fluff, a behavioural marketing agency for D2C brands. Analyse advertising creatives through consumer psychology, visual hierarchy, and conversion optimisation.
+
+Return ONLY raw JSON. No markdown. No backticks. No explanation. Start with { end with }.
+
+{
+  "overall_score": <integer 0-100>,
+  "overall_verdict": "<one punchy sentence>",
+  "pass": <true if score >= ${threshold}, else false>,
+  "dimensions": {
+    "visual_hierarchy": { "score": <0-100>, "recommendation": "<specific 1-2 sentence observation>" },
+    "clarity_readability": { "score": <0-100>, "recommendation": "<specific observation>" },
+    "three_second_test": { "score": <0-100>, "recommendation": "<specific observation>" },
+    "behavioural_triggers": { "score": <0-100>, "recommendation": "<psychology principles present or missing>" },
+    "cta_strength": { "score": <0-100>, "recommendation": "<specific observation>" },
+    "cognitive_load": { "score": <0-100>, "recommendation": "<specific observation>" },
+    "emotional_resonance": { "score": <0-100>, "recommendation": "<specific observation>" },
+    "brand_consistency": { "score": <0-100>, "recommendation": "<specific observation>" }
+  },
+  "top_fixes": ["<most impactful fix>", "<second fix>", "<third fix>"],
+  "attention_zones": [
+    { "priority": 1, "label": "<element e.g. Headline>", "x": <0.0-1.0>, "y": <0.0-1.0>, "w": <0.0-1.0>, "h": <0.0-1.0>, "note": "<why this draws attention>" },
+    { "priority": 2, "label": "<element>", "x": <0.0-1.0>, "y": <0.0-1.0>, "w": <0.0-1.0>, "h": <0.0-1.0>, "note": "<note>" },
+    { "priority": 3, "label": "<element>", "x": <0.0-1.0>, "y": <0.0-1.0>, "w": <0.0-1.0>, "h": <0.0-1.0>, "note": "<note>" }
+  ]
+}
+
+x/y = top-left corner as fraction of image width/height. w/h = width/height as fraction. Be accurate based on what you actually see.
+${platform ? `Platform: ${platform}.` : ""}${client ? ` Client: ${client}.` : ""}${brandNotes ? ` Brand guide: ${brandNotes}.` : ""}${isVideo ? " Video creative — benchmark against best-practice standards for the format." : ""}
+Be specific. Reference actual elements visible. No generic advice.`;
+
+  const callAPI = async (creative) => {
+    const isVideo = creative.type === "video";
+    let messages;
+    if (!isVideo) {
+      const raw = await toBase64Raw(creative.file);
+      messages = [
+        {
+          role: "user",
+          content: [
+            {
+              type: "image",
+              source: {
+                type: "base64",
+                media_type: creative.mimeType,
+                data: raw,
+              },
+            },
+            {
+              type: "text",
+              text: "Analyse this creative. Return raw JSON only, starting with {",
+            },
+          ],
+        },
+      ];
+    } else {
+      messages = [
+        {
+          role: "user",
+          content: `Video file: "${creative.name}". Provide the JSON analysis. Raw JSON only, starting with {`,
+        },
+      ];
+    }
+    const resp = await fetch("/api/analyse", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-3-5-sonnet-20241022", // Updated to the latest stable model
+        max_tokens: 2000,
+        system: buildSystem(isVideo),
+        messages,
+      }),
+    });
+    if (!resp.ok) {
+      const e = await resp.json().catch(() => ({}));
+      throw new Error(e.error?.message || `API error ${resp.status}`);
+    }
+    const data = await resp.json();
+    const raw = (data.content || [])
+      .map((b) => b.text || "")
+      .join("")
+      .trim();
+    const s = raw.indexOf("{"),
+      e2 = raw.lastIndexOf("}");
+    if (s === -1 || e2 === -1) throw new Error("No JSON found in response");
+    return JSON.parse(raw.slice(s, e2 + 1));
+  };
+
+  const runSingle = async () => {
+    if (!single) return;
+    setSingleAnalysing(true);
+    setError(null);
+    setSingleResult(null);
+    try {
+      setSingleResult(await callAPI(single));
+    } catch (err) {
+      setError(err.message);
+    }
+    setSingleAnalysing(false);
+  };
+
+  const runAB = async () => {
+    const filled = creatives.filter(Boolean);
+    if (filled.length < 2) return;
+    setError(null);
+    for (let i = 0; i < creatives.length; i++) {
+      if (!creatives[i]) continue;
+      setAbAnalysing(i);
+      try {
+        const result = await callAPI(creatives[i]);
+        setCreatives((prev) => {
+          const n = [...prev];
+          if (n[i]) n[i] = { ...n[i], result };
+          return n;
+        });
+      } catch (err) {
+        setError(`Creative ${LABELS[i]}: ${err.message}`);
+      }
+    }
+    setAbAnalysing(null);
+  };
+
+  const exportReport = (items) => {
+    const lines = [
+      "NO FLUFF CREATIVE ANALYSER — REPORT",
+      "=====================================",
+      `Date: ${new Date().toLocaleDateString("en-GB")}`,
+      client ? `Client: ${client}` : "",
+      platform ? `Platform: ${platform}` : "",
+      "",
+      ...items.map((r, i) =>
+        [
+          `${items.length > 1 ? `--- CREATIVE ${LABELS[i]} ---` : "--- ANALYSIS ---"}`,
+          `Score: ${r.result.overall_score}/100 — ${r.result.pass ? "PASS" : "FAIL"} (threshold ${threshold})`,
+          `Verdict: ${r.result.overall_verdict}`,
+          "",
+          "Dimensions:",
+          ...DIMS.map(
+            (d) =>
+              `  ${d.name}: ${r.result.dimensions[d.key].score}/100\n    → ${r.result.dimensions[d.key].recommendation}`,
+          ),
+          "",
+          "Top fixes:",
+          ...(r.result.top_fixes || []).map((f, j) => `  ${j + 1}. ${f}`),
+          "",
+        ].join("\n"),
+      ),
+    ]
+      .filter(Boolean)
+      .join("\n");
+    const blob = new Blob([lines], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `NF_Creative_Report_${client || "unnamed"}_${new Date().toISOString().slice(0, 10)}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const brandList = Object.keys(brands);
+  const analysedCreatives = creatives
+    .map((c, i) => (c?.result ? { ...c, index: i } : null))
+    .filter(Boolean);
+  const winner =
+    analysedCreatives.length > 1
+      ? analysedCreatives.reduce((a, b) =>
+          a.result.overall_score > b.result.overall_score ? a : b,
+        )
+      : null;
+
+  return (
+    <div
+      style={{
+        fontFamily: "var(--font-sans,system-ui)",
+        background: "#FAFAFA",
+        minHeight: "100vh",
+        padding: "2rem 1rem",
+      }}
+    >
+      {showBrandMgr && (
+        <BrandManager
+          selectedBrand={selectedBrand}
+          onSelect={(n, notes) => {
+            setSelectedBrand(n);
+            setBrandNotes(notes || "");
+            if (n) setClient(n);
+          }}
+          onClose={() => setShowBrandMgr(false)}
+          onUpdated={(b) => setBrands(b)}
+        />
+      )}
+      <div style={{ maxWidth: 720, margin: "0 auto" }}>
+        {/* Header */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            marginBottom: "1.75rem",
+          }}
+        >
+          <div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                marginBottom: 4,
+              }}
+            >
+              <div
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: "50%",
+                  background: "#111",
+                }}
+              />
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: "0.1em",
+                  color: "#AAA",
+                  textTransform: "uppercase",
+                }}
+              >
+                No Fluff
+              </span>
+            </div>
+            <h1
+              style={{
+                fontSize: 22,
+                fontWeight: 600,
+                color: "#111",
+                margin: 0,
+              }}
+            >
+              Creative Analyser
+            </h1>
+            <p style={{ fontSize: 13, color: "#999", marginTop: 4 }}>
+              Pre-flight analysis powered by behavioural science
+            </p>
+          </div>
+          <button
+            onClick={() => setShowBrandMgr(true)}
+            style={{
+              padding: "8px 14px",
+              borderRadius: 10,
+              border: "1px solid #EFEFEF",
+              background: "#fff",
+              fontSize: 12,
+              fontWeight: 600,
+              color: "#555",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              flexShrink: 0,
+              marginTop: 4,
+            }}
+          >
+            <svg
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+            </svg>
+            Brand guidelines
+          </button>
+        </div>
+
+        {/* Mode toggle */}
+        <div
+          style={{
+            display: "flex",
+            gap: 6,
+            marginBottom: "1.25rem",
+            background: "#EFEFEF",
+            borderRadius: 10,
+            padding: 4,
+          }}
+        >
+          {[
+            ["single", "Single creative"],
+            ["ab", "A/B comparison"],
+          ].map(([m, l]) => (
+            <button
+              key={m}
+              onClick={() => {
+                setMode(m);
+                setError(null);
+              }}
+              style={{
+                flex: 1,
+                padding: "8px 0",
+                borderRadius: 8,
+                border: "none",
+                fontSize: 13,
+                fontWeight: 500,
+                background: mode === m ? "#fff" : "transparent",
+                color: mode === m ? "#111" : "#888",
+                boxShadow: mode === m ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+                cursor: "pointer",
+                transition: "all 0.15s",
+              }}
+            >
+              {l}
+            </button>
+          ))}
+        </div>
+
+        {/* Config */}
+        <div
+          style={{
+            background: "#fff",
+            border: "1px solid #F0F0F0",
+            borderRadius: 14,
+            padding: "1.25rem",
+            marginBottom: "1.25rem",
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
+          }}
+        >
+          <div
+            style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}
+          >
+            <div>
+              <label
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: "#AAA",
+                  display: "block",
+                  marginBottom: 5,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                }}
+              >
+                Client / campaign
+              </label>
+              <input
+                value={client}
+                onChange={(e) => setClient(e.target.value)}
+                placeholder="e.g. Sirf Coffee — Diwali"
+                style={{
+                  width: "100%",
+                  padding: "8px 12px",
+                  border: "1px solid #EFEFEF",
+                  borderRadius: 8,
+                  fontSize: 13,
+                  color: "#222",
+                  background: "#FAFAFA",
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+            <div>
+              <label
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: "#AAA",
+                  display: "block",
+                  marginBottom: 5,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                }}
+              >
+                Platform
+              </label>
+              <select
+                value={platform}
+                onChange={(e) => setPlatform(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "8px 12px",
+                  border: "1px solid #EFEFEF",
+                  borderRadius: 8,
+                  fontSize: 13,
+                  color: platform ? "#222" : "#AAA",
+                  background: "#FAFAFA",
+                  outline: "none",
+                }}
+              >
+                <option value="">Select platform</option>
+                {PLATFORMS.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                color: "#AAA",
+                display: "block",
+                marginBottom: 5,
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+              }}
+            >
+              Brand guidelines
+            </label>
+            {brandList.length > 0 ? (
+              <div style={{ display: "flex", gap: 8 }}>
+                <select
+                  value={selectedBrand}
+                  onChange={(e) => {
+                    const n = e.target.value;
+                    setSelectedBrand(n);
+                    setBrandNotes(brands[n]?.notes || "");
+                    if (n) setClient(n);
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: "8px 12px",
+                    border: `1px solid ${selectedBrand ? "#6366F1" : "#EFEFEF"}`,
+                    borderRadius: 8,
+                    fontSize: 13,
+                    color: selectedBrand ? "#6366F1" : "#AAA",
+                    background: "#FAFAFA",
+                    outline: "none",
+                  }}
+                >
+                  <option value="">Select saved brand…</option>
+                  {brandList.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => setShowBrandMgr(true)}
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: 8,
+                    border: "1px solid #EFEFEF",
+                    background: "#fff",
+                    fontSize: 12,
+                    color: "#666",
+                    cursor: "pointer",
+                  }}
+                >
+                  Manage
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowBrandMgr(true)}
+                style={{
+                  width: "100%",
+                  padding: "9px",
+                  borderRadius: 8,
+                  border: "1px dashed #DDD",
+                  background: "#FAFAFA",
+                  fontSize: 13,
+                  color: "#888",
+                  cursor: "pointer",
+                }}
+              >
+                + Save a brand guideline
+              </button>
+            )}
+            {selectedBrand && brandNotes && (
+              <p
+                style={{
+                  fontSize: 11,
+                  color: "#6366F1",
+                  marginTop: 6,
+                  lineHeight: 1.4,
+                  background: "#F5F3FF",
+                  padding: "6px 10px",
+                  borderRadius: 6,
+                }}
+              >
+                Using: <strong>{selectedBrand}</strong> —{" "}
+                {brandNotes.length > 100
+                  ? brandNotes.slice(0, 100) + "…"
+                  : brandNotes}
+              </p>
+            )}
+          </div>
+          {!selectedBrand && (
+            <div>
+              <label
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: "#AAA",
+                  display: "block",
+                  marginBottom: 5,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                }}
+              >
+                Or enter brand notes manually
+              </label>
+              <textarea
+                value={brandNotes}
+                onChange={(e) => setBrandNotes(e.target.value)}
+                placeholder="e.g. Primary red #E63030, bold sans-serif, no lifestyle imagery…"
+                rows={2}
+                style={{
+                  width: "100%",
+                  padding: "8px 12px",
+                  border: "1px solid #EFEFEF",
+                  borderRadius: 8,
+                  fontSize: 13,
+                  color: "#222",
+                  background: "#FAFAFA",
+                  outline: "none",
+                  resize: "vertical",
+                  fontFamily: "inherit",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+          )}
+          <div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginBottom: 6,
+              }}
+            >
+              <label
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: "#AAA",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                }}
+              >
+                Pass threshold
+              </label>
+              <span style={{ fontSize: 12, fontWeight: 600, color: "#222" }}>
+                {threshold}/100
+              </span>
+            </div>
+            <input
+              type="range"
+              min={40}
+              max={90}
+              step={5}
+              value={threshold}
+              onChange={(e) => setThreshold(Number(e.target.value))}
+              style={{ width: "100%", accentColor: "#111" }}
+            />
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                fontSize: 10,
+                color: "#CCC",
+                marginTop: 2,
+              }}
+            >
+              <span>40 — lenient</span>
+              <span>90 — strict</span>
+            </div>
+          </div>
+        </div>
+
+        {/* SINGLE MODE */}
+        {mode === "single" && (
+          <>
+            {!single && (
+              <UploadZone
+                onFile={(f) => {
+                  setSingle(f);
+                  setSingleResult(null);
+                  setError(null);
+                }}
+              />
+            )}
+            {single && !singleResult && (
+              <>
+                <CreativePreview
+                  creative={single}
+                  onRemove={() => {
+                    setSingle(null);
+                    setSingleResult(null);
+                  }}
+                />
+                <button
+                  onClick={runSingle}
+                  disabled={singleAnalysing}
+                  style={{
+                    width: "100%",
+                    padding: 13,
+                    borderRadius: 12,
+                    border: "none",
+                    background: singleAnalysing ? "#F5F5F5" : "#111",
+                    color: singleAnalysing ? "#AAA" : "#fff",
+                    fontSize: 14,
+                    fontWeight: 600,
+                    cursor: singleAnalysing ? "not-allowed" : "pointer",
+                    marginTop: 10,
+                  }}
+                >
+                  {singleAnalysing ? "Analysing…" : "Analyse creative"}
+                </button>
+              </>
+            )}
+            {singleResult && (
+              <SingleResult
+                creative={single}
+                result={singleResult}
+                threshold={threshold}
+                onReset={() => {
+                  setSingle(null);
+                  setSingleResult(null);
+                }}
+                onExport={() => exportReport([{ result: singleResult }])}
+              />
+            )}
+          </>
+        )}
+
+        {/* AB MODE */}
+        {mode === "ab" && (
+          <>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  creatives.length <= 2 ? "1fr 1fr" : "1fr 1fr 1fr",
+                gap: 10,
+                marginBottom: "1rem",
+              }}
+            >
+              {creatives.map((c, i) =>
+                c ? (
+                  <div key={i}>
+                    <CreativePreview
+                      creative={c}
+                      onRemove={() =>
+                        setCreatives((prev) => {
+                          const n = [...prev];
+                          n[i] = null;
+                          return n;
+                        })
+                      }
+                      label={LABELS[i]}
+                      labelColor={LABEL_COLORS[i]}
+                      compact
+                    />
+                    {c.result && (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          padding: "8px 10px",
+                          background: "#fff",
+                          border: "1px solid #EFEFEF",
+                          borderTop: "none",
+                          borderRadius: "0 0 14px 14px",
+                        }}
+                      >
+                        <RadialScore
+                          score={c.result.overall_score}
+                          size={38}
+                          color={LABEL_COLORS[i]}
+                        />
+                        <div style={{ flex: 1 }}>
+                          <p
+                            style={{
+                              fontSize: 12,
+                              fontWeight: 700,
+                              color: LABEL_COLORS[i],
+                              margin: 0,
+                            }}
+                          >
+                            {c.result.overall_score}/100
+                          </p>
+                          <p style={{ fontSize: 10, color: "#888", margin: 0 }}>
+                            {verdictText(c.result.overall_score)}
+                          </p>
+                        </div>
+                        <span
+                          style={{
+                            fontSize: 9,
+                            fontWeight: 700,
+                            padding: "2px 7px",
+                            borderRadius: 20,
+                            background: c.result.pass ? "#F0FDF4" : "#FEF2F2",
+                            color: c.result.pass ? "#15803D" : "#B91C1C",
+                          }}
+                        >
+                          {c.result.pass ? "PASS" : "FAIL"}
+                        </span>
+                      </div>
+                    )}
+                    {abAnalysing === i && (
+                      <div
+                        style={{
+                          padding: "8px",
+                          textAlign: "center",
+                          background: "#FAFAFA",
+                          borderRadius: "0 0 14px 14px",
+                          border: "1px solid #EFEFEF",
+                          borderTop: "none",
+                        }}
+                      >
+                        <span style={{ fontSize: 11, color: "#AAA" }}>
+                          Analysing…
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <UploadZone
+                    key={i}
+                    onFile={(f) =>
+                      setCreatives((prev) => {
+                        const n = [...prev];
+                        n[i] = f;
+                        return n;
+                      })
+                    }
+                    label={LABELS[i]}
+                    labelColor={LABEL_COLORS[i]}
+                  />
+                ),
+              )}
+            </div>
+            <div style={{ display: "flex", gap: 8, marginBottom: "1rem" }}>
+              {creatives.length < 4 && (
+                <button
+                  onClick={() => setCreatives((prev) => [...prev, null])}
+                  style={{
+                    flex: 1,
+                    padding: "10px",
+                    borderRadius: 10,
+                    border: "1px dashed #DDD",
+                    background: "#fff",
+                    fontSize: 13,
+                    color: "#888",
+                    cursor: "pointer",
+                  }}
+                >
+                  + Add {LABELS[creatives.length]}
+                </button>
+              )}
+              <button
+                onClick={runAB}
+                disabled={
+                  creatives.filter(Boolean).length < 2 || abAnalysing !== null
+                }
+                style={{
+                  flex: 2,
+                  padding: "10px",
+                  borderRadius: 10,
+                  border: "none",
+                  background:
+                    creatives.filter(Boolean).length < 2 || abAnalysing !== null
+                      ? "#F5F5F5"
+                      : "#111",
+                  color:
+                    creatives.filter(Boolean).length < 2 || abAnalysing !== null
+                      ? "#AAA"
+                      : "#fff",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                {abAnalysing !== null
+                  ? `Analysing ${LABELS[abAnalysing]}…`
+                  : `Analyse all (${creatives.filter(Boolean).length})`}
+              </button>
+            </div>
+            {analysedCreatives.length >= 2 && (
+              <ABResults
+                analysedCreatives={analysedCreatives}
+                winner={winner}
+                threshold={threshold}
+                onExport={() => exportReport(analysedCreatives)}
+              />
+            )}
+          </>
+        )}
+
+        {error && (
+          <div
+            style={{
+              marginTop: 10,
+              padding: "12px 16px",
+              background: "#FEF2F2",
+              borderRadius: 10,
+              fontSize: 13,
+              color: "#B91C1C",
+            }}
+          >
+            {error}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SingleResult({ creative, result, threshold, onReset, onExport }) {
+  const [tab, setTab] = useState("analysis");
+  const passed = result.pass;
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: "1.25rem",
+        marginTop: "1rem",
+      }}
+    >
+      <div
+        style={{
+          borderRadius: 16,
+          padding: "1.25rem 1.5rem",
+          background: passed ? "#F0FDF4" : "#FEF2F2",
+          border: `1px solid ${passed ? "#BBF7D0" : "#FECACA"}`,
+          display: "flex",
+          alignItems: "center",
+          gap: "1.25rem",
+        }}
+      >
+        <RadialScore score={result.overall_score} size={72} />
+        <div style={{ flex: 1 }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              alignItems: "center",
+              marginBottom: 4,
+            }}
+          >
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                padding: "2px 9px",
+                borderRadius: 20,
+                background: passed ? "#22C55E" : "#EF4444",
+                color: "#fff",
+              }}
+            >
+              {passed ? "PASS" : "FAIL"}
+            </span>
+            <span style={{ fontSize: 11, color: "#AAA" }}>
+              threshold {threshold}
+            </span>
+          </div>
+          <p
+            style={{
+              fontSize: 15,
+              fontWeight: 600,
+              color: "#111",
+              margin: "0 0 2px",
+            }}
+          >
+            {result.overall_score}/100 — {result.overall_verdict}
+          </p>
+          <p style={{ fontSize: 12, color: "#888", margin: 0 }}>
+            {verdictText(result.overall_score)}
+          </p>
+        </div>
+      </div>
+
+      {/* Creative image in results */}
+      {creative && <CreativePreview creative={creative} />}
+
+      <div
+        style={{
+          display: "flex",
+          gap: 6,
+          background: "#EFEFEF",
+          borderRadius: 10,
+          padding: 4,
+        }}
+      >
+        {[
+          ["analysis", "Analysis"],
+          ["heatmap", "Attention map"],
+        ].map(([t, l]) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            style={{
+              flex: 1,
+              padding: "7px 0",
+              borderRadius: 8,
+              border: "none",
+              fontSize: 12,
+              fontWeight: 500,
+              background: tab === t ? "#fff" : "transparent",
+              color: tab === t ? "#111" : "#888",
+              boxShadow: tab === t ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+              cursor: "pointer",
+            }}
+          >
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {tab === "analysis" && (
+        <>
+          <div>
+            <p
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                color: "#BBB",
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                marginBottom: 10,
+              }}
+            >
+              Dimension breakdown
+            </p>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 8,
+              }}
+            >
+              {DIMS.map((d) => {
+                const dim = result.dimensions[d.key];
+                const { bg, text } = scoreBg(dim.score);
+                return (
+                  <div
+                    key={d.key}
+                    style={{
+                      background: "#fff",
+                      border: "1px solid #F0F0F0",
+                      borderRadius: 12,
+                      padding: "12px 14px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        marginBottom: 6,
+                      }}
+                    >
+                      <span
+                        style={{ fontSize: 12, fontWeight: 600, color: "#222" }}
+                      >
+                        {d.name}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          padding: "2px 7px",
+                          borderRadius: 20,
+                          background: bg,
+                          color: text,
+                        }}
+                      >
+                        {dim.score}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        height: 3,
+                        background: "#F0F0F0",
+                        borderRadius: 2,
+                        marginBottom: 7,
+                      }}
+                    >
+                      <div
+                        style={{
+                          height: 3,
+                          borderRadius: 2,
+                          width: `${dim.score}%`,
+                          background: scoreColor(dim.score),
+                          transition: "width 0.7s ease",
+                        }}
+                      />
+                    </div>
+                    <p
+                      style={{
+                        fontSize: 12,
+                        color: "#777",
+                        lineHeight: 1.5,
+                        margin: 0,
+                      }}
+                    >
+                      {dim.recommendation}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div
+            style={{
+              background: "#fff",
+              border: "1px solid #F0F0F0",
+              borderRadius: 14,
+              padding: "1.25rem",
+            }}
+          >
+            <p
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                color: "#BBB",
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                marginBottom: 12,
+              }}
+            >
+              Top fixes
+            </p>
+            {(result.top_fixes || []).map((fix, i) => {
+              const colors = ["#EF4444", "#F59E0B", "#6366F1"];
+              const labels = ["Critical", "Important", "Nice to have"];
+              return (
+                <div
+                  key={i}
+                  style={{
+                    display: "flex",
+                    gap: 10,
+                    paddingBottom: i < 2 ? 12 : 0,
+                    marginBottom: i < 2 ? 12 : 0,
+                    borderBottom: i < 2 ? "1px solid #F8F8F8" : "none",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      padding: "2px 7px",
+                      borderRadius: 20,
+                      background: colors[i] + "18",
+                      color: colors[i],
+                      flexShrink: 0,
+                      height: "fit-content",
+                    }}
+                  >
+                    {labels[i]}
+                  </span>
+                  <p
+                    style={{
+                      fontSize: 13,
+                      color: "#333",
+                      lineHeight: 1.55,
+                      margin: 0,
+                    }}
+                  >
+                    {fix}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {tab === "heatmap" && (
+        <div
+          style={{
+            background: "#fff",
+            border: "1px solid #F0F0F0",
+            borderRadius: 14,
+            padding: "1.25rem",
+          }}
+        >
+          <p
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              color: "#BBB",
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              marginBottom: 10,
+            }}
+          >
+            Attention map
+          </p>
+          {creative?.type === "video" ? (
+            <p
+              style={{
+                fontSize: 13,
+                color: "#AAA",
+                textAlign: "center",
+                padding: "2rem 0",
+              }}
+            >
+              Attention mapping is for static images only
+            </p>
+          ) : (
+            <>
+              <HeatmapCanvas
+                dataUrl={creative?.dataUrl}
+                zones={result.attention_zones || []}
+              />
+              <div
+                style={{
+                  marginTop: 12,
+                  display: "flex",
+                  gap: 8,
+                  flexWrap: "wrap",
+                }}
+              >
+                {(result.attention_zones || []).map((z) => (
+                  <div
+                    key={z.priority}
+                    style={{
+                      flex: 1,
+                      minWidth: 140,
+                      background: "#FAFAFA",
+                      border: "1px solid #F0F0F0",
+                      borderRadius: 8,
+                      padding: "8px 12px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        marginBottom: 4,
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 16,
+                          height: 16,
+                          borderRadius: "50%",
+                          background:
+                            z.priority === 1
+                              ? "#EF4444"
+                              : z.priority === 2
+                                ? "#F59E0B"
+                                : "#EAB308",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 9,
+                            fontWeight: 800,
+                            color: "#fff",
+                          }}
+                        >
+                          {z.priority}
+                        </span>
+                      </div>
+                      <span
+                        style={{ fontSize: 12, fontWeight: 600, color: "#222" }}
+                      >
+                        {z.label}
+                      </span>
+                    </div>
+                    <p
+                      style={{
+                        fontSize: 11,
+                        color: "#888",
+                        margin: 0,
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      {z.note}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <p
+                style={{
+                  fontSize: 10,
+                  color: "#CCC",
+                  marginTop: 10,
+                  textAlign: "center",
+                }}
+              >
+                Zones based on AI visual analysis — not pixel-level eye tracking
+              </p>
+            </>
+          )}
+        </div>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        <button
+          onClick={onReset}
+          style={{
+            padding: "12px",
+            borderRadius: 10,
+            border: "1px solid #EFEFEF",
+            background: "#fff",
+            fontSize: 13,
+            fontWeight: 500,
+            color: "#444",
+            cursor: "pointer",
+          }}
+        >
+          Analyse another
+        </button>
+        <button
+          onClick={onExport}
+          style={{
+            padding: "12px",
+            borderRadius: 10,
+            border: "none",
+            background: "#111",
+            fontSize: 13,
+            fontWeight: 500,
+            color: "#fff",
+            cursor: "pointer",
+          }}
+        >
+          Export report
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ABResults({ analysedCreatives, winner, threshold, onExport }) {
+  const [activeTab, setActiveTab] = useState("comparison");
+  const [detailIdx, setDetailIdx] = useState(analysedCreatives[0]?.index ?? 0);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+      {winner && (
+        <div
+          style={{
+            borderRadius: 14,
+            padding: "1rem 1.25rem",
+            background: "#FFFBEB",
+            border: "1px solid #FDE68A",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+          }}
+        >
+          <div
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: "50%",
+              background: LABEL_COLORS[winner.index],
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <span style={{ fontSize: 13, fontWeight: 800, color: "#fff" }}>
+              {LABELS[winner.index]}
+            </span>
+          </div>
+          <div style={{ flex: 1 }}>
+            <p
+              style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: "#92400E",
+                margin: 0,
+              }}
+            >
+              Creative {LABELS[winner.index]} leads —{" "}
+              {winner.result.overall_score}/100
+            </p>
+            <p style={{ fontSize: 12, color: "#B45309", margin: 0 }}>
+              {winner.result.overall_verdict}
+            </p>
+          </div>
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              padding: "3px 10px",
+              borderRadius: 20,
+              background: "#F59E0B",
+              color: "#fff",
+            }}
+          >
+            WINNER
+          </span>
+        </div>
+      )}
+      <div
+        style={{
+          display: "flex",
+          gap: 6,
+          background: "#EFEFEF",
+          borderRadius: 10,
+          padding: 4,
+        }}
+      >
+        {[
+          ["comparison", "Side by side"],
+          ["heatmaps", "Attention maps"],
+          ["detail", "Drill down"],
+        ].map(([t, l]) => (
+          <button
+            key={t}
+            onClick={() => setActiveTab(t)}
+            style={{
+              flex: 1,
+              padding: "7px 0",
+              borderRadius: 8,
+              border: "none",
+              fontSize: 12,
+              fontWeight: 500,
+              background: activeTab === t ? "#fff" : "transparent",
+              color: activeTab === t ? "#111" : "#888",
+              boxShadow:
+                activeTab === t ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+              cursor: "pointer",
+            }}
+          >
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === "comparison" && (
+        <div
+          style={{
+            background: "#fff",
+            border: "1px solid #F0F0F0",
+            borderRadius: 14,
+            padding: "1.25rem",
+          }}
+        >
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: `2fr ${analysedCreatives.map(() => "1fr").join(" ")}`,
+              gap: 8,
+              marginBottom: 16,
+              paddingBottom: 14,
+              borderBottom: "1px solid #F5F5F5",
+            }}
+          >
+            <div />
+            {analysedCreatives.map((c) => (
+              <div key={c.index} style={{ textAlign: "center" }}>
+                {c.type === "image" && c.dataUrl ? (
+                  <img
+                    src={c.dataUrl}
+                    alt=""
+                    style={{
+                      width: "100%",
+                      height: 60,
+                      objectFit: "cover",
+                      borderRadius: 6,
+                      marginBottom: 6,
+                    }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      height: 60,
+                      background: "#F5F5F5",
+                      borderRadius: 6,
+                      marginBottom: 6,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <span style={{ fontSize: 10, color: "#AAA" }}>Video</span>
+                  </div>
+                )}
+                <div
+                  style={{
+                    width: 20,
+                    height: 20,
+                    borderRadius: "50%",
+                    background: LABEL_COLORS[c.index],
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    margin: "0 auto 4px",
+                  }}
+                >
+                  <span style={{ fontSize: 9, fontWeight: 800, color: "#fff" }}>
+                    {LABELS[c.index]}
+                  </span>
+                </div>
+                <p
+                  style={{
+                    fontSize: 16,
+                    fontWeight: 700,
+                    color: LABEL_COLORS[c.index],
+                    margin: 0,
+                  }}
+                >
+                  {c.result.overall_score}
+                </p>
+                <span
+                  style={{
+                    fontSize: 9,
+                    fontWeight: 700,
+                    padding: "2px 6px",
+                    borderRadius: 20,
+                    background: c.result.pass ? "#F0FDF4" : "#FEF2F2",
+                    color: c.result.pass ? "#15803D" : "#B91C1C",
+                  }}
+                >
+                  {c.result.pass ? "PASS" : "FAIL"}
+                </span>
+              </div>
+            ))}
+          </div>
+          {DIMS.map((d) => {
+            const scores = analysedCreatives.map(
+              (c) => c.result.dimensions[d.key].score,
+            );
+            const maxScore = Math.max(...scores);
+            return (
+              <div
+                key={d.key}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: `2fr ${analysedCreatives.map(() => "1fr").join(" ")}`,
+                  gap: 8,
+                  paddingBottom: 10,
+                  marginBottom: 10,
+                  borderBottom: "1px solid #F8F8F8",
+                  alignItems: "center",
+                }}
+              >
+                <span style={{ fontSize: 12, color: "#555", fontWeight: 500 }}>
+                  {d.name}
+                </span>
+                {analysedCreatives.map((c) => {
+                  const s = c.result.dimensions[d.key].score;
+                  const isWin = s === maxScore;
+                  return (
+                    <div key={c.index} style={{ textAlign: "center" }}>
+                      <span
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 700,
+                          color: isWin ? LABEL_COLORS[c.index] : "#CCC",
+                        }}
+                      >
+                        {s}
+                      </span>
+                      {isWin && (
+                        <div
+                          style={{
+                            width: 4,
+                            height: 4,
+                            borderRadius: "50%",
+                            background: LABEL_COLORS[c.index],
+                            margin: "3px auto 0",
+                          }}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {activeTab === "heatmaps" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {analysedCreatives.map((c) =>
+            c.type === "image" ? (
+              <div
+                key={c.index}
+                style={{
+                  background: "#fff",
+                  border: "1px solid #F0F0F0",
+                  borderRadius: 14,
+                  padding: "1.25rem",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    marginBottom: 12,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: "50%",
+                      background: LABEL_COLORS[c.index],
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <span
+                      style={{ fontSize: 10, fontWeight: 800, color: "#fff" }}
+                    >
+                      {LABELS[c.index]}
+                    </span>
+                  </div>
+                  <span
+                    style={{ fontSize: 13, fontWeight: 600, color: "#222" }}
+                  >
+                    Creative {LABELS[c.index]} — Attention map
+                  </span>
+                </div>
+                <HeatmapCanvas
+                  dataUrl={c.dataUrl}
+                  zones={c.result.attention_zones || []}
+                />
+                <div
+                  style={{
+                    marginTop: 10,
+                    display: "flex",
+                    gap: 8,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  {(c.result.attention_zones || []).map((z) => (
+                    <div
+                      key={z.priority}
+                      style={{
+                        flex: 1,
+                        minWidth: 120,
+                        background: "#FAFAFA",
+                        borderRadius: 8,
+                        padding: "7px 10px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 5,
+                          marginBottom: 3,
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 14,
+                            height: 14,
+                            borderRadius: "50%",
+                            background:
+                              z.priority === 1
+                                ? "#EF4444"
+                                : z.priority === 2
+                                  ? "#F59E0B"
+                                  : "#EAB308",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: 8,
+                              fontWeight: 800,
+                              color: "#fff",
+                            }}
+                          >
+                            {z.priority}
+                          </span>
+                        </div>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: "#222",
+                          }}
+                        >
+                          {z.label}
+                        </span>
+                      </div>
+                      <p style={{ fontSize: 10, color: "#888", margin: 0 }}>
+                        {z.note}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div
+                key={c.index}
+                style={{
+                  background: "#FAFAFA",
+                  border: "1px solid #F0F0F0",
+                  borderRadius: 14,
+                  padding: "1.25rem",
+                  textAlign: "center",
+                }}
+              >
+                <span style={{ fontSize: 12, color: "#AAA" }}>
+                  Attention mapping not available for video
+                </span>
+              </div>
+            ),
+          )}
+          <p style={{ fontSize: 10, color: "#CCC", textAlign: "center" }}>
+            Zones based on AI visual analysis — not pixel-level eye tracking
+          </p>
+        </div>
+      )}
+
+      {activeTab === "detail" && (
+        <div>
+          <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+            {analysedCreatives.map((c) => (
+              <button
+                key={c.index}
+                onClick={() => setDetailIdx(c.index)}
+                style={{
+                  padding: "6px 14px",
+                  borderRadius: 8,
+                  border: `1px solid ${detailIdx === c.index ? LABEL_COLORS[c.index] : "#EFEFEF"}`,
+                  background:
+                    detailIdx === c.index
+                      ? LABEL_COLORS[c.index] + "12"
+                      : "#fff",
+                  color: detailIdx === c.index ? LABEL_COLORS[c.index] : "#888",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Creative {LABELS[c.index]}
+              </button>
+            ))}
+          </div>
+          {(() => {
+            const c = analysedCreatives.find((c) => c.index === detailIdx);
+            if (!c) return null;
+            const others = analysedCreatives.filter(
+              (o) => o.index !== detailIdx,
+            );
+            return (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <CreativePreview creative={c} compact />
+                {DIMS.map((d) => {
+                  const dim = c.result.dimensions[d.key];
+                  const { bg, text } = scoreBg(dim.score);
+                  return (
+                    <div
+                      key={d.key}
+                      style={{
+                        background: "#fff",
+                        border: "1px solid #F0F0F0",
+                        borderRadius: 12,
+                        padding: "12px 14px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          marginBottom: 8,
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: "#222",
+                          }}
+                        >
+                          {d.name}
+                        </span>
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: 6,
+                            alignItems: "center",
+                          }}
+                        >
+                          {others.map((o) => {
+                            const diff =
+                              dim.score - o.result.dimensions[d.key].score;
+                            return (
+                              <span
+                                key={o.index}
+                                style={{
+                                  fontSize: 10,
+                                  color: diff >= 0 ? "#22C55E" : "#EF4444",
+                                  fontWeight: 600,
+                                }}
+                              >
+                                vs {LABELS[o.index]}: {diff >= 0 ? "+" : ""}
+                                {diff}
+                              </span>
+                            );
+                          })}
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              padding: "2px 7px",
+                              borderRadius: 20,
+                              background: bg,
+                              color: text,
+                            }}
+                          >
+                            {dim.score}
+                          </span>
+                        </div>
+                      </div>
+                      <div
+                        style={{
+                          height: 3,
+                          background: "#F0F0F0",
+                          borderRadius: 2,
+                          marginBottom: 8,
+                        }}
+                      >
+                        <div
+                          style={{
+                            height: 3,
+                            borderRadius: 2,
+                            width: `${dim.score}%`,
+                            background: scoreColor(dim.score),
+                            transition: "width 0.7s ease",
+                          }}
+                        />
+                      </div>
+                      <p
+                        style={{
+                          fontSize: 12,
+                          color: "#777",
+                          lineHeight: 1.5,
+                          margin: 0,
+                        }}
+                      >
+                        {dim.recommendation}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      <button
+        onClick={onExport}
+        style={{
+          width: "100%",
+          padding: "12px",
+          borderRadius: 10,
+          border: "none",
+          background: "#111",
+          fontSize: 13,
+          fontWeight: 600,
+          color: "#fff",
+          cursor: "pointer",
+        }}
+      >
+        Export full comparison report
+      </button>
+    </div>
+  );
+}
