@@ -1707,7 +1707,11 @@ Be specific. Reference actual elements visible. No generic advice.`;
           }}
         >
           <div
-            style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr 1fr",
+              gap: 10,
+            }}
           >
             <div>
               <label
@@ -1776,7 +1780,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                 ))}
               </select>
             </div>
-            <div style={{ gridColumn: "1 / -1" }}>
+            <div>
               <label
                 style={{
                   fontSize: 10,
@@ -1804,27 +1808,13 @@ Be specific. Reference actual elements visible. No generic advice.`;
                   outline: "none",
                 }}
               >
-                <option value="">Select industry (enables benchmarks)</option>
+                <option value="">Select industry…</option>
                 {INDUSTRIES.map((i) => (
                   <option key={i} value={i}>
                     {i}
                   </option>
                 ))}
               </select>
-              {industry && (
-                <p
-                  style={{
-                    fontSize: 11,
-                    color: "#6366F1",
-                    marginTop: 5,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 4,
-                  }}
-                >
-                  <span>✦</span> Industry benchmarks will be included in results
-                </p>
-              )}
             </div>
           </div>
           <div>
