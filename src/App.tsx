@@ -956,6 +956,227 @@ interface AnalysedCreative extends CreativeFile {
   index: number;
 }
 
+function ModelSelector({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const selected = MODELS.find((m) => m.id === value) || MODELS[1];
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node))
+        setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const creditColor = (credits: number) => {
+    if (credits <= 1) return { bg: "#F0FDF4", text: "#15803D" };
+    if (credits <= 3) return { bg: "#FFFBEB", text: "#B45309" };
+    if (credits <= 4) return { bg: "#EEF2FF", text: "#4338CA" };
+    return { bg: "#FEF2F2", text: "#B91C1C" };
+  };
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      {/* Trigger */}
+      <div
+        onClick={() => setOpen((o) => !o)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "9px 12px",
+          border: `1px solid ${open ? "#6366F1" : "#EFEFEF"}`,
+          borderRadius: 8,
+          background: "#FAFAFA",
+          cursor: "pointer",
+          transition: "border-color 0.15s",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 6,
+              background: "#111",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <span style={{ fontSize: 12, color: "#fff", fontWeight: 700 }}>
+              A
+            </span>
+          </div>
+          <span style={{ fontSize: 13, fontWeight: 500, color: "#222" }}>
+            {selected.name}
+          </span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              padding: "2px 8px",
+              borderRadius: 20,
+              background: creditColor(selected.credits).bg,
+              color: creditColor(selected.credits).text,
+            }}
+          >
+            {selected.credits} credit{selected.credits !== 1 ? "s" : ""}
+          </span>
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#AAA"
+            strokeWidth="2.5"
+            style={{
+              transform: open ? "rotate(180deg)" : "rotate(0deg)",
+              transition: "transform 0.2s",
+            }}
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </div>
+      </div>
+
+      {/* Dropdown panel */}
+      {open && (
+        <div
+          style={{
+            position: "absolute",
+            top: "calc(100% + 6px)",
+            left: 0,
+            right: 0,
+            background: "#fff",
+            border: "1px solid #EFEFEF",
+            borderRadius: 10,
+            boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
+            zIndex: 50,
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              padding: "6px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 2,
+            }}
+          >
+            {MODELS.map((m) => {
+              const isSelected = m.id === value;
+              const { bg, text } = creditColor(m.credits);
+              return (
+                <div
+                  key={m.id}
+                  onClick={() => {
+                    onChange(m.id);
+                    setOpen(false);
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "9px 10px",
+                    borderRadius: 7,
+                    cursor: "pointer",
+                    background: isSelected ? "#F5F3FF" : "transparent",
+                    transition: "background 0.1s",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isSelected)
+                      (e.currentTarget as HTMLDivElement).style.background =
+                        "#FAFAFA";
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isSelected)
+                      (e.currentTarget as HTMLDivElement).style.background =
+                        "transparent";
+                  }}
+                >
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: 10 }}
+                  >
+                    <div
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 6,
+                        background: isSelected ? "#6366F1" : "#111",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        transition: "background 0.15s",
+                      }}
+                    >
+                      <span
+                        style={{ fontSize: 12, color: "#fff", fontWeight: 700 }}
+                      >
+                        A
+                      </span>
+                    </div>
+                    <div>
+                      <p
+                        style={{
+                          fontSize: 13,
+                          fontWeight: isSelected ? 600 : 500,
+                          color: isSelected ? "#6366F1" : "#222",
+                          margin: 0,
+                        }}
+                      >
+                        {m.name}
+                      </p>
+                    </div>
+                  </div>
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: 6 }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        padding: "2px 8px",
+                        borderRadius: 20,
+                        background: bg,
+                        color: text,
+                      }}
+                    >
+                      {m.credits} credit{m.credits !== 1 ? "s" : ""}
+                    </span>
+                    {isSelected && (
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#6366F1"
+                        strokeWidth="2.5"
+                      >
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [mode, setMode] = useState("single");
   const [showBrandMgr, setShowBrandMgr] = useState(false);
@@ -1416,58 +1637,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
             >
               Model
             </label>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <select
-                value={selectedModel}
-                onChange={(e) => setSelectedModel(e.target.value)}
-                style={{
-                  flex: 1,
-                  padding: "8px 12px",
-                  border: "1px solid #EFEFEF",
-                  borderRadius: 8,
-                  fontSize: 13,
-                  color: "#222",
-                  background: "#FAFAFA",
-                  outline: "none",
-                }}
-              >
-                {MODELS.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 5,
-                  padding: "8px 12px",
-                  borderRadius: 8,
-                  background: "#F5F3FF",
-                  border: "1px solid #E0DBFF",
-                  flexShrink: 0,
-                }}
-              >
-                <div
-                  style={{
-                    width: 7,
-                    height: 7,
-                    borderRadius: "50%",
-                    background: "#6366F1",
-                  }}
-                />
-                <span
-                  style={{ fontSize: 12, fontWeight: 700, color: "#6366F1" }}
-                >
-                  {MODELS.find((m) => m.id === selectedModel)?.credits} credit
-                  {MODELS.find((m) => m.id === selectedModel)?.credits !== 1
-                    ? "s"
-                    : ""}{" "}
-                  per analysis
-                </span>
-              </div>
-            </div>
+            <ModelSelector value={selectedModel} onChange={setSelectedModel} />
           </div>
 
           {/* Brand selection */}
