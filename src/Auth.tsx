@@ -59,7 +59,7 @@ export default function Auth() {
   const handleGoogle = async () => {
     await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: "https://signal.nofluff.in" },
+      options: { redirectTo: "https://preflyght.nofluff.in" },
     });
   };
 
