@@ -22,6 +22,13 @@ const PLATFORMS = [
 const LABELS = ["A", "B", "C", "D"];
 const LABEL_COLORS = ["#6366F1", "#F59E0B", "#10B981", "#EF4444"];
 
+const MODELS = [
+  { id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5", credits: 1 },
+  { id: "claude-sonnet-4-5", name: "Claude Sonnet 4.5", credits: 3 },
+  { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", credits: 4 },
+  { id: "claude-opus-4-6", name: "Claude Opus 4.6", credits: 8 },
+];
+
 function scoreColor(s: number) {
   return s >= 75 ? "#22C55E" : s >= 50 ? "#F59E0B" : "#EF4444";
 }
@@ -953,6 +960,7 @@ export default function App() {
   const [platform, setPlatform] = useState("");
   const [threshold, setThreshold] = useState(65);
   const [error, setError] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState(MODELS[1].id); // default: Sonnet 4.5
 
   const [single, setSingle] = useState<CreativeFile | null>(null);
   const [singleResult, setSingleResult] = useState<AnalysisResult | null>(null);
@@ -1048,7 +1056,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "claude-sonnet-4-5",
+        model: selectedModel,
         max_tokens: 2000,
         system: buildSystem(isVideo),
         messages,
@@ -1385,6 +1393,73 @@ Be specific. Reference actual elements visible. No generic advice.`;
                   </option>
                 ))}
               </select>
+            </div>
+          </div>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <label
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                color: "#AAA",
+                display: "block",
+                marginBottom: 5,
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+              }}
+            >
+              Model
+            </label>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <select
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value)}
+                style={{
+                  flex: 1,
+                  padding: "8px 12px",
+                  border: "1px solid #EFEFEF",
+                  borderRadius: 8,
+                  fontSize: 13,
+                  color: "#222",
+                  background: "#FAFAFA",
+                  outline: "none",
+                }}
+              >
+                {MODELS.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "8px 12px",
+                  borderRadius: 8,
+                  background: "#F5F3FF",
+                  border: "1px solid #E0DBFF",
+                  flexShrink: 0,
+                }}
+              >
+                <div
+                  style={{
+                    width: 7,
+                    height: 7,
+                    borderRadius: "50%",
+                    background: "#6366F1",
+                  }}
+                />
+                <span
+                  style={{ fontSize: 12, fontWeight: 700, color: "#6366F1" }}
+                >
+                  {MODELS.find((m) => m.id === selectedModel)?.credits} credit
+                  {MODELS.find((m) => m.id === selectedModel)?.credits !== 1
+                    ? "s"
+                    : ""}{" "}
+                  per analysis
+                </span>
+              </div>
             </div>
           </div>
 
