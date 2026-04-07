@@ -1305,11 +1305,15 @@ Be specific. Reference actual elements visible. No generic advice.`;
       .join("")
       .trim();
     console.log("Raw API response:", rawText);
-    const s = rawText.indexOf("{"),
-      e2 = rawText.lastIndexOf("}");
-    if (s === -1 || e2 === -1) throw new Error("No JSON found in response");
-    const parsed = JSON.parse(rawText.slice(s, e2 + 1));
-    console.log("Parsed result:", parsed);
+    // REPLACE WITH:
+    const start = rawText.indexOf("{"),
+      end = rawText.lastIndexOf("}");
+    if (start === -1 || end === -1)
+      throw new Error("No JSON found in response");
+    const parsed = JSON.parse(rawText.slice(start, end + 1));
+    if (!parsed.dimensions || !parsed.overall_score) {
+      throw new Error("Incomplete analysis returned — please try again.");
+    }
     return parsed;
   };
 
