@@ -56,9 +56,10 @@ export default function Auth() {
     setLoading(false);
   };
 
-    const { error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: { redirectTo: "https://signal.nofluff.in" },
+  const handleGoogle = async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: "https://signal.nofluff.in" },
     });
   };
 
