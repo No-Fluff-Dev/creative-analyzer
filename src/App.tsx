@@ -1304,10 +1304,13 @@ Be specific. Reference actual elements visible. No generic advice.`;
       .map((b: { text?: string }) => b.text || "")
       .join("")
       .trim();
+    console.log("Raw API response:", rawText);
     const s = rawText.indexOf("{"),
       e2 = rawText.lastIndexOf("}");
     if (s === -1 || e2 === -1) throw new Error("No JSON found in response");
-    return JSON.parse(rawText.slice(s, e2 + 1));
+    const parsed = JSON.parse(rawText.slice(s, e2 + 1));
+    console.log("Parsed result:", parsed);
+    return parsed;
   };
 
   const runSingle = async () => {
