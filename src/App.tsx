@@ -411,6 +411,11 @@ function BrandManager({
               background: "#fff",
               cursor: "pointer",
               fontSize: 14,
+              color: "#555",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              lineHeight: 1,
             }}
           >
             ✕
@@ -574,6 +579,7 @@ function BrandManager({
               outline: "none",
               background: "#fff",
               boxSizing: "border-box",
+              color: "#111",
             }}
           />
           <textarea
@@ -593,6 +599,7 @@ function BrandManager({
               background: "#fff",
               boxSizing: "border-box",
               marginBottom: 8,
+              color: "#111",
             }}
           />
 
