@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { supabase } from "./supabase";
+import { generatePDF } from "./generatePDF";
 
 const DIMS = [
   { key: "visual_hierarchy", name: "Visual hierarchy" },
@@ -2103,9 +2104,24 @@ Be specific. Reference actual elements visible. No generic advice.`;
                   setSingle(null);
                   setSingleResult(null);
                 }}
-                onExport={() =>
-                  exportReport([{ ...single!, result: singleResult, index: 0 }])
-                }
+                onExport={async () => {
+                  const heatmapCanvas = document.querySelector(
+                    "canvas",
+                  ) as HTMLCanvasElement | null;
+                  await generatePDF({
+                    creative: single,
+                    result: singleResult,
+                    heatmapDataUrl: heatmapCanvas?.toDataURL("image/png"),
+                    client,
+                    platform,
+                    industry,
+                    threshold,
+                    model:
+                      MODELS.find((m) => m.id === selectedModel)?.name ||
+                      selectedModel,
+                    date: new Date().toLocaleDateString("en-GB"),
+                  });
+                }}
               />
             )}
           </>
@@ -2991,7 +3007,7 @@ function SingleResult({
             cursor: "pointer",
           }}
         >
-          Export report
+          Export PDF
         </button>
       </div>
     </div>
