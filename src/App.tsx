@@ -22,40 +22,48 @@ const PLATFORMS = [
 const LABELS = ["A", "B", "C", "D"];
 const LABEL_COLORS = ["#6366F1", "#F59E0B", "#10B981", "#EF4444"];
 
-function scoreColor(s) {
+function scoreColor(s: number) {
   return s >= 75 ? "#22C55E" : s >= 50 ? "#F59E0B" : "#EF4444";
 }
-function scoreBg(s) {
+function scoreBg(s: number) {
   if (s >= 75) return { bg: "#F0FDF4", text: "#15803D" };
   if (s >= 50) return { bg: "#FFFBEB", text: "#B45309" };
   return { bg: "#FEF2F2", text: "#B91C1C" };
 }
-function verdictText(s) {
+function verdictText(s: number) {
   if (s >= 80) return "Ready to test";
   if (s >= 65) return "Minor fixes needed";
   if (s >= 50) return "Needs work";
   return "Rework recommended";
 }
 
-function toBase64(file) {
+function toBase64(file: File): Promise<string> {
   return new Promise((res, rej) => {
     const r = new FileReader();
-    r.onload = () => res(r.result);
+    r.onload = () => res(r.result as string);
     r.onerror = () => rej(new Error("Read failed"));
     r.readAsDataURL(file);
   });
 }
 
-function toBase64Raw(file) {
+function toBase64Raw(file: File): Promise<string> {
   return new Promise((res, rej) => {
     const r = new FileReader();
-    r.onload = () => res(r.result.split(",")[1]);
+    r.onload = () => res((r.result as string).split(",")[1]);
     r.onerror = () => rej(new Error("Read failed"));
     r.readAsDataURL(file);
   });
 }
 
-function RadialScore({ score, size = 72, color }) {
+function RadialScore({
+  score,
+  size = 72,
+  color,
+}: {
+  score: number;
+  size?: number;
+  color?: string;
+}) {
   const r = size / 2 - 6,
     circ = 2 * Math.PI * r;
   const offset = circ - (score / 100) * circ,
@@ -97,12 +105,23 @@ function RadialScore({ score, size = 72, color }) {
   );
 }
 
-function HeatmapCanvas({ dataUrl, zones }) {
-  const canvasRef = useRef();
+interface Zone {
+  priority: number;
+  label: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  note: string;
+}
+
+function HeatmapCanvas({ dataUrl, zones }: { dataUrl: string; zones: Zone[] }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     if (!canvasRef.current || !zones?.length || !dataUrl) return;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
+    if (!ctx) return;
     const img = new Image();
     img.onload = () => {
       canvas.width = img.naturalWidth;
@@ -175,27 +194,45 @@ function HeatmapCanvas({ dataUrl, zones }) {
   );
 }
 
-function loadBrands() {
+interface Brand {
+  notes: string;
+  updatedAt: number;
+}
+interface BrandMap {
+  [name: string]: Brand;
+}
+
+function loadBrands(): BrandMap {
   try {
     return JSON.parse(localStorage.getItem("nf_brands") || "{}");
   } catch {
     return {};
   }
 }
-function saveBrands(b) {
+function saveBrands(b: BrandMap) {
   try {
     localStorage.setItem("nf_brands", JSON.stringify(b));
   } catch {}
 }
 
-function BrandManager({ onSelect, selectedBrand, onClose, onUpdated }) {
-  const [brands, setBrands] = useState(loadBrands());
+function BrandManager({
+  onSelect,
+  selectedBrand,
+  onClose,
+  onUpdated,
+}: {
+  onSelect: (name: string, notes: string) => void;
+  selectedBrand: string;
+  onClose: () => void;
+  onUpdated: (b: BrandMap) => void;
+}) {
+  const [brands, setBrands] = useState<BrandMap>(loadBrands());
   const [name, setName] = useState("");
   const [notes, setNotes] = useState("");
-  const [editing, setEditing] = useState(null);
+  const [editing, setEditing] = useState<string | null>(null);
   const commit = () => {
     if (!name.trim()) return;
-    const updated = editing
+    const updated: BrandMap = editing
       ? (() => {
           const u = { ...brands };
           delete u[editing];
@@ -211,7 +248,7 @@ function BrandManager({ onSelect, selectedBrand, onClose, onUpdated }) {
     setNotes("");
     setEditing(null);
   };
-  const del = (n) => {
+  const del = (n: string) => {
     const u = { ...brands };
     delete u[n];
     setBrands(u);
@@ -219,7 +256,7 @@ function BrandManager({ onSelect, selectedBrand, onClose, onUpdated }) {
     onUpdated(u);
     if (selectedBrand === n) onSelect("", "");
   };
-  const edit = (n) => {
+  const edit = (n: string) => {
     setEditing(n);
     setName(n);
     setNotes(brands[n].notes);
@@ -470,10 +507,26 @@ function BrandManager({ onSelect, selectedBrand, onClose, onUpdated }) {
   );
 }
 
-function UploadZone({ onFile, label, labelColor }) {
-  const ref = useRef();
+interface CreativeFile {
+  file: File;
+  type: "image" | "video";
+  dataUrl: string | null;
+  name: string;
+  mimeType: string;
+}
+
+function UploadZone({
+  onFile,
+  label,
+  labelColor,
+}: {
+  onFile: (f: CreativeFile) => void;
+  label?: string;
+  labelColor?: string;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
   const [drag, setDrag] = useState(false);
-  const handle = async (f) => {
+  const handle = async (f: File) => {
     if (!f) return;
     const isVideo = f.type.startsWith("video");
     const dataUrl = isVideo ? null : await toBase64(f);
@@ -495,9 +548,9 @@ function UploadZone({ onFile, label, labelColor }) {
       onDrop={(e) => {
         e.preventDefault();
         setDrag(false);
-        handle(e.dataTransfer.files[0]);
+        if (e.dataTransfer.files[0]) handle(e.dataTransfer.files[0]);
       }}
-      onClick={() => ref.current.click()}
+      onClick={() => ref.current?.click()}
       style={{
         border: `1.5px dashed ${drag ? "#6366F1" : "#E0E0E0"}`,
         borderRadius: 14,
@@ -520,7 +573,7 @@ function UploadZone({ onFile, label, labelColor }) {
             width: 32,
             height: 32,
             borderRadius: "50%",
-            background: labelColor + "20",
+            background: (labelColor || "#6366F1") + "20",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -555,13 +608,27 @@ function UploadZone({ onFile, label, labelColor }) {
         type="file"
         style={{ display: "none" }}
         accept="image/*,video/mp4,video/quicktime"
-        onChange={(e) => handle(e.target.files[0])}
+        onChange={(e) => {
+          if (e.target.files?.[0]) handle(e.target.files[0]);
+        }}
       />
     </div>
   );
 }
 
-function CreativePreview({ creative, onRemove, label, labelColor, compact }) {
+function CreativePreview({
+  creative,
+  onRemove,
+  label,
+  labelColor,
+  compact,
+}: {
+  creative: CreativeFile;
+  onRemove?: () => void;
+  label?: string;
+  labelColor?: string;
+  compact?: boolean;
+}) {
   if (!creative) return null;
   const h = compact ? 140 : 260;
   return (
@@ -635,7 +702,7 @@ function CreativePreview({ creative, onRemove, label, labelColor, compact }) {
         </div>
       ) : (
         <img
-          src={creative.dataUrl}
+          src={creative.dataUrl || ""}
           alt=""
           style={{
             width: "100%",
@@ -649,28 +716,42 @@ function CreativePreview({ creative, onRemove, label, labelColor, compact }) {
   );
 }
 
+interface AnalysisResult {
+  overall_score: number;
+  overall_verdict: string;
+  pass: boolean;
+  dimensions: { [key: string]: { score: number; recommendation: string } };
+  top_fixes: string[];
+  attention_zones: Zone[];
+}
+
+interface AnalysedCreative extends CreativeFile {
+  result: AnalysisResult;
+  index: number;
+}
+
 export default function App() {
   const [mode, setMode] = useState("single");
   const [showBrandMgr, setShowBrandMgr] = useState(false);
-  const [brands, setBrands] = useState(loadBrands());
+  const [brands, setBrands] = useState<BrandMap>(loadBrands());
   const [selectedBrand, setSelectedBrand] = useState("");
   const [brandNotes, setBrandNotes] = useState("");
   const [client, setClient] = useState("");
   const [platform, setPlatform] = useState("");
   const [threshold, setThreshold] = useState(65);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // Single
-  const [single, setSingle] = useState(null);
-  const [singleResult, setSingleResult] = useState(null);
+  const [single, setSingle] = useState<CreativeFile | null>(null);
+  const [singleResult, setSingleResult] = useState<AnalysisResult | null>(null);
   const [singleAnalysing, setSingleAnalysing] = useState(false);
 
-  // AB
-  const [creatives, setCreatives] = useState([null, null]);
-  const [abAnalysing, setAbAnalysing] = useState(null);
+  const [creatives, setCreatives] = useState<
+    ((CreativeFile & { result?: AnalysisResult }) | null)[]
+  >([null, null]);
+  const [abAnalysing, setAbAnalysing] = useState<number | null>(null);
 
   const buildSystem = (
-    isVideo,
+    isVideo: boolean,
   ) => `You are a senior creative strategist at No Fluff, a behavioural marketing agency for D2C brands. Analyse advertising creatives through consumer psychology, visual hierarchy, and conversion optimisation.
 
 Return ONLY raw JSON. No markdown. No backticks. No explanation. Start with { end with }.
@@ -701,7 +782,7 @@ x/y = top-left corner as fraction of image width/height. w/h = width/height as f
 ${platform ? `Platform: ${platform}.` : ""}${client ? ` Client: ${client}.` : ""}${brandNotes ? ` Brand guide: ${brandNotes}.` : ""}${isVideo ? " Video creative — benchmark against best-practice standards for the format." : ""}
 Be specific. Reference actual elements visible. No generic advice.`;
 
-  const callAPI = async (creative) => {
+  const callAPI = async (creative: CreativeFile): Promise<AnalysisResult> => {
     const isVideo = creative.type === "video";
     let messages;
     if (!isVideo) {
@@ -737,7 +818,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "claude-3-5-sonnet-20241022", // Updated to the latest stable model
+        model: "claude-3-5-sonnet-20241022",
         max_tokens: 2000,
         system: buildSystem(isVideo),
         messages,
@@ -748,14 +829,14 @@ Be specific. Reference actual elements visible. No generic advice.`;
       throw new Error(e.error?.message || `API error ${resp.status}`);
     }
     const data = await resp.json();
-    const raw = (data.content || [])
-      .map((b) => b.text || "")
+    const rawText = (data.content || [])
+      .map((b: { text?: string }) => b.text || "")
       .join("")
       .trim();
-    const s = raw.indexOf("{"),
-      e2 = raw.lastIndexOf("}");
+    const s = rawText.indexOf("{"),
+      e2 = rawText.lastIndexOf("}");
     if (s === -1 || e2 === -1) throw new Error("No JSON found in response");
-    return JSON.parse(raw.slice(s, e2 + 1));
+    return JSON.parse(rawText.slice(s, e2 + 1));
   };
 
   const runSingle = async () => {
@@ -766,7 +847,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
     try {
       setSingleResult(await callAPI(single));
     } catch (err) {
-      setError(err.message);
+      setError((err as Error).message);
     }
     setSingleAnalysing(false);
   };
@@ -779,20 +860,20 @@ Be specific. Reference actual elements visible. No generic advice.`;
       if (!creatives[i]) continue;
       setAbAnalysing(i);
       try {
-        const result = await callAPI(creatives[i]);
+        const result = await callAPI(creatives[i] as CreativeFile);
         setCreatives((prev) => {
           const n = [...prev];
-          if (n[i]) n[i] = { ...n[i], result };
+          if (n[i]) n[i] = { ...(n[i] as CreativeFile), result };
           return n;
         });
       } catch (err) {
-        setError(`Creative ${LABELS[i]}: ${err.message}`);
+        setError(`Creative ${LABELS[i]}: ${(err as Error).message}`);
       }
     }
     setAbAnalysing(null);
   };
 
-  const exportReport = (items) => {
+  const exportReport = (items: AnalysedCreative[]) => {
     const lines = [
       "NO FLUFF CREATIVE ANALYSER — REPORT",
       "=====================================",
@@ -831,8 +912,12 @@ Be specific. Reference actual elements visible. No generic advice.`;
 
   const brandList = Object.keys(brands);
   const analysedCreatives = creatives
-    .map((c, i) => (c?.result ? { ...c, index: i } : null))
-    .filter(Boolean);
+    .map((c, i) =>
+      c && (c as AnalysedCreative).result
+        ? ({ ...c, index: i } as AnalysedCreative)
+        : null,
+    )
+    .filter((c): c is AnalysedCreative => c !== null);
   const winner =
     analysedCreatives.length > 1
       ? analysedCreatives.reduce((a, b) =>
@@ -1290,14 +1375,16 @@ Be specific. Reference actual elements visible. No generic advice.`;
             )}
             {singleResult && (
               <SingleResult
-                creative={single}
+                creative={single!}
                 result={singleResult}
                 threshold={threshold}
                 onReset={() => {
                   setSingle(null);
                   setSingleResult(null);
                 }}
-                onExport={() => exportReport([{ result: singleResult }])}
+                onExport={() =>
+                  exportReport([{ ...single!, result: singleResult, index: 0 }])
+                }
               />
             )}
           </>
@@ -1319,7 +1406,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                 c ? (
                   <div key={i}>
                     <CreativePreview
-                      creative={c}
+                      creative={c as CreativeFile}
                       onRemove={() =>
                         setCreatives((prev) => {
                           const n = [...prev];
@@ -1331,7 +1418,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                       labelColor={LABEL_COLORS[i]}
                       compact
                     />
-                    {c.result && (
+                    {(c as AnalysedCreative).result && (
                       <div
                         style={{
                           display: "flex",
@@ -1345,7 +1432,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                         }}
                       >
                         <RadialScore
-                          score={c.result.overall_score}
+                          score={(c as AnalysedCreative).result.overall_score}
                           size={38}
                           color={LABEL_COLORS[i]}
                         />
@@ -1358,10 +1445,12 @@ Be specific. Reference actual elements visible. No generic advice.`;
                               margin: 0,
                             }}
                           >
-                            {c.result.overall_score}/100
+                            {(c as AnalysedCreative).result.overall_score}/100
                           </p>
                           <p style={{ fontSize: 10, color: "#888", margin: 0 }}>
-                            {verdictText(c.result.overall_score)}
+                            {verdictText(
+                              (c as AnalysedCreative).result.overall_score,
+                            )}
                           </p>
                         </div>
                         <span
@@ -1370,11 +1459,17 @@ Be specific. Reference actual elements visible. No generic advice.`;
                             fontWeight: 700,
                             padding: "2px 7px",
                             borderRadius: 20,
-                            background: c.result.pass ? "#F0FDF4" : "#FEF2F2",
-                            color: c.result.pass ? "#15803D" : "#B91C1C",
+                            background: (c as AnalysedCreative).result.pass
+                              ? "#F0FDF4"
+                              : "#FEF2F2",
+                            color: (c as AnalysedCreative).result.pass
+                              ? "#15803D"
+                              : "#B91C1C",
                           }}
                         >
-                          {c.result.pass ? "PASS" : "FAIL"}
+                          {(c as AnalysedCreative).result.pass
+                            ? "PASS"
+                            : "FAIL"}
                         </span>
                       </div>
                     )}
@@ -1487,7 +1582,19 @@ Be specific. Reference actual elements visible. No generic advice.`;
   );
 }
 
-function SingleResult({ creative, result, threshold, onReset, onExport }) {
+function SingleResult({
+  creative,
+  result,
+  threshold,
+  onReset,
+  onExport,
+}: {
+  creative: CreativeFile;
+  result: AnalysisResult;
+  threshold: number;
+  onReset: () => void;
+  onExport: () => void;
+}) {
   const [tab, setTab] = useState("analysis");
   const passed = result.pass;
   return (
@@ -1510,7 +1617,11 @@ function SingleResult({ creative, result, threshold, onReset, onExport }) {
           gap: "1.25rem",
         }}
       >
-        <RadialScore score={result.overall_score} size={72} />
+        <RadialScore
+          score={result.overall_score}
+          size={72}
+          color={scoreColor(result.overall_score)}
+        />
         <div style={{ flex: 1 }}>
           <div
             style={{
@@ -1551,10 +1662,15 @@ function SingleResult({ creative, result, threshold, onReset, onExport }) {
           </p>
         </div>
       </div>
-
-      {/* Creative image in results */}
-      {creative && <CreativePreview creative={creative} />}
-
+      {creative && (
+        <CreativePreview
+          creative={creative}
+          onRemove={undefined}
+          label={undefined}
+          labelColor={undefined}
+          compact={false}
+        />
+      )}
       <div
         style={{
           display: "flex",
@@ -1588,7 +1704,6 @@ function SingleResult({ creative, result, threshold, onReset, onExport }) {
           </button>
         ))}
       </div>
-
       {tab === "analysis" && (
         <>
           <div>
@@ -1746,7 +1861,6 @@ function SingleResult({ creative, result, threshold, onReset, onExport }) {
           </div>
         </>
       )}
-
       {tab === "heatmap" && (
         <div
           style={{
@@ -1782,7 +1896,7 @@ function SingleResult({ creative, result, threshold, onReset, onExport }) {
           ) : (
             <>
               <HeatmapCanvas
-                dataUrl={creative?.dataUrl}
+                dataUrl={creative?.dataUrl || ""}
                 zones={result.attention_zones || []}
               />
               <div
@@ -1872,7 +1986,6 @@ function SingleResult({ creative, result, threshold, onReset, onExport }) {
           )}
         </div>
       )}
-
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
         <button
           onClick={onReset}
@@ -1909,7 +2022,16 @@ function SingleResult({ creative, result, threshold, onReset, onExport }) {
   );
 }
 
-function ABResults({ analysedCreatives, winner, threshold, onExport }) {
+function ABResults({
+  analysedCreatives,
+  winner,
+  onExport,
+}: {
+  analysedCreatives: AnalysedCreative[];
+  winner: AnalysedCreative | null;
+  threshold?: number;
+  onExport: () => void;
+}) {
   const [activeTab, setActiveTab] = useState("comparison");
   const [detailIdx, setDetailIdx] = useState(analysedCreatives[0]?.index ?? 0);
   return (
@@ -2006,7 +2128,6 @@ function ABResults({ analysedCreatives, winner, threshold, onExport }) {
           </button>
         ))}
       </div>
-
       {activeTab === "comparison" && (
         <div
           style={{
@@ -2151,7 +2272,6 @@ function ABResults({ analysedCreatives, winner, threshold, onExport }) {
           })}
         </div>
       )}
-
       {activeTab === "heatmaps" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {analysedCreatives.map((c) =>
@@ -2197,7 +2317,7 @@ function ABResults({ analysedCreatives, winner, threshold, onExport }) {
                   </span>
                 </div>
                 <HeatmapCanvas
-                  dataUrl={c.dataUrl}
+                  dataUrl={c.dataUrl || ""}
                   zones={c.result.attention_zones || []}
                 />
                 <div
@@ -2292,7 +2412,6 @@ function ABResults({ analysedCreatives, winner, threshold, onExport }) {
           </p>
         </div>
       )}
-
       {activeTab === "detail" && (
         <div>
           <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
@@ -2326,7 +2445,13 @@ function ABResults({ analysedCreatives, winner, threshold, onExport }) {
             );
             return (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <CreativePreview creative={c} compact />
+                <CreativePreview
+                  creative={c}
+                  onRemove={undefined}
+                  label={undefined}
+                  labelColor={undefined}
+                  compact
+                />
                 {DIMS.map((d) => {
                   const dim = c.result.dimensions[d.key];
                   const { bg, text } = scoreBg(dim.score);
@@ -2431,7 +2556,6 @@ function ABResults({ analysedCreatives, winner, threshold, onExport }) {
           })()}
         </div>
       )}
-
       <button
         onClick={onExport}
         style={{
