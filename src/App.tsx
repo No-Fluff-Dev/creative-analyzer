@@ -22,7 +22,6 @@ const PLATFORMS = [
 ];
 const LABELS = ["A", "B", "C", "D"];
 const LABEL_COLORS = ["#6366F1", "#F59E0B", "#10B981", "#EF4444"];
-
 const MODELS = [
   { id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5", credits: 1 },
   { id: "claude-sonnet-4-5", name: "Claude Sonnet 4.5", credits: 3 },
@@ -53,7 +52,6 @@ function toBase64(file: File): Promise<string> {
     r.readAsDataURL(file);
   });
 }
-
 function toBase64Raw(file: File): Promise<string> {
   return new Promise((res, rej) => {
     const r = new FileReader();
@@ -63,7 +61,6 @@ function toBase64Raw(file: File): Promise<string> {
   });
 }
 
-// Extract text from PDF using pdf.js
 async function extractPdfText(file: File): Promise<string> {
   try {
     const arrayBuffer = await file.arrayBuffer();
@@ -85,7 +82,6 @@ async function extractPdfText(file: File): Promise<string> {
   }
 }
 
-// Extract text from Word (.docx) using mammoth
 async function extractDocxText(file: File): Promise<string> {
   try {
     const mammoth = await import("mammoth");
@@ -98,13 +94,15 @@ async function extractDocxText(file: File): Promise<string> {
 }
 
 interface BrandFile {
+  id?: string;
   name: string;
-  type: string; // mime type
-  dataUrl: string; // base64 data URL for images
-  extractedText: string; // text content for PDFs/docs
+  type: string;
+  dataUrl: string;
+  extractedText: string;
+  storagePath?: string;
 }
-
 interface Brand {
+  id?: string;
   notes: string;
   updatedAt: number;
   files?: BrandFile[];
@@ -113,17 +111,58 @@ interface BrandMap {
   [name: string]: Brand;
 }
 
-function loadBrands(): BrandMap {
-  try {
-    return JSON.parse(localStorage.getItem("nf_brands") || "{}");
-  } catch {
-    return {};
+async function loadBrandsFromSupabase(userId: string): Promise<BrandMap> {
+  const { data: brands, error } = await supabase
+    .from("brands")
+    .select("*, brand_files(*)")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: true });
+  if (error || !brands) return {};
+  const brandMap: BrandMap = {};
+  for (const brand of brands) {
+    const files: BrandFile[] = await Promise.all(
+      (brand.brand_files || []).map(async (f: any) => {
+        let dataUrl = "";
+        if (f.storage_path && f.mime_type?.startsWith("image/")) {
+          const { data } = await supabase.storage
+            .from("brand-assets")
+            .download(f.storage_path);
+          if (data) {
+            dataUrl = await new Promise((res) => {
+              const reader = new FileReader();
+              reader.onload = () => res(reader.result as string);
+              reader.readAsDataURL(data);
+            });
+          }
+        }
+        return {
+          id: f.id,
+          name: f.name,
+          type: f.mime_type,
+          dataUrl,
+          extractedText: f.extracted_text || "",
+          storagePath: f.storage_path,
+        };
+      }),
+    );
+    brandMap[brand.name] = {
+      id: brand.id,
+      notes: brand.notes || "",
+      updatedAt: new Date(brand.updated_at).getTime(),
+      files,
+    };
   }
+  return brandMap;
 }
-function saveBrands(b: BrandMap) {
-  try {
-    localStorage.setItem("nf_brands", JSON.stringify(b));
-  } catch {}
+
+interface Zone {
+  priority: number;
+  label: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  note: string;
 }
 
 function RadialScore({
@@ -176,16 +215,6 @@ function RadialScore({
   );
 }
 
-interface Zone {
-  priority: number;
-  label: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  note: string;
-}
-
 function HeatmapCanvas({ dataUrl, zones }: { dataUrl: string; zones: Zone[] }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
@@ -236,8 +265,8 @@ function HeatmapCanvas({ dataUrl, zones }: { dataUrl: string; zones: Zone[] }) {
         const labelText = `${zone.priority}. ${zone.label}`;
         const fs = Math.max(12, img.naturalWidth * 0.016);
         ctx.font = `bold ${fs}px system-ui`;
-        const tw = ctx.measureText(labelText).width;
-        const pad = 6,
+        const tw = ctx.measureText(labelText).width,
+          pad = 6,
           bh = fs + pad * 2;
         const bx = x,
           by = Math.max(0, y - bh - 2);
@@ -270,19 +299,29 @@ function BrandManager({
   selectedBrand,
   onClose,
   onUpdated,
+  userId,
 }: {
   onSelect: (name: string, notes: string, files?: BrandFile[]) => void;
   selectedBrand: string;
   onClose: () => void;
   onUpdated: (b: BrandMap) => void;
+  userId: string;
 }) {
-  const [brands, setBrands] = useState<BrandMap>(loadBrands());
+  const [brands, setBrands] = useState<BrandMap>({});
   const [name, setName] = useState("");
   const [notes, setNotes] = useState("");
   const [files, setFiles] = useState<BrandFile[]>([]);
   const [editing, setEditing] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    loadBrandsFromSupabase(userId).then((b) => {
+      setBrands(b);
+      onUpdated(b);
+    });
+  }, [userId]);
 
   const handleFileUpload = async (f: File) => {
     setUploading(true);
@@ -292,59 +331,98 @@ function BrandManager({
       const isDocx =
         f.type ===
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-
-      let dataUrl = "";
-      let extractedText = "";
-
-      if (isImage) {
-        dataUrl = await toBase64(f);
-      } else if (isPdf) {
+      let dataUrl = "",
+        extractedText = "";
+      if (isImage) dataUrl = await toBase64(f);
+      else if (isPdf) {
         extractedText = await extractPdfText(f);
-        dataUrl = await toBase64(f); // store raw too
-      } else if (isDocx) {
-        extractedText = await extractDocxText(f);
-      }
-
-      const brandFile: BrandFile = {
-        name: f.name,
-        type: f.type,
-        dataUrl,
-        extractedText,
-      };
-      setFiles((prev) => [...prev, brandFile]);
-    } catch {
-      // silently fail
-    }
+        dataUrl = await toBase64(f);
+      } else if (isDocx) extractedText = await extractDocxText(f);
+      setFiles((prev) => [
+        ...prev,
+        { name: f.name, type: f.type, dataUrl, extractedText, _file: f } as any,
+      ]);
+    } catch {}
     setUploading(false);
   };
 
-  const commit = () => {
-    if (!name.trim()) return;
-    const updated: BrandMap = editing
-      ? (() => {
-          const u = { ...brands };
-          delete u[editing];
-          u[name.trim()] = { notes, files, updatedAt: Date.now() };
-          return u;
-        })()
-      : { ...brands, [name.trim()]: { notes, files, updatedAt: Date.now() } };
-    setBrands(updated);
-    saveBrands(updated);
-    onUpdated(updated);
-    if (editing && selectedBrand === editing)
-      onSelect(name.trim(), notes, files);
-    setName("");
-    setNotes("");
-    setFiles([]);
-    setEditing(null);
+  const commit = async () => {
+    if (!name.trim() || saving) return;
+    setSaving(true);
+    try {
+      let brandId: string;
+      if (editing && brands[editing]?.id) {
+        const { data } = await supabase
+          .from("brands")
+          .update({
+            name: name.trim(),
+            notes,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", brands[editing].id)
+          .select()
+          .single();
+        brandId = data.id;
+      } else {
+        const { data } = await supabase
+          .from("brands")
+          .insert({ user_id: userId, name: name.trim(), notes })
+          .select()
+          .single();
+        brandId = data.id;
+      }
+      const savedFiles: BrandFile[] = [];
+      for (const f of files) {
+        if ((f as any)._file) {
+          const rawFile = (f as any)._file as File;
+          const storagePath = `${userId}/${brandId}/${Date.now()}_${rawFile.name}`;
+          await supabase.storage
+            .from("brand-assets")
+            .upload(storagePath, rawFile);
+          const { data: fileRecord } = await supabase
+            .from("brand_files")
+            .insert({
+              brand_id: brandId,
+              user_id: userId,
+              name: rawFile.name,
+              mime_type: rawFile.type,
+              extracted_text: f.extractedText || null,
+              storage_path: storagePath,
+            })
+            .select()
+            .single();
+          savedFiles.push({ ...f, id: fileRecord.id, storagePath });
+        } else {
+          savedFiles.push(f);
+        }
+      }
+      const updated = await loadBrandsFromSupabase(userId);
+      setBrands(updated);
+      onUpdated(updated);
+      if (editing && selectedBrand === editing)
+        onSelect(name.trim(), notes, savedFiles);
+      setName("");
+      setNotes("");
+      setFiles([]);
+      setEditing(null);
+    } catch (err) {
+      console.error("Failed to save brand:", err);
+    }
+    setSaving(false);
   };
 
-  const del = (n: string) => {
-    const u = { ...brands };
-    delete u[n];
-    setBrands(u);
-    saveBrands(u);
-    onUpdated(u);
+  const del = async (n: string) => {
+    const brand = brands[n];
+    if (!brand?.id) return;
+    const filePaths = (brand.files || [])
+      .filter((f) => f.storagePath)
+      .map((f) => f.storagePath as string);
+    if (filePaths.length > 0)
+      await supabase.storage.from("brand-assets").remove(filePaths);
+    await supabase.from("brands").delete().eq("id", brand.id);
+    const updated = await loadBrandsFromSupabase(userId);
+    setBrands(updated);
+    onUpdated(updated);
     if (selectedBrand === n) onSelect("", "", []);
   };
 
@@ -355,14 +433,18 @@ function BrandManager({
     setFiles(brands[n].files || []);
   };
 
-  const removeFile = (idx: number) =>
+  const removeFile = async (idx: number) => {
+    const f = files[idx];
+    if (f.id) {
+      if (f.storagePath)
+        await supabase.storage.from("brand-assets").remove([f.storagePath]);
+      await supabase.from("brand_files").delete().eq("id", f.id);
+    }
     setFiles((prev) => prev.filter((_, i) => i !== idx));
-
-  const fileIcon = (type: string) => {
-    if (type.startsWith("image/")) return "🖼️";
-    if (type === "application/pdf") return "📄";
-    return "📝";
   };
+
+  const fileIcon = (type: string) =>
+    type.startsWith("image/") ? "🖼️" : type === "application/pdf" ? "📄" : "📝";
 
   return (
     <div
@@ -416,7 +498,6 @@ function BrandManager({
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              lineHeight: 1,
             }}
           >
             ✕
@@ -603,8 +684,6 @@ function BrandManager({
               color: "#111",
             }}
           />
-
-          {/* File upload zone */}
           <div
             onClick={() => fileRef.current?.click()}
             style={{
@@ -634,8 +713,6 @@ function BrandManager({
               }}
             />
           </div>
-
-          {/* Uploaded files */}
           {files.length > 0 && (
             <div
               style={{
@@ -687,24 +764,23 @@ function BrandManager({
               ))}
             </div>
           )}
-
           <button
             onClick={commit}
-            disabled={!name.trim()}
+            disabled={!name.trim() || saving}
             style={{
               marginTop: 4,
               width: "100%",
               padding: "9px",
               borderRadius: 8,
               border: "none",
-              background: name.trim() ? "#111" : "#F0F0F0",
-              color: name.trim() ? "#fff" : "#AAA",
+              background: name.trim() && !saving ? "#111" : "#F0F0F0",
+              color: name.trim() && !saving ? "#fff" : "#AAA",
               fontSize: 13,
               fontWeight: 600,
-              cursor: name.trim() ? "pointer" : "not-allowed",
+              cursor: name.trim() && !saving ? "pointer" : "not-allowed",
             }}
           >
-            {editing ? "Save changes" : "Save brand"}
+            {saving ? "Saving…" : editing ? "Save changes" : "Save brand"}
           </button>
           {editing && (
             <button
@@ -755,7 +831,6 @@ function UploadZone({
   const ref = useRef<HTMLInputElement>(null);
   const [drag, setDrag] = useState(false);
   const handle = async (f: File) => {
-    if (!f) return;
     const isVideo = f.type.startsWith("video");
     const dataUrl = isVideo ? null : await toBase64(f);
     onFile({
@@ -944,19 +1019,6 @@ function CreativePreview({
   );
 }
 
-interface AnalysisResult {
-  overall_score: number;
-  overall_verdict: string;
-  pass: boolean;
-  dimensions: { [key: string]: { score: number; recommendation: string } };
-  top_fixes: string[];
-  attention_zones: Zone[];
-}
-interface AnalysedCreative extends CreativeFile {
-  result: AnalysisResult;
-  index: number;
-}
-
 function ModelSelector({
   value,
   onChange,
@@ -967,7 +1029,6 @@ function ModelSelector({
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const selected = MODELS.find((m) => m.id === value) || MODELS[1];
-
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node))
@@ -976,17 +1037,14 @@ function ModelSelector({
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
-
   const creditColor = (credits: number) => {
     if (credits <= 1) return { bg: "#F0FDF4", text: "#15803D" };
     if (credits <= 3) return { bg: "#FFFBEB", text: "#B45309" };
     if (credits <= 4) return { bg: "#EEF2FF", text: "#4338CA" };
     return { bg: "#FEF2F2", text: "#B91C1C" };
   };
-
   return (
     <div ref={ref} style={{ position: "relative" }}>
-      {/* Trigger */}
       <div
         onClick={() => setOpen((o) => !o)}
         style={{
@@ -1050,8 +1108,6 @@ function ModelSelector({
           </svg>
         </div>
       </div>
-
-      {/* Dropdown panel */}
       {open && (
         <div
           style={{
@@ -1127,18 +1183,16 @@ function ModelSelector({
                         C
                       </span>
                     </div>
-                    <div>
-                      <p
-                        style={{
-                          fontSize: 13,
-                          fontWeight: isSelected ? 600 : 500,
-                          color: isSelected ? "#6366F1" : "#222",
-                          margin: 0,
-                        }}
-                      >
-                        {m.name}
-                      </p>
-                    </div>
+                    <p
+                      style={{
+                        fontSize: 13,
+                        fontWeight: isSelected ? 600 : 500,
+                        color: isSelected ? "#6366F1" : "#222",
+                        margin: 0,
+                      }}
+                    >
+                      {m.name}
+                    </p>
                   </div>
                   <div
                     style={{ display: "flex", alignItems: "center", gap: 6 }}
@@ -1178,6 +1232,19 @@ function ModelSelector({
   );
 }
 
+interface AnalysisResult {
+  overall_score: number;
+  overall_verdict: string;
+  pass: boolean;
+  dimensions: { [key: string]: { score: number; recommendation: string } };
+  top_fixes: string[];
+  attention_zones: Zone[];
+}
+interface AnalysedCreative extends CreativeFile {
+  result: AnalysisResult;
+  index: number;
+}
+
 export default function App({
   session,
 }: {
@@ -1185,7 +1252,7 @@ export default function App({
 }) {
   const [mode, setMode] = useState("single");
   const [showBrandMgr, setShowBrandMgr] = useState(false);
-  const [brands, setBrands] = useState<BrandMap>(loadBrands());
+  const [brands, setBrands] = useState<BrandMap>({});
   const [selectedBrand, setSelectedBrand] = useState("");
   const [brandNotes, setBrandNotes] = useState("");
   const [brandFiles, setBrandFiles] = useState<BrandFile[]>([]);
@@ -1193,23 +1260,26 @@ export default function App({
   const [platform, setPlatform] = useState("");
   const [threshold, setThreshold] = useState(65);
   const [error, setError] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState(MODELS[1].id); // default: Sonnet 4.5
-
+  const [selectedModel, setSelectedModel] = useState(MODELS[1].id);
   const [single, setSingle] = useState<CreativeFile | null>(null);
   const [singleResult, setSingleResult] = useState<AnalysisResult | null>(null);
   const [singleAnalysing, setSingleAnalysing] = useState(false);
-
   const [creatives, setCreatives] = useState<
     ((CreativeFile & { result?: AnalysisResult }) | null)[]
   >([null, null]);
   const [abAnalysing, setAbAnalysing] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (session?.user?.id) {
+      loadBrandsFromSupabase(session.user.id).then((b) => setBrands(b));
+    }
+  }, [session]);
 
   const buildSystem = (isVideo: boolean) => {
     const fileContext = brandFiles
       .filter((f) => f.extractedText)
       .map((f) => `[Brand file: ${f.name}]\n${f.extractedText}`)
       .join("\n\n");
-
     return `You are a senior creative strategist at No Fluff, a behavioural marketing agency for D2C brands. Analyse advertising creatives through consumer psychology, visual hierarchy, and conversion optimisation.
 
 Return ONLY raw JSON. No markdown. No backticks. No explanation. Start with { end with }.
@@ -1243,24 +1313,18 @@ Be specific. Reference actual elements visible. No generic advice.`;
 
   const callAPI = async (creative: CreativeFile): Promise<AnalysisResult> => {
     const isVideo = creative.type === "video";
-
-    // Build content array — brand images + creative
     const contentParts: object[] = [];
-
-    // Add brand image files to content
     const brandImageFiles = brandFiles.filter(
       (f) => f.type.startsWith("image/") && f.dataUrl,
     );
     for (const bf of brandImageFiles) {
       const raw = bf.dataUrl.split(",")[1];
-      const mime = bf.type;
       contentParts.push({
         type: "image",
-        source: { type: "base64", media_type: mime, data: raw },
+        source: { type: "base64", media_type: bf.type, data: raw },
       });
       contentParts.push({ type: "text", text: `[Brand asset: ${bf.name}]` });
     }
-
     if (!isVideo) {
       const raw = await toBase64Raw(creative.file);
       contentParts.push({
@@ -1277,14 +1341,12 @@ Be specific. Reference actual elements visible. No generic advice.`;
         text: `Video file: "${creative.name}". Provide the JSON analysis. Raw JSON only, starting with {`,
       });
     }
-
     const messages = [
       {
         role: "user",
         content: isVideo ? contentParts[contentParts.length - 1] : contentParts,
       },
     ];
-
     const resp = await fetch("/api/analyse", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1304,16 +1366,13 @@ Be specific. Reference actual elements visible. No generic advice.`;
       .map((b: { text?: string }) => b.text || "")
       .join("")
       .trim();
-    console.log("Raw API response:", rawText);
-    // REPLACE WITH:
     const start = rawText.indexOf("{"),
       end = rawText.lastIndexOf("}");
     if (start === -1 || end === -1)
       throw new Error("No JSON found in response");
     const parsed = JSON.parse(rawText.slice(start, end + 1));
-    if (!parsed.dimensions || !parsed.overall_score) {
+    if (!parsed.dimensions || !parsed.overall_score)
       throw new Error("Incomplete analysis returned — please try again.");
-    }
     return parsed;
   };
 
@@ -1423,6 +1482,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
           }}
           onClose={() => setShowBrandMgr(false)}
           onUpdated={(b) => setBrands(b)}
+          userId={session.user.id}
         />
       )}
       <div style={{ maxWidth: 720, margin: "0 auto" }}>
@@ -1478,52 +1538,60 @@ Be specific. Reference actual elements visible. No generic advice.`;
               Pre-flight analysis powered by behavioural science
             </p>
           </div>
-          <button
-            onClick={() => setShowBrandMgr(true)}
+          <div
             style={{
-              padding: "8px 14px",
-              borderRadius: 10,
-              border: "1px solid #EFEFEF",
-              background: "#fff",
-              fontSize: 12,
-              fontWeight: 600,
-              color: "#555",
-              cursor: "pointer",
               display: "flex",
+              gap: 8,
               alignItems: "center",
-              gap: 6,
-              flexShrink: 0,
               marginTop: 4,
             }}
           >
-            <svg
-              width="13"
-              height="13"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
+            <button
+              onClick={() => setShowBrandMgr(true)}
+              style={{
+                padding: "8px 14px",
+                borderRadius: 10,
+                border: "1px solid #EFEFEF",
+                background: "#fff",
+                fontSize: 12,
+                fontWeight: 600,
+                color: "#555",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                flexShrink: 0,
+              }}
             >
-              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-            </svg>
-            Brand guidelines
-          </button>
-          <button
-            onClick={() => supabase.auth.signOut()}
-            style={{
-              padding: "8px 14px",
-              borderRadius: 10,
-              border: "1px solid #EFEFEF",
-              background: "#fff",
-              fontSize: 12,
-              fontWeight: 600,
-              color: "#888",
-              cursor: "pointer",
-            }}
-          >
-            Sign out
-          </button>
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+              </svg>
+              Brand guidelines
+            </button>
+            <button
+              onClick={() => supabase.auth.signOut()}
+              style={{
+                padding: "8px 14px",
+                borderRadius: 10,
+                border: "1px solid #EFEFEF",
+                background: "#fff",
+                fontSize: 12,
+                fontWeight: 600,
+                color: "#888",
+                cursor: "pointer",
+              }}
+            >
+              Sign out
+            </button>
+          </div>
         </div>
 
         {/* Mode toggle */}
@@ -1650,7 +1718,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
               </select>
             </div>
           </div>
-          <div style={{ gridColumn: "1 / -1" }}>
+          <div>
             <label
               style={{
                 fontSize: 10,
@@ -1666,8 +1734,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
             </label>
             <ModelSelector value={selectedModel} onChange={setSelectedModel} />
           </div>
-
-          {/* Brand selection */}
           <div>
             <label
               style={{
@@ -1805,7 +1871,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
               </div>
             )}
           </div>
-
           {!selectedBrand && (
             <div>
               <label
@@ -1842,7 +1907,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
               />
             </div>
           )}
-
           <div>
             <div
               style={{
@@ -2120,7 +2184,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
             )}
           </>
         )}
-
         {error && (
           <div
             style={{
