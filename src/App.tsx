@@ -1013,7 +1013,7 @@ function ModelSelector({
             }}
           >
             <span style={{ fontSize: 12, color: "#fff", fontWeight: 700 }}>
-              A
+              C
             </span>
           </div>
           <span style={{ fontSize: 13, fontWeight: 500, color: "#222" }}>
