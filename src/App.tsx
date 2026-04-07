@@ -55,6 +55,69 @@ function toBase64Raw(file: File): Promise<string> {
   });
 }
 
+// Extract text from PDF using pdf.js
+async function extractPdfText(file: File): Promise<string> {
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdfjsLib = await import(
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" as any
+    );
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    let text = "";
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      text += content.items.map((item: any) => item.str).join(" ") + "\n";
+    }
+    return text.trim();
+  } catch {
+    return "";
+  }
+}
+
+// Extract text from Word (.docx) using mammoth
+async function extractDocxText(file: File): Promise<string> {
+  try {
+    const mammoth = await import("mammoth");
+    const arrayBuffer = await file.arrayBuffer();
+    const result = await mammoth.extractRawText({ arrayBuffer });
+    return result.value.trim();
+  } catch {
+    return "";
+  }
+}
+
+interface BrandFile {
+  name: string;
+  type: string; // mime type
+  dataUrl: string; // base64 data URL for images
+  extractedText: string; // text content for PDFs/docs
+}
+
+interface Brand {
+  notes: string;
+  updatedAt: number;
+  files?: BrandFile[];
+}
+interface BrandMap {
+  [name: string]: Brand;
+}
+
+function loadBrands(): BrandMap {
+  try {
+    return JSON.parse(localStorage.getItem("nf_brands") || "{}");
+  } catch {
+    return {};
+  }
+}
+function saveBrands(b: BrandMap) {
+  try {
+    localStorage.setItem("nf_brands", JSON.stringify(b));
+  } catch {}
+}
+
 function RadialScore({
   score,
   size = 72,
@@ -194,34 +257,13 @@ function HeatmapCanvas({ dataUrl, zones }: { dataUrl: string; zones: Zone[] }) {
   );
 }
 
-interface Brand {
-  notes: string;
-  updatedAt: number;
-}
-interface BrandMap {
-  [name: string]: Brand;
-}
-
-function loadBrands(): BrandMap {
-  try {
-    return JSON.parse(localStorage.getItem("nf_brands") || "{}");
-  } catch {
-    return {};
-  }
-}
-function saveBrands(b: BrandMap) {
-  try {
-    localStorage.setItem("nf_brands", JSON.stringify(b));
-  } catch {}
-}
-
 function BrandManager({
   onSelect,
   selectedBrand,
   onClose,
   onUpdated,
 }: {
-  onSelect: (name: string, notes: string) => void;
+  onSelect: (name: string, notes: string, files?: BrandFile[]) => void;
   selectedBrand: string;
   onClose: () => void;
   onUpdated: (b: BrandMap) => void;
@@ -229,38 +271,91 @@ function BrandManager({
   const [brands, setBrands] = useState<BrandMap>(loadBrands());
   const [name, setName] = useState("");
   const [notes, setNotes] = useState("");
+  const [files, setFiles] = useState<BrandFile[]>([]);
   const [editing, setEditing] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = async (f: File) => {
+    setUploading(true);
+    try {
+      const isImage = f.type.startsWith("image/");
+      const isPdf = f.type === "application/pdf";
+      const isDocx =
+        f.type ===
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+      let dataUrl = "";
+      let extractedText = "";
+
+      if (isImage) {
+        dataUrl = await toBase64(f);
+      } else if (isPdf) {
+        extractedText = await extractPdfText(f);
+        dataUrl = await toBase64(f); // store raw too
+      } else if (isDocx) {
+        extractedText = await extractDocxText(f);
+      }
+
+      const brandFile: BrandFile = {
+        name: f.name,
+        type: f.type,
+        dataUrl,
+        extractedText,
+      };
+      setFiles((prev) => [...prev, brandFile]);
+    } catch {
+      // silently fail
+    }
+    setUploading(false);
+  };
+
   const commit = () => {
     if (!name.trim()) return;
     const updated: BrandMap = editing
       ? (() => {
           const u = { ...brands };
           delete u[editing];
-          u[name.trim()] = { notes, updatedAt: Date.now() };
+          u[name.trim()] = { notes, files, updatedAt: Date.now() };
           return u;
         })()
-      : { ...brands, [name.trim()]: { notes, updatedAt: Date.now() } };
+      : { ...brands, [name.trim()]: { notes, files, updatedAt: Date.now() } };
     setBrands(updated);
     saveBrands(updated);
     onUpdated(updated);
-    if (editing && selectedBrand === editing) onSelect(name.trim(), notes);
+    if (editing && selectedBrand === editing)
+      onSelect(name.trim(), notes, files);
     setName("");
     setNotes("");
+    setFiles([]);
     setEditing(null);
   };
+
   const del = (n: string) => {
     const u = { ...brands };
     delete u[n];
     setBrands(u);
     saveBrands(u);
     onUpdated(u);
-    if (selectedBrand === n) onSelect("", "");
+    if (selectedBrand === n) onSelect("", "", []);
   };
+
   const edit = (n: string) => {
     setEditing(n);
     setName(n);
     setNotes(brands[n].notes);
+    setFiles(brands[n].files || []);
   };
+
+  const removeFile = (idx: number) =>
+    setFiles((prev) => prev.filter((_, i) => i !== idx));
+
+  const fileIcon = (type: string) => {
+    if (type.startsWith("image/")) return "🖼️";
+    if (type === "application/pdf") return "📄";
+    return "📝";
+  };
+
   return (
     <div
       style={{
@@ -280,8 +375,8 @@ function BrandManager({
           borderRadius: 18,
           padding: "1.5rem",
           width: "100%",
-          maxWidth: 460,
-          maxHeight: "82vh",
+          maxWidth: 480,
+          maxHeight: "85vh",
           overflowY: "auto",
           boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
         }}
@@ -314,6 +409,7 @@ function BrandManager({
             ✕
           </button>
         </div>
+
         {Object.keys(brands).length > 0 && (
           <div
             style={{
@@ -327,7 +423,7 @@ function BrandManager({
               <div
                 key={n}
                 onClick={() => {
-                  onSelect(n, d.notes);
+                  onSelect(n, d.notes, d.files || []);
                   onClose();
                 }}
                 style={{
@@ -403,10 +499,40 @@ function BrandManager({
                 >
                   {d.notes || "No notes"}
                 </p>
+                {(d.files || []).length > 0 && (
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 4,
+                      flexWrap: "wrap",
+                      marginTop: 6,
+                    }}
+                  >
+                    {(d.files || []).map((f, i) => (
+                      <span
+                        key={i}
+                        style={{
+                          fontSize: 10,
+                          padding: "2px 6px",
+                          borderRadius: 4,
+                          background: "#F5F3FF",
+                          color: "#6366F1",
+                          border: "1px solid #E0DBFF",
+                        }}
+                      >
+                        {fileIcon(f.type)}{" "}
+                        {f.name.length > 20
+                          ? f.name.slice(0, 20) + "…"
+                          : f.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>
         )}
+
         <div
           style={{
             background: "#FAFAFA",
@@ -447,7 +573,7 @@ function BrandManager({
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Colours, fonts, tone, visual rules, messaging…"
-            rows={4}
+            rows={3}
             style={{
               width: "100%",
               padding: "8px 12px",
@@ -459,13 +585,99 @@ function BrandManager({
               outline: "none",
               background: "#fff",
               boxSizing: "border-box",
+              marginBottom: 8,
             }}
           />
+
+          {/* File upload zone */}
+          <div
+            onClick={() => fileRef.current?.click()}
+            style={{
+              border: "1.5px dashed #DDD",
+              borderRadius: 8,
+              padding: "12px",
+              textAlign: "center",
+              cursor: "pointer",
+              background: "#fff",
+              marginBottom: 8,
+            }}
+          >
+            <p style={{ fontSize: 12, color: "#888", margin: 0 }}>
+              {uploading ? "Processing file…" : "📎 Upload brand guideline"}
+            </p>
+            <p style={{ fontSize: 10, color: "#CCC", margin: "3px 0 0" }}>
+              PDF · Word (.docx) · PNG · JPG · SVG
+            </p>
+            <input
+              ref={fileRef}
+              type="file"
+              style={{ display: "none" }}
+              accept=".pdf,.docx,image/png,image/jpeg,image/svg+xml"
+              onChange={(e) => {
+                if (e.target.files?.[0]) handleFileUpload(e.target.files[0]);
+                e.target.value = "";
+              }}
+            />
+          </div>
+
+          {/* Uploaded files */}
+          {files.length > 0 && (
+            <div
+              style={{
+                display: "flex",
+                gap: 4,
+                flexWrap: "wrap",
+                marginBottom: 8,
+              }}
+            >
+              {files.map((f, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                    fontSize: 11,
+                    padding: "3px 8px",
+                    borderRadius: 6,
+                    background: "#F5F3FF",
+                    color: "#6366F1",
+                    border: "1px solid #E0DBFF",
+                  }}
+                >
+                  <span>
+                    {fileIcon(f.type)}{" "}
+                    {f.name.length > 22 ? f.name.slice(0, 22) + "…" : f.name}
+                  </span>
+                  {f.extractedText && (
+                    <span style={{ color: "#10B981", fontSize: 9 }}>
+                      ✓ text extracted
+                    </span>
+                  )}
+                  <button
+                    onClick={() => removeFile(i)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      color: "#6366F1",
+                      fontSize: 12,
+                      padding: 0,
+                      lineHeight: 1,
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           <button
             onClick={commit}
             disabled={!name.trim()}
             style={{
-              marginTop: 8,
+              marginTop: 4,
               width: "100%",
               padding: "9px",
               borderRadius: 8,
@@ -485,6 +697,7 @@ function BrandManager({
                 setEditing(null);
                 setName("");
                 setNotes("");
+                setFiles([]);
               }}
               style={{
                 marginTop: 6,
@@ -724,7 +937,6 @@ interface AnalysisResult {
   top_fixes: string[];
   attention_zones: Zone[];
 }
-
 interface AnalysedCreative extends CreativeFile {
   result: AnalysisResult;
   index: number;
@@ -736,6 +948,7 @@ export default function App() {
   const [brands, setBrands] = useState<BrandMap>(loadBrands());
   const [selectedBrand, setSelectedBrand] = useState("");
   const [brandNotes, setBrandNotes] = useState("");
+  const [brandFiles, setBrandFiles] = useState<BrandFile[]>([]);
   const [client, setClient] = useState("");
   const [platform, setPlatform] = useState("");
   const [threshold, setThreshold] = useState(65);
@@ -750,9 +963,13 @@ export default function App() {
   >([null, null]);
   const [abAnalysing, setAbAnalysing] = useState<number | null>(null);
 
-  const buildSystem = (
-    isVideo: boolean,
-  ) => `You are a senior creative strategist at No Fluff, a behavioural marketing agency for D2C brands. Analyse advertising creatives through consumer psychology, visual hierarchy, and conversion optimisation.
+  const buildSystem = (isVideo: boolean) => {
+    const fileContext = brandFiles
+      .filter((f) => f.extractedText)
+      .map((f) => `[Brand file: ${f.name}]\n${f.extractedText}`)
+      .join("\n\n");
+
+    return `You are a senior creative strategist at No Fluff, a behavioural marketing agency for D2C brands. Analyse advertising creatives through consumer psychology, visual hierarchy, and conversion optimisation.
 
 Return ONLY raw JSON. No markdown. No backticks. No explanation. Start with { end with }.
 
@@ -778,42 +995,55 @@ Return ONLY raw JSON. No markdown. No backticks. No explanation. Start with { en
   ]
 }
 
-x/y = top-left corner as fraction of image width/height. w/h = width/height as fraction. Be accurate based on what you actually see.
-${platform ? `Platform: ${platform}.` : ""}${client ? ` Client: ${client}.` : ""}${brandNotes ? ` Brand guide: ${brandNotes}.` : ""}${isVideo ? " Video creative — benchmark against best-practice standards for the format." : ""}
+x/y = top-left corner as fraction of image width/height. w/h = width/height as fraction.
+${platform ? `Platform: ${platform}.` : ""}${client ? ` Client: ${client}.` : ""}${brandNotes ? ` Brand notes: ${brandNotes}.` : ""}${fileContext ? `\n\nBrand guideline documents:\n${fileContext}` : ""}${isVideo ? " Video creative — benchmark against best-practice standards for the format." : ""}
 Be specific. Reference actual elements visible. No generic advice.`;
+  };
 
   const callAPI = async (creative: CreativeFile): Promise<AnalysisResult> => {
     const isVideo = creative.type === "video";
-    let messages;
+
+    // Build content array — brand images + creative
+    const contentParts: object[] = [];
+
+    // Add brand image files to content
+    const brandImageFiles = brandFiles.filter(
+      (f) => f.type.startsWith("image/") && f.dataUrl,
+    );
+    for (const bf of brandImageFiles) {
+      const raw = bf.dataUrl.split(",")[1];
+      const mime = bf.type;
+      contentParts.push({
+        type: "image",
+        source: { type: "base64", media_type: mime, data: raw },
+      });
+      contentParts.push({ type: "text", text: `[Brand asset: ${bf.name}]` });
+    }
+
     if (!isVideo) {
       const raw = await toBase64Raw(creative.file);
-      messages = [
-        {
-          role: "user",
-          content: [
-            {
-              type: "image",
-              source: {
-                type: "base64",
-                media_type: creative.mimeType,
-                data: raw,
-              },
-            },
-            {
-              type: "text",
-              text: "Analyse this creative. Return raw JSON only, starting with {",
-            },
-          ],
-        },
-      ];
+      contentParts.push({
+        type: "image",
+        source: { type: "base64", media_type: creative.mimeType, data: raw },
+      });
+      contentParts.push({
+        type: "text",
+        text: "Analyse this creative. Return raw JSON only, starting with {",
+      });
     } else {
-      messages = [
-        {
-          role: "user",
-          content: `Video file: "${creative.name}". Provide the JSON analysis. Raw JSON only, starting with {`,
-        },
-      ];
+      contentParts.push({
+        type: "text",
+        text: `Video file: "${creative.name}". Provide the JSON analysis. Raw JSON only, starting with {`,
+      });
     }
+
+    const messages = [
+      {
+        role: "user",
+        content: isVideo ? contentParts[contentParts.length - 1] : contentParts,
+      },
+    ];
+
     const resp = await fetch("/api/analyse", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -937,9 +1167,10 @@ Be specific. Reference actual elements visible. No generic advice.`;
       {showBrandMgr && (
         <BrandManager
           selectedBrand={selectedBrand}
-          onSelect={(n, notes) => {
+          onSelect={(n, notes, files) => {
             setSelectedBrand(n);
             setBrandNotes(notes || "");
+            setBrandFiles(files || []);
             if (n) setClient(n);
           }}
           onClose={() => setShowBrandMgr(false)}
@@ -1156,6 +1387,8 @@ Be specific. Reference actual elements visible. No generic advice.`;
               </select>
             </div>
           </div>
+
+          {/* Brand selection */}
           <div>
             <label
               style={{
@@ -1178,6 +1411,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                     const n = e.target.value;
                     setSelectedBrand(n);
                     setBrandNotes(brands[n]?.notes || "");
+                    setBrandFiles(brands[n]?.files || []);
                     if (n) setClient(n);
                   }}
                   style={{
@@ -1230,25 +1464,69 @@ Be specific. Reference actual elements visible. No generic advice.`;
                 + Save a brand guideline
               </button>
             )}
-            {selectedBrand && brandNotes && (
-              <p
+            {selectedBrand && (brandNotes || brandFiles.length > 0) && (
+              <div
                 style={{
-                  fontSize: 11,
-                  color: "#6366F1",
                   marginTop: 6,
-                  lineHeight: 1.4,
                   background: "#F5F3FF",
-                  padding: "6px 10px",
+                  padding: "8px 10px",
                   borderRadius: 6,
                 }}
               >
-                Using: <strong>{selectedBrand}</strong> —{" "}
-                {brandNotes.length > 100
-                  ? brandNotes.slice(0, 100) + "…"
-                  : brandNotes}
-              </p>
+                {brandNotes && (
+                  <p
+                    style={{
+                      fontSize: 11,
+                      color: "#6366F1",
+                      margin: 0,
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    Using: <strong>{selectedBrand}</strong> —{" "}
+                    {brandNotes.length > 80
+                      ? brandNotes.slice(0, 80) + "…"
+                      : brandNotes}
+                  </p>
+                )}
+                {brandFiles.length > 0 && (
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 4,
+                      flexWrap: "wrap",
+                      marginTop: brandNotes ? 5 : 0,
+                    }}
+                  >
+                    {brandFiles.map((f, i) => (
+                      <span
+                        key={i}
+                        style={{
+                          fontSize: 10,
+                          padding: "2px 6px",
+                          borderRadius: 4,
+                          background: "#E0DBFF",
+                          color: "#6366F1",
+                        }}
+                      >
+                        {f.type.startsWith("image/")
+                          ? "🖼️"
+                          : f.type === "application/pdf"
+                            ? "📄"
+                            : "📝"}{" "}
+                        {f.name.length > 18
+                          ? f.name.slice(0, 18) + "…"
+                          : f.name}
+                        {f.extractedText && (
+                          <span style={{ color: "#10B981" }}> ✓</span>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
           </div>
+
           {!selectedBrand && (
             <div>
               <label
@@ -1285,6 +1563,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
               />
             </div>
           )}
+
           <div>
             <div
               style={{
