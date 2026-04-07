@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { supabase } from "./supabase";
 
 const DIMS = [
   { key: "visual_hierarchy", name: "Visual hierarchy" },
@@ -1177,7 +1178,11 @@ function ModelSelector({
   );
 }
 
-export default function App() {
+export default function App({
+  session,
+}: {
+  session: import("@supabase/supabase-js").Session;
+}) {
   const [mode, setMode] = useState("single");
   const [showBrandMgr, setShowBrandMgr] = useState(false);
   const [brands, setBrands] = useState<BrandMap>(loadBrands());
@@ -1496,6 +1501,21 @@ Be specific. Reference actual elements visible. No generic advice.`;
               <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
             </svg>
             Brand guidelines
+          </button>
+          <button
+            onClick={() => supabase.auth.signOut()}
+            style={{
+              padding: "8px 14px",
+              borderRadius: 10,
+              border: "1px solid #EFEFEF",
+              background: "#fff",
+              fontSize: 12,
+              fontWeight: 600,
+              color: "#888",
+              cursor: "pointer",
+            }}
+          >
+            Sign out
           </button>
         </div>
 
