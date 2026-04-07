@@ -28,6 +28,20 @@ const MODELS = [
   { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", credits: 4 },
   { id: "claude-opus-4-6", name: "Claude Opus 4.6", credits: 8 },
 ];
+const INDUSTRIES = [
+  "Skincare",
+  "Haircare",
+  "Supplements & wellness",
+  "Food & beverage",
+  "Fashion & apparel",
+  "Jewellery",
+  "Home & living",
+  "Pet care",
+  "Sports & fitness",
+  "Electronics",
+  "Baby & parenting",
+  "Beauty & cosmetics",
+];
 
 function scoreColor(s: number) {
   return s >= 75 ? "#22C55E" : s >= 50 ? "#F59E0B" : "#EF4444";
@@ -1232,6 +1246,17 @@ function ModelSelector({
   );
 }
 
+interface IndustryExample {
+  brand: string;
+  campaign: string;
+  technique: string;
+  lesson: string;
+}
+interface IndustryBenchmarks {
+  summary: string;
+  examples: IndustryExample[];
+  gap: string;
+}
 interface AnalysisResult {
   overall_score: number;
   overall_verdict: string;
@@ -1239,6 +1264,7 @@ interface AnalysisResult {
   dimensions: { [key: string]: { score: number; recommendation: string } };
   top_fixes: string[];
   attention_zones: Zone[];
+  industry_benchmarks?: IndustryBenchmarks;
 }
 interface AnalysedCreative extends CreativeFile {
   result: AnalysisResult;
@@ -1268,6 +1294,7 @@ export default function App({
     ((CreativeFile & { result?: AnalysisResult }) | null)[]
   >([null, null]);
   const [abAnalysing, setAbAnalysing] = useState<number | null>(null);
+  const [industry, setIndustry] = useState("");
 
   useEffect(() => {
     if (session?.user?.id) {
@@ -1280,7 +1307,30 @@ export default function App({
       .filter((f) => f.extractedText)
       .map((f) => `[Brand file: ${f.name}]\n${f.extractedText}`)
       .join("\n\n");
-    return `You are a senior creative strategist at No Fluff, a behavioural marketing agency for D2C brands. Analyse advertising creatives through consumer psychology, visual hierarchy, and conversion optimisation.
+
+    const industrySection = industry
+      ? `
+  "industry_benchmarks": {
+    "summary": "<2-3 sentences on what the best ${industry} campaigns globally are doing in 2024-2025, based on current web knowledge>",
+    "examples": [
+      {
+        "brand": "<real brand name>",
+        "campaign": "<real campaign name>",
+        "technique": "<what creative or psychological technique makes it work>",
+        "lesson": "<one direct sentence on what this specific creative could learn from it>"
+      },
+      {
+        "brand": "<real brand name>",
+        "campaign": "<real campaign name>",
+        "technique": "<technique>",
+        "lesson": "<lesson>"
+      }
+    ],
+    "gap": "<single sentence — the biggest difference between this creative and what top ${industry} players are doing>"
+  },`
+      : "";
+
+    return `You are a senior creative strategist at No Fluff, a behavioural marketing agency for D2C brands. Analyse advertising creatives through consumer psychology, visual hierarchy, and conversion optimisation.${industry ? ` Use your web search tool to find current 2024-2025 ${industry} campaign examples before completing the industry_benchmarks section.` : ""}
 
 Return ONLY raw JSON. No markdown. No backticks. No explanation. Start with { end with }.
 
@@ -1303,11 +1353,11 @@ Return ONLY raw JSON. No markdown. No backticks. No explanation. Start with { en
     { "priority": 1, "label": "<element e.g. Headline>", "x": <0.0-1.0>, "y": <0.0-1.0>, "w": <0.0-1.0>, "h": <0.0-1.0>, "note": "<why this draws attention>" },
     { "priority": 2, "label": "<element>", "x": <0.0-1.0>, "y": <0.0-1.0>, "w": <0.0-1.0>, "h": <0.0-1.0>, "note": "<note>" },
     { "priority": 3, "label": "<element>", "x": <0.0-1.0>, "y": <0.0-1.0>, "w": <0.0-1.0>, "h": <0.0-1.0>, "note": "<note>" }
-  ]
+  ]${industry ? `,${industrySection}` : ""}
 }
 
 x/y = top-left corner as fraction of image width/height. w/h = width/height as fraction.
-${platform ? `Platform: ${platform}.` : ""}${client ? ` Client: ${client}.` : ""}${brandNotes ? ` Brand notes: ${brandNotes}.` : ""}${fileContext ? `\n\nBrand guideline documents:\n${fileContext}` : ""}${isVideo ? " Video creative — benchmark against best-practice standards for the format." : ""}
+${platform ? `Platform: ${platform}.` : ""}${client ? ` Client: ${client}.` : ""}${industry ? ` Industry: ${industry}.` : ""}${brandNotes ? ` Brand notes: ${brandNotes}.` : ""}${fileContext ? `\n\nBrand guideline documents:\n${fileContext}` : ""}${isVideo ? " Video creative — benchmark against best-practice standards for the format." : ""}
 Be specific. Reference actual elements visible. No generic advice.`;
   };
 
@@ -1347,22 +1397,31 @@ Be specific. Reference actual elements visible. No generic advice.`;
         content: isVideo ? contentParts[contentParts.length - 1] : contentParts,
       },
     ];
+    const requestBody: Record<string, unknown> = {
+      model: selectedModel,
+      max_tokens: 4000,
+      system: buildSystem(isVideo),
+      messages,
+    };
+
+    if (industry) {
+      requestBody.tools = [{ type: "web_search_20250305", name: "web_search" }];
+    }
+
     const resp = await fetch("/api/analyse", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: selectedModel,
-        max_tokens: 2000,
-        system: buildSystem(isVideo),
-        messages,
-      }),
+      body: JSON.stringify(requestBody),
     });
+
     if (!resp.ok) {
       const e = await resp.json().catch(() => ({}));
       throw new Error(e.error?.message || `API error ${resp.status}`);
     }
     const data = await resp.json();
+    // Extract text from all content blocks (handles tool_use + text mixed responses)
     const rawText = (data.content || [])
+      .filter((b: { type: string }) => b.type === "text")
       .map((b: { text?: string }) => b.text || "")
       .join("")
       .trim();
@@ -1716,6 +1775,56 @@ Be specific. Reference actual elements visible. No generic advice.`;
                   </option>
                 ))}
               </select>
+            </div>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <label
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: "#AAA",
+                  display: "block",
+                  marginBottom: 5,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                }}
+              >
+                Industry
+              </label>
+              <select
+                value={industry}
+                onChange={(e) => setIndustry(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "8px 12px",
+                  border: `1px solid ${industry ? "#6366F1" : "#EFEFEF"}`,
+                  borderRadius: 8,
+                  fontSize: 13,
+                  color: industry ? "#6366F1" : "#AAA",
+                  background: "#FAFAFA",
+                  outline: "none",
+                }}
+              >
+                <option value="">Select industry (enables benchmarks)</option>
+                {INDUSTRIES.map((i) => (
+                  <option key={i} value={i}>
+                    {i}
+                  </option>
+                ))}
+              </select>
+              {industry && (
+                <p
+                  style={{
+                    fontSize: 11,
+                    color: "#6366F1",
+                    marginTop: 5,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                  }}
+                >
+                  <span>✦</span> Industry benchmarks will be included in results
+                </p>
+              )}
             </div>
           </div>
           <div>
@@ -2304,6 +2413,7 @@ function SingleResult({
         {[
           ["analysis", "Analysis"],
           ["heatmap", "Attention map"],
+          ["benchmarks", "Benchmarks"],
         ].map(([t, l]) => (
           <button
             key={t}
@@ -2607,6 +2717,261 @@ function SingleResult({
           )}
         </div>
       )}
+      {tab === "benchmarks" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {!result.industry_benchmarks ? (
+            <div
+              style={{
+                background: "#fff",
+                border: "1px solid #F0F0F0",
+                borderRadius: 14,
+                padding: "2rem",
+                textAlign: "center",
+              }}
+            >
+              <p style={{ fontSize: 24, margin: "0 0 8px" }}>📊</p>
+              <p
+                style={{
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: "#222",
+                  margin: "0 0 4px",
+                }}
+              >
+                No industry selected
+              </p>
+              <p style={{ fontSize: 13, color: "#AAA", margin: 0 }}>
+                Select an industry in the config panel before analysing to get
+                real-world campaign benchmarks.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Creative reference */}
+              {creative && (
+                <CreativePreview
+                  creative={creative}
+                  onRemove={undefined}
+                  label={undefined}
+                  labelColor={undefined}
+                  compact={false}
+                />
+              )}
+
+              {/* Summary */}
+              <div
+                style={{
+                  background: "#fff",
+                  border: "1px solid #F0F0F0",
+                  borderRadius: 14,
+                  padding: "1.25rem",
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: "#BBB",
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    marginBottom: 10,
+                  }}
+                >
+                  What top campaigns are doing
+                </p>
+                <p
+                  style={{
+                    fontSize: 13,
+                    color: "#444",
+                    lineHeight: 1.65,
+                    margin: 0,
+                  }}
+                >
+                  {result.industry_benchmarks.summary}
+                </p>
+              </div>
+
+              {/* Examples */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <p
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: "#BBB",
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    margin: 0,
+                  }}
+                >
+                  Real-world examples
+                </p>
+                {(result.industry_benchmarks.examples || []).map(
+                  (ex: any, i: number) => (
+                    <div
+                      key={i}
+                      style={{
+                        background: "#fff",
+                        border: "1px solid #F0F0F0",
+                        borderRadius: 12,
+                        padding: "1rem 1.25rem",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          marginBottom: 8,
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: 6,
+                            background: i === 0 ? "#6366F1" : "#F59E0B",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 800,
+                              color: "#fff",
+                            }}
+                          >
+                            {i + 1}
+                          </span>
+                        </div>
+                        <div>
+                          <p
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 700,
+                              color: "#111",
+                              margin: 0,
+                            }}
+                          >
+                            {ex.brand}
+                          </p>
+                          <p style={{ fontSize: 11, color: "#888", margin: 0 }}>
+                            {ex.campaign}
+                          </p>
+                        </div>
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 6,
+                        }}
+                      >
+                        <div
+                          style={{
+                            background: "#F5F3FF",
+                            borderRadius: 8,
+                            padding: "8px 10px",
+                          }}
+                        >
+                          <p
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: "#6366F1",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.06em",
+                              margin: "0 0 3px",
+                            }}
+                          >
+                            Technique
+                          </p>
+                          <p
+                            style={{
+                              fontSize: 12,
+                              color: "#444",
+                              margin: 0,
+                              lineHeight: 1.5,
+                            }}
+                          >
+                            {ex.technique}
+                          </p>
+                        </div>
+                        <div
+                          style={{
+                            background: "#F0FDF4",
+                            borderRadius: 8,
+                            padding: "8px 10px",
+                          }}
+                        >
+                          <p
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: "#15803D",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.06em",
+                              margin: "0 0 3px",
+                            }}
+                          >
+                            What you can learn
+                          </p>
+                          <p
+                            style={{
+                              fontSize: 12,
+                              color: "#444",
+                              margin: 0,
+                              lineHeight: 1.5,
+                            }}
+                          >
+                            {ex.lesson}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ),
+                )}
+              </div>
+
+              {/* Gap */}
+              <div
+                style={{
+                  background: "#FEF2F2",
+                  border: "1px solid #FECACA",
+                  borderRadius: 12,
+                  padding: "1rem 1.25rem",
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: "#B91C1C",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                    margin: "0 0 6px",
+                  }}
+                >
+                  The gap
+                </p>
+                <p
+                  style={{
+                    fontSize: 13,
+                    color: "#333",
+                    lineHeight: 1.6,
+                    margin: 0,
+                  }}
+                >
+                  {result.industry_benchmarks.gap}
+                </p>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
         <button
           onClick={onReset}

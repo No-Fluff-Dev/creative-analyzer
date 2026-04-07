@@ -1,4 +1,3 @@
-//Anthropic setings
 export async function POST(req: Request) {
   try {
     const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -8,14 +7,23 @@ export async function POST(req: Request) {
         JSON.stringify({
           error: "ANTHROPIC_API_KEY is not set in environment",
         }),
-        {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        },
+        { status: 500, headers: { "Content-Type": "application/json" } },
       );
     }
 
     const body = await req.json();
+
+    // Build request — include tools if provided
+    const anthropicRequest: Record<string, unknown> = {
+      model: body.model,
+      max_tokens: body.max_tokens || 4000,
+      system: body.system,
+      messages: body.messages,
+    };
+
+    if (body.tools) {
+      anthropicRequest.tools = body.tools;
+    }
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -23,8 +31,9 @@ export async function POST(req: Request) {
         "Content-Type": "application/json",
         "x-api-key": apiKey,
         "anthropic-version": "2023-06-01",
+        "anthropic-beta": "web-search-2025-03-05",
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(anthropicRequest),
     });
 
     const data = await response.json();
