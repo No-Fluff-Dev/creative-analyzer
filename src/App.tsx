@@ -2624,11 +2624,16 @@ export default function App({
   session: import("@supabase/supabase-js").Session;
 }) {
   const [currentView, setCurrentView] = useState<
-    "analyzer" | "dashboard" | "brands"
+    "analyzer" | "dashboard" | "brands" | "profile"
   >("analyzer");
   const [profile, setProfile] = useState<any>(null);
   const [analysesHistory, setAnalysesHistory] = useState<any[]>([]);
   const [viewingHistoryItem, setViewingHistoryItem] = useState<any>(null);
+
+  // Editing profile state
+  const [editName, setEditName] = useState("");
+  const [editCompany, setEditCompany] = useState("");
+  const [savingProfile, setSavingProfile] = useState(false);
 
   const [mode, setMode] = useState("single");
   const [showBrandMgr, setShowBrandMgr] = useState(false);
@@ -2660,7 +2665,11 @@ export default function App({
       .select("*")
       .eq("id", session.user.id)
       .single();
-    if (prof) setProfile(prof);
+    if (prof) {
+      setProfile(prof);
+      setEditName(prof.full_name || "");
+      setEditCompany(prof.company || "");
+    }
     const { data: hist } = await supabase
       .from("analyses")
       .select("*")
@@ -2675,6 +2684,26 @@ export default function App({
       fetchUserData();
     }
   }, [session, currentView]);
+
+  const handleSaveProfile = async () => {
+    setSavingProfile(true);
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        full_name: editName,
+        company: editCompany,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", session.user.id);
+
+    if (!error) {
+      setProfile({ ...profile, full_name: editName, company: editCompany });
+      alert("Profile updated successfully!");
+    } else {
+      alert("Failed to update profile: " + error.message);
+    }
+    setSavingProfile(false);
+  };
 
   const deleteAnalysis = async (id: string) => {
     const confirmDelete = window.confirm(
@@ -3211,6 +3240,46 @@ Be specific. Reference actual elements visible. No generic advice.`;
           </svg>
           {isSidebarOpen && <span>Dashboard History</span>}
         </button>
+        <button
+          onClick={() => {
+            setCurrentView("profile");
+            setViewingHistoryItem(null);
+          }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: "10px",
+            borderRadius: 8,
+            border: "none",
+            background: currentView === "profile" ? "#F5F3FF" : "transparent",
+            color: currentView === "profile" ? "#6366F1" : "#555",
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: "pointer",
+            textAlign: "left",
+            transition: "all 0.15s",
+            justifyContent: isSidebarOpen ? "flex-start" : "center",
+            whiteSpace: "nowrap",
+          }}
+          title={!isSidebarOpen ? "Profile & Settings" : undefined}
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ flexShrink: 0 }}
+          >
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          {isSidebarOpen && <span>Profile & Settings</span>}
+        </button>
 
         <div style={{ flex: 1 }} />
 
@@ -3474,6 +3543,176 @@ Be specific. Reference actual elements visible. No generic advice.`;
               userId={session.user.id}
               isModal={false}
             />
+          </div>
+        )}
+
+        {/* === PROFILE & SETTINGS VIEW === */}
+        {currentView === "profile" && (
+          <div style={{ width: "100%", maxWidth: 600, margin: "0 auto" }}>
+            <h1
+              style={{
+                fontSize: 24,
+                fontWeight: 600,
+                color: "#111",
+                margin: "0 0 6px",
+              }}
+            >
+              Profile & Settings
+            </h1>
+            <p style={{ fontSize: 14, color: "#888", marginBottom: "2rem" }}>
+              Manage your account details and view your subscription.
+            </p>
+
+            <div
+              style={{
+                background: "#fff",
+                border: "1px solid #F0F0F0",
+                borderRadius: 14,
+                padding: "1.5rem",
+              }}
+            >
+              <div style={{ marginBottom: "1.25rem" }}>
+                <label
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: "#AAA",
+                    display: "block",
+                    marginBottom: 6,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                  }}
+                >
+                  Email Address
+                </label>
+                <input
+                  value={session.user.email || ""}
+                  disabled
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    border: "1px solid #EFEFEF",
+                    borderRadius: 8,
+                    fontSize: 13,
+                    color: "#888",
+                    background: "#FAFAFA",
+                    outline: "none",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: "1.25rem" }}>
+                <label
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: "#AAA",
+                    display: "block",
+                    marginBottom: 6,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                  }}
+                >
+                  Full Name
+                </label>
+                <input
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="e.g. Jane Doe"
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    border: "1px solid #EFEFEF",
+                    borderRadius: 8,
+                    fontSize: 13,
+                    color: "#222",
+                    background: "#fff",
+                    outline: "none",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: "1.25rem" }}>
+                <label
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: "#AAA",
+                    display: "block",
+                    marginBottom: 6,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                  }}
+                >
+                  Company
+                </label>
+                <input
+                  value={editCompany}
+                  onChange={(e) => setEditCompany(e.target.value)}
+                  placeholder="e.g. Acme Corp"
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    border: "1px solid #EFEFEF",
+                    borderRadius: 8,
+                    fontSize: 13,
+                    color: "#222",
+                    background: "#fff",
+                    outline: "none",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: "1.5rem" }}>
+                <label
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: "#AAA",
+                    display: "block",
+                    marginBottom: 6,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                  }}
+                >
+                  Credits Remaining
+                </label>
+                <div
+                  style={{
+                    display: "inline-block",
+                    background: "#F5F3FF",
+                    padding: "6px 12px",
+                    borderRadius: 8,
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: "#6366F1",
+                  }}
+                >
+                  {profile?.credits_remaining || 0} tokens
+                </div>
+              </div>
+
+              <button
+                onClick={handleSaveProfile}
+                disabled={savingProfile}
+                style={{
+                  width: "100%",
+                  padding: "12px",
+                  borderRadius: 10,
+                  border: "none",
+                  background: savingProfile ? "#F0F0F0" : "#111",
+                  color: savingProfile ? "#AAA" : "#fff",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: savingProfile ? "not-allowed" : "pointer",
+                }}
+              >
+                {savingProfile ? "Saving..." : "Save Profile"}
+              </button>
+            </div>
           </div>
         )}
 
