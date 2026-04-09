@@ -3033,43 +3033,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
         overflow: "visible",
       }}
     >
-      <button
-        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        style={{
-          position: "absolute",
-          right: -12,
-          top: 24,
-          background: "#fff",
-          border: "1px solid #EFEFEF",
-          borderRadius: "50%",
-          width: 24,
-          height: 24,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          cursor: "pointer",
-          zIndex: 10,
-          boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
-        }}
-      >
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="#666"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          style={{
-            transform: isSidebarOpen ? "rotate(0deg)" : "rotate(180deg)",
-            transition: "transform 0.3s ease",
-          }}
-        >
-          <polyline points="15 18 9 12 15 6"></polyline>
-        </svg>
-      </button>
-
       <div
         style={{
           padding: isSidebarOpen ? "1.5rem" : "1.5rem 0",
@@ -3248,6 +3211,42 @@ Be specific. Reference actual elements visible. No generic advice.`;
           {isSidebarOpen && <span>Dashboard History</span>}
         </button>
       </nav>
+      <button
+        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+        style={{
+          position: "absolute",
+          right: -12,
+          top: 24,
+          background: "#fff",
+          border: "1px solid #EFEFEF",
+          borderRadius: "50%",
+          width: 24,
+          height: 24,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: "pointer",
+          zIndex: 10,
+          boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+        }}
+      >
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#666"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={{
+            transform: isSidebarOpen ? "rotate(0deg)" : "rotate(180deg)",
+            transition: "transform 0.3s ease",
+          }}
+        >
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+      </button>
 
       <div
         style={{
