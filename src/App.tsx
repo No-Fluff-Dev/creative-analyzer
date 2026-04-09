@@ -315,12 +315,14 @@ function BrandManager({
   onClose,
   onUpdated,
   userId,
+  isModal = true,
 }: {
   onSelect: (name: string, notes: string, files?: BrandFile[]) => void;
   selectedBrand: string;
   onClose: () => void;
   onUpdated: (b: BrandMap) => void;
   userId: string;
+  isModal?: boolean;
 }) {
   const [brands, setBrands] = useState<BrandMap>({});
   const [name, setName] = useState("");
@@ -461,44 +463,32 @@ function BrandManager({
   const fileIcon = (type: string) =>
     type.startsWith("image/") ? "🖼️" : type === "application/pdf" ? "📄" : "📝";
 
-  return (
+  const content = (
     <div
       style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.45)",
-        zIndex: 100,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "1rem",
+        background: "#fff",
+        borderRadius: 18,
+        padding: "1.5rem",
+        width: "100%",
+        maxWidth: isModal ? 480 : "100%",
+        maxHeight: isModal ? "85vh" : "auto",
+        overflowY: "auto",
+        boxShadow: isModal ? "0 20px 60px rgba(0,0,0,0.2)" : "none",
+        border: isModal ? "none" : "1px solid #EFEFEF",
       }}
     >
       <div
         style={{
-          background: "#fff",
-          borderRadius: 18,
-          padding: "1.5rem",
-          width: "100%",
-          maxWidth: 480,
-          maxHeight: "85vh",
-          overflowY: "auto",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "1.25rem",
         }}
       >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "1.25rem",
-          }}
-        >
-          <h2
-            style={{ fontSize: 16, fontWeight: 600, color: "#111", margin: 0 }}
-          >
-            Brand guidelines
-          </h2>
+        <h2 style={{ fontSize: 16, fontWeight: 600, color: "#111", margin: 0 }}>
+          Brand guidelines
+        </h2>
+        {isModal && (
           <button
             onClick={onClose}
             style={{
@@ -517,311 +507,337 @@ function BrandManager({
           >
             ✕
           </button>
-        </div>
+        )}
+      </div>
 
-        {Object.keys(brands).length > 0 && (
-          <div
-            style={{
-              marginBottom: "1.25rem",
-              display: "flex",
-              flexDirection: "column",
-              gap: 8,
-            }}
-          >
-            {Object.entries(brands).map(([n, d]) => (
+      {Object.keys(brands).length > 0 && (
+        <div
+          style={{
+            marginBottom: "1.25rem",
+            display: "grid",
+            gridTemplateColumns: isModal ? "1fr" : "1fr 1fr",
+            gap: 10,
+          }}
+        >
+          {Object.entries(brands).map(([n, d]) => (
+            <div
+              key={n}
+              onClick={() => {
+                onSelect(n, d.notes, d.files || []);
+                onClose();
+              }}
+              style={{
+                border: `2px solid ${selectedBrand === n ? "#6366F1" : "#F0F0F0"}`,
+                borderRadius: 10,
+                padding: "10px 14px",
+                cursor: "pointer",
+                background: "#fff",
+              }}
+            >
               <div
-                key={n}
-                onClick={() => {
-                  onSelect(n, d.notes, d.files || []);
-                  onClose();
-                }}
                 style={{
-                  border: `2px solid ${selectedBrand === n ? "#6366F1" : "#F0F0F0"}`,
-                  borderRadius: 10,
-                  padding: "10px 14px",
-                  cursor: "pointer",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
                 }}
               >
+                <span
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: selectedBrand === n ? "#6366F1" : "#222",
+                  }}
+                >
+                  {n}
+                </span>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      edit(n);
+                    }}
+                    style={{
+                      fontSize: 11,
+                      padding: "2px 8px",
+                      borderRadius: 6,
+                      border: "1px solid #EFEFEF",
+                      background: "#fff",
+                      cursor: "pointer",
+                      color: "#666",
+                    }}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      del(n);
+                    }}
+                    style={{
+                      fontSize: 11,
+                      padding: "2px 8px",
+                      borderRadius: 6,
+                      border: "1px solid #FEECEC",
+                      background: "#FEF2F2",
+                      cursor: "pointer",
+                      color: "#B91C1C",
+                    }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+              <p
+                style={{
+                  fontSize: 11,
+                  color: "#AAA",
+                  margin: "4px 0 0",
+                  lineHeight: 1.4,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {d.notes || "No notes"}
+              </p>
+              {(d.files || []).length > 0 && (
                 <div
                   style={{
                     display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
+                    gap: 4,
+                    flexWrap: "wrap",
+                    marginTop: 6,
                   }}
                 >
-                  <span
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: selectedBrand === n ? "#6366F1" : "#222",
-                    }}
-                  >
-                    {n}
-                  </span>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        edit(n);
-                      }}
+                  {(d.files || []).map((f, i) => (
+                    <span
+                      key={i}
                       style={{
-                        fontSize: 11,
-                        padding: "2px 8px",
-                        borderRadius: 6,
-                        border: "1px solid #EFEFEF",
-                        background: "#fff",
-                        cursor: "pointer",
-                        color: "#666",
+                        fontSize: 10,
+                        padding: "2px 6px",
+                        borderRadius: 4,
+                        background: "#F5F3FF",
+                        color: "#6366F1",
+                        border: "1px solid #E0DBFF",
                       }}
                     >
-                      Edit
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        del(n);
-                      }}
-                      style={{
-                        fontSize: 11,
-                        padding: "2px 8px",
-                        borderRadius: 6,
-                        border: "1px solid #FEECEC",
-                        background: "#FEF2F2",
-                        cursor: "pointer",
-                        color: "#B91C1C",
-                      }}
-                    >
-                      Delete
-                    </button>
-                  </div>
+                      {fileIcon(f.type)}{" "}
+                      {f.name.length > 20 ? f.name.slice(0, 20) + "…" : f.name}
+                    </span>
+                  ))}
                 </div>
-                <p
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div
+        style={{
+          background: "#FAFAFA",
+          borderRadius: 12,
+          padding: "1.25rem",
+          border: "1px solid #F0F0F0",
+        }}
+      >
+        <p
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            color: "#AAA",
+            textTransform: "uppercase",
+            letterSpacing: "0.06em",
+            marginBottom: 10,
+          }}
+        >
+          {editing ? "Edit brand" : "Add new brand"}
+        </p>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Brand / client name"
+          style={{
+            width: "100%",
+            padding: "10px 12px",
+            border: "1px solid #EFEFEF",
+            borderRadius: 8,
+            fontSize: 13,
+            marginBottom: 10,
+            outline: "none",
+            background: "#fff",
+            boxSizing: "border-box",
+            color: "#111",
+          }}
+        />
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Colours, fonts, tone, visual rules, messaging…"
+          rows={3}
+          style={{
+            width: "100%",
+            padding: "10px 12px",
+            border: "1px solid #EFEFEF",
+            borderRadius: 8,
+            fontSize: 13,
+            resize: "vertical",
+            fontFamily: "inherit",
+            outline: "none",
+            background: "#fff",
+            boxSizing: "border-box",
+            marginBottom: 10,
+            color: "#111",
+          }}
+        />
+
+        <div
+          onClick={() => fileRef.current?.click()}
+          style={{
+            border: "1.5px dashed #DDD",
+            borderRadius: 8,
+            padding: "16px",
+            textAlign: "center",
+            cursor: "pointer",
+            background: "#fff",
+            marginBottom: 10,
+            transition: "all 0.15s",
+          }}
+        >
+          <p
+            style={{ fontSize: 13, fontWeight: 500, color: "#555", margin: 0 }}
+          >
+            {uploading
+              ? "Processing file…"
+              : "📎 Upload brand guideline document"}
+          </p>
+          <p style={{ fontSize: 11, color: "#CCC", margin: "4px 0 0" }}>
+            PDF · Word (.docx) · PNG · JPG · SVG
+          </p>
+          <input
+            ref={fileRef}
+            type="file"
+            style={{ display: "none" }}
+            accept=".pdf,.docx,image/png,image/jpeg,image/svg+xml"
+            onChange={(e) => {
+              if (e.target.files?.[0]) handleFileUpload(e.target.files[0]);
+              e.target.value = "";
+            }}
+          />
+        </div>
+
+        {files.length > 0 && (
+          <div
+            style={{
+              display: "flex",
+              gap: 6,
+              flexWrap: "wrap",
+              marginBottom: 12,
+            }}
+          >
+            {files.map((f, i) => (
+              <div
+                key={i}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontSize: 11,
+                  padding: "4px 10px",
+                  borderRadius: 6,
+                  background: "#F5F3FF",
+                  color: "#6366F1",
+                  border: "1px solid #E0DBFF",
+                }}
+              >
+                <span>
+                  {fileIcon(f.type)}{" "}
+                  {f.name.length > 22 ? f.name.slice(0, 22) + "…" : f.name}
+                </span>
+                {f.extractedText && (
+                  <span style={{ color: "#10B981", fontSize: 9 }}>
+                    ✓ text extracted
+                  </span>
+                )}
+                <button
+                  onClick={() => removeFile(i)}
                   style={{
-                    fontSize: 11,
-                    color: "#AAA",
-                    margin: "4px 0 0",
-                    lineHeight: 1.4,
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    color: "#6366F1",
+                    fontSize: 12,
+                    padding: 0,
+                    lineHeight: 1,
                   }}
                 >
-                  {d.notes || "No notes"}
-                </p>
-                {(d.files || []).length > 0 && (
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: 4,
-                      flexWrap: "wrap",
-                      marginTop: 6,
-                    }}
-                  >
-                    {(d.files || []).map((f, i) => (
-                      <span
-                        key={i}
-                        style={{
-                          fontSize: 10,
-                          padding: "2px 6px",
-                          borderRadius: 4,
-                          background: "#F5F3FF",
-                          color: "#6366F1",
-                          border: "1px solid #E0DBFF",
-                        }}
-                      >
-                        {fileIcon(f.type)}{" "}
-                        {f.name.length > 20
-                          ? f.name.slice(0, 20) + "…"
-                          : f.name}
-                      </span>
-                    ))}
-                  </div>
-                )}
+                  ✕
+                </button>
               </div>
             ))}
           </div>
         )}
 
-        <div
+        <button
+          onClick={commit}
+          disabled={!name.trim() || saving}
           style={{
-            background: "#FAFAFA",
-            borderRadius: 12,
-            padding: "1rem",
-            border: "1px solid #F0F0F0",
+            marginTop: 4,
+            width: "100%",
+            padding: "10px",
+            borderRadius: 8,
+            border: "none",
+            background: name.trim() && !saving ? "#111" : "#F0F0F0",
+            color: name.trim() && !saving ? "#fff" : "#AAA",
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: name.trim() && !saving ? "pointer" : "not-allowed",
           }}
         >
-          <p
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              color: "#AAA",
-              textTransform: "uppercase",
-              letterSpacing: "0.06em",
-              marginBottom: 10,
-            }}
-          >
-            {editing ? "Edit brand" : "Add new brand"}
-          </p>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Brand / client name"
-            style={{
-              width: "100%",
-              padding: "8px 12px",
-              border: "1px solid #EFEFEF",
-              borderRadius: 8,
-              fontSize: 13,
-              marginBottom: 8,
-              outline: "none",
-              background: "#fff",
-              boxSizing: "border-box",
-              color: "#111",
-            }}
-          />
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Colours, fonts, tone, visual rules, messaging…"
-            rows={3}
-            style={{
-              width: "100%",
-              padding: "8px 12px",
-              border: "1px solid #EFEFEF",
-              borderRadius: 8,
-              fontSize: 13,
-              resize: "vertical",
-              fontFamily: "inherit",
-              outline: "none",
-              background: "#fff",
-              boxSizing: "border-box",
-              marginBottom: 8,
-              color: "#111",
-            }}
-          />
-          <div
-            onClick={() => fileRef.current?.click()}
-            style={{
-              border: "1.5px dashed #DDD",
-              borderRadius: 8,
-              padding: "12px",
-              textAlign: "center",
-              cursor: "pointer",
-              background: "#fff",
-              marginBottom: 8,
-            }}
-          >
-            <p style={{ fontSize: 12, color: "#888", margin: 0 }}>
-              {uploading ? "Processing file…" : "📎 Upload brand guideline"}
-            </p>
-            <p style={{ fontSize: 10, color: "#CCC", margin: "3px 0 0" }}>
-              PDF · Word (.docx) · PNG · JPG · SVG
-            </p>
-            <input
-              ref={fileRef}
-              type="file"
-              style={{ display: "none" }}
-              accept=".pdf,.docx,image/png,image/jpeg,image/svg+xml"
-              onChange={(e) => {
-                if (e.target.files?.[0]) handleFileUpload(e.target.files[0]);
-                e.target.value = "";
-              }}
-            />
-          </div>
-          {files.length > 0 && (
-            <div
-              style={{
-                display: "flex",
-                gap: 4,
-                flexWrap: "wrap",
-                marginBottom: 8,
-              }}
-            >
-              {files.map((f, i) => (
-                <div
-                  key={i}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 4,
-                    fontSize: 11,
-                    padding: "3px 8px",
-                    borderRadius: 6,
-                    background: "#F5F3FF",
-                    color: "#6366F1",
-                    border: "1px solid #E0DBFF",
-                  }}
-                >
-                  <span>
-                    {fileIcon(f.type)}{" "}
-                    {f.name.length > 22 ? f.name.slice(0, 22) + "…" : f.name}
-                  </span>
-                  {f.extractedText && (
-                    <span style={{ color: "#10B981", fontSize: 9 }}>
-                      ✓ text extracted
-                    </span>
-                  )}
-                  <button
-                    onClick={() => removeFile(i)}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      color: "#6366F1",
-                      fontSize: 12,
-                      padding: 0,
-                      lineHeight: 1,
-                    }}
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
+          {saving ? "Saving…" : editing ? "Save changes" : "Save brand"}
+        </button>
+        {editing && (
           <button
-            onClick={commit}
-            disabled={!name.trim() || saving}
+            onClick={() => {
+              setEditing(null);
+              setName("");
+              setNotes("");
+              setFiles([]);
+            }}
             style={{
-              marginTop: 4,
+              marginTop: 8,
               width: "100%",
-              padding: "9px",
+              padding: "10px",
               borderRadius: 8,
-              border: "none",
-              background: name.trim() && !saving ? "#111" : "#F0F0F0",
-              color: name.trim() && !saving ? "#fff" : "#AAA",
+              border: "1px solid #EFEFEF",
+              background: "#fff",
               fontSize: 13,
-              fontWeight: 600,
-              cursor: name.trim() && !saving ? "pointer" : "not-allowed",
+              fontWeight: 500,
+              color: "#888",
+              cursor: "pointer",
             }}
           >
-            {saving ? "Saving…" : editing ? "Save changes" : "Save brand"}
+            Cancel
           </button>
-          {editing && (
-            <button
-              onClick={() => {
-                setEditing(null);
-                setName("");
-                setNotes("");
-                setFiles([]);
-              }}
-              style={{
-                marginTop: 6,
-                width: "100%",
-                padding: "8px",
-                borderRadius: 8,
-                border: "1px solid #EFEFEF",
-                background: "#fff",
-                fontSize: 13,
-                color: "#888",
-                cursor: "pointer",
-              }}
-            >
-              Cancel
-            </button>
-          )}
-        </div>
+        )}
       </div>
+    </div>
+  );
+
+  if (!isModal) return content;
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.45)",
+        zIndex: 100,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "1rem",
+      }}
+    >
+      {content}
     </div>
   );
 }
@@ -1313,7 +1329,7 @@ function SingleResult({
   platform,
   industry,
 }: {
-  creative: CreativeFile;
+  creative: CreativeFile | null;
   result: AnalysisResult;
   threshold: number;
   onReset: () => void;
@@ -1390,7 +1406,7 @@ function SingleResult({
           </p>
         </div>
       </div>
-      {creative && (
+      {creative && creative.dataUrl && (
         <CreativePreview
           creative={creative}
           onRemove={undefined}
@@ -1456,7 +1472,7 @@ function SingleResult({
               }}
             >
               {DIMS.map((d) => {
-                const dim = result.dimensions[d.key] || {
+                const dim = result.dimensions?.[d.key] || {
                   score: 0,
                   recommendation: "Data missing.",
                 };
@@ -1625,6 +1641,17 @@ function SingleResult({
             >
               Attention mapping is for static images only
             </p>
+          ) : !creative?.dataUrl ? (
+            <p
+              style={{
+                fontSize: 13,
+                color: "#AAA",
+                textAlign: "center",
+                padding: "2rem 0",
+              }}
+            >
+              Image unavailable for saved analyses.
+            </p>
           ) : (
             <>
               <HeatmapCanvas
@@ -1748,8 +1775,7 @@ function SingleResult({
             </div>
           ) : (
             <>
-              {/* Creative reference */}
-              {creative && (
+              {creative && creative.dataUrl && (
                 <CreativePreview
                   creative={creative}
                   onRemove={undefined}
@@ -1758,8 +1784,6 @@ function SingleResult({
                   compact={false}
                 />
               )}
-
-              {/* Summary */}
               <div
                 style={{
                   background: "#fff",
@@ -1791,8 +1815,6 @@ function SingleResult({
                   {result.industry_benchmarks.summary}
                 </p>
               </div>
-
-              {/* Examples */}
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <p
                   style={{
@@ -1935,8 +1957,6 @@ function SingleResult({
                   ),
                 )}
               </div>
-
-              {/* Gap */}
               <div
                 style={{
                   background: "#FEF2F2",
@@ -1987,7 +2007,7 @@ function SingleResult({
             cursor: "pointer",
           }}
         >
-          Analyse another
+          Back
         </button>
         <button
           onClick={onExport}
@@ -2567,41 +2587,18 @@ function ABResults({
   );
 }
 
-interface IndustryExample {
-  brand: string;
-  campaign: string;
-  technique: string;
-  lesson: string;
-}
-interface IndustryBenchmarks {
-  summary: string;
-  examples: IndustryExample[];
-  gap: string;
-}
-interface AnalysisResult {
-  overall_score: number;
-  overall_verdict: string;
-  pass: boolean;
-  dimensions: { [key: string]: { score: number; recommendation: string } };
-  top_fixes: string[];
-  attention_zones: Zone[];
-  industry_benchmarks?: IndustryBenchmarks;
-}
-interface AnalysedCreative extends CreativeFile {
-  result: AnalysisResult;
-  index: number;
-}
-
 export default function App({
   session,
 }: {
   session: import("@supabase/supabase-js").Session;
 }) {
-  const [currentView, setCurrentView] = useState<"analyzer" | "dashboard">(
-    "analyzer",
-  );
+  // App Navigation
+  const [currentView, setCurrentView] = useState<
+    "analyzer" | "dashboard" | "brands"
+  >("analyzer");
   const [profile, setProfile] = useState<any>(null);
   const [analysesHistory, setAnalysesHistory] = useState<any[]>([]);
+  const [viewingHistoryItem, setViewingHistoryItem] = useState<any>(null);
 
   const [mode, setMode] = useState("single");
   const [showBrandMgr, setShowBrandMgr] = useState(false);
@@ -2644,6 +2641,15 @@ export default function App({
       fetchUserData();
     }
   }, [session, currentView]);
+
+  const deleteAnalysis = async (id: string) => {
+    const confirmDelete = window.confirm(
+      "Are you sure you want to permanently delete this report?",
+    );
+    if (!confirmDelete) return;
+    await supabase.from("analyses").delete().eq("id", id);
+    setAnalysesHistory((prev) => prev.filter((item) => item.id !== id));
+  };
 
   const buildSystem = (isVideo: boolean) => {
     const fileContext = brandFiles
@@ -2777,7 +2783,11 @@ Be specific. Reference actual elements visible. No generic advice.`;
     return parsed;
   };
 
-  const saveAnalysisRecord = async (score: number, pass: boolean) => {
+  const saveAnalysisRecord = async (
+    score: number,
+    pass: boolean,
+    fullResult: AnalysisResult,
+  ) => {
     const creditsUsed =
       MODELS.find((m) => m.id === selectedModel)?.credits || 1;
     await supabase.from("analyses").insert({
@@ -2788,6 +2798,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
       credits_used: creditsUsed,
       overall_score: score,
       pass: pass,
+      result: fullResult,
     });
     fetchUserData();
   };
@@ -2800,7 +2811,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
     try {
       const res = await callAPI(single);
       setSingleResult(res);
-      await saveAnalysisRecord(res.overall_score, res.pass);
+      await saveAnalysisRecord(res.overall_score, res.pass, res);
     } catch (err) {
       setError((err as Error).message);
     }
@@ -2821,7 +2832,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
           if (n[i]) n[i] = { ...(n[i] as CreativeFile), result };
           return n;
         });
-        await saveAnalysisRecord(result.overall_score, result.pass);
+        await saveAnalysisRecord(result.overall_score, result.pass, result);
       } catch (err) {
         setError(`Creative ${LABELS[i]}: ${(err as Error).message}`);
       }
@@ -2944,7 +2955,10 @@ Be specific. Reference actual elements visible. No generic advice.`;
         }}
       >
         <button
-          onClick={() => setCurrentView("analyzer")}
+          onClick={() => {
+            setCurrentView("analyzer");
+            setViewingHistoryItem(null);
+          }}
           style={{
             display: "flex",
             alignItems: "center",
@@ -2977,7 +2991,46 @@ Be specific. Reference actual elements visible. No generic advice.`;
           Analyzer Workspace
         </button>
         <button
-          onClick={() => setCurrentView("dashboard")}
+          onClick={() => {
+            setCurrentView("brands");
+            setViewingHistoryItem(null);
+          }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: "10px 14px",
+            borderRadius: 8,
+            border: "none",
+            background: currentView === "brands" ? "#F5F3FF" : "transparent",
+            color: currentView === "brands" ? "#6366F1" : "#555",
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: "pointer",
+            textAlign: "left",
+            transition: "all 0.15s",
+          }}
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+            <line x1="7" y1="7" x2="7.01" y2="7"></line>
+          </svg>
+          Brand Assets
+        </button>
+        <button
+          onClick={() => {
+            setCurrentView("dashboard");
+            setViewingHistoryItem(null);
+          }}
           style={{
             display: "flex",
             alignItems: "center",
@@ -3110,7 +3163,8 @@ Be specific. Reference actual elements visible. No generic advice.`;
         fontFamily: "var(--font-sans,system-ui)",
       }}
     >
-      {showBrandMgr && (
+      {/* Fallback modal if triggered inside Analyzer view */}
+      {showBrandMgr && currentView !== "brands" && (
         <BrandManager
           selectedBrand={selectedBrand}
           onSelect={(n, notes, files) => {
@@ -3122,6 +3176,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
           onClose={() => setShowBrandMgr(false)}
           onUpdated={(b) => setBrands(b)}
           userId={session.user.id}
+          isModal={true}
         />
       )}
 
@@ -3137,8 +3192,8 @@ Be specific. Reference actual elements visible. No generic advice.`;
           boxSizing: "border-box",
         }}
       >
-        {/* === DASHBOARD VIEW === */}
-        {currentView === "dashboard" && (
+        {/* === BRAND MANAGER VIEW === */}
+        {currentView === "brands" && (
           <div style={{ maxWidth: 900, margin: "0 auto" }}>
             <h1
               style={{
@@ -3148,178 +3203,417 @@ Be specific. Reference actual elements visible. No generic advice.`;
                 margin: "0 0 6px",
               }}
             >
-              Analysis Dashboard
+              Brand Assets
             </h1>
             <p style={{ fontSize: 14, color: "#888", marginBottom: "2rem" }}>
-              Review your past creative performance and credit usage.
+              Manage your clients' brand guidelines, rules, and visual assets.
             </p>
-
-            <div
-              style={{
-                background: "#fff",
-                border: "1px solid #EFEFEF",
-                borderRadius: 14,
-                overflow: "hidden",
+            <BrandManager
+              selectedBrand={selectedBrand}
+              onSelect={(n, notes, files) => {
+                setSelectedBrand(n);
+                setBrandNotes(notes || "");
+                setBrandFiles(files || []);
+                if (n) setClient(n);
               }}
-            >
-              <table
-                style={{
-                  width: "100%",
-                  borderCollapse: "collapse",
-                  textAlign: "left",
-                }}
-              >
-                <thead>
-                  <tr
+              onClose={() => {}}
+              onUpdated={(b) => setBrands(b)}
+              userId={session.user.id}
+              isModal={false}
+            />
+          </div>
+        )}
+
+        {/* === DASHBOARD VIEW === */}
+        {currentView === "dashboard" && (
+          <div style={{ maxWidth: 900, margin: "0 auto" }}>
+            {viewingHistoryItem ? (
+              <div>
+                <button
+                  onClick={() => setViewingHistoryItem(null)}
+                  style={{
+                    padding: "8px 14px",
+                    borderRadius: 8,
+                    border: "1px solid #EFEFEF",
+                    background: "#fff",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "#555",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    marginBottom: "1.5rem",
+                  }}
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                  </svg>
+                  Back to History
+                </button>
+                <div
+                  style={{
+                    background: "#fff",
+                    border: "1px solid #F0F0F0",
+                    borderRadius: 14,
+                    padding: "1.25rem",
+                    marginBottom: "1rem",
+                  }}
+                >
+                  <p
                     style={{
-                      background: "#FAFAFA",
-                      borderBottom: "1px solid #EFEFEF",
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: "#AAA",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                      marginBottom: 5,
                     }}
                   >
-                    <th
-                      style={{
-                        padding: "12px 16px",
-                        fontSize: 11,
-                        fontWeight: 700,
-                        color: "#AAA",
-                        textTransform: "uppercase",
-                      }}
-                    >
-                      Date
-                    </th>
-                    <th
-                      style={{
-                        padding: "12px 16px",
-                        fontSize: 11,
-                        fontWeight: 700,
-                        color: "#AAA",
-                        textTransform: "uppercase",
-                      }}
-                    >
-                      Client / Campaign
-                    </th>
-                    <th
-                      style={{
-                        padding: "12px 16px",
-                        fontSize: 11,
-                        fontWeight: 700,
-                        color: "#AAA",
-                        textTransform: "uppercase",
-                      }}
-                    >
-                      Platform
-                    </th>
-                    <th
-                      style={{
-                        padding: "12px 16px",
-                        fontSize: 11,
-                        fontWeight: 700,
-                        color: "#AAA",
-                        textTransform: "uppercase",
-                      }}
-                    >
-                      Score
-                    </th>
-                    <th
-                      style={{
-                        padding: "12px 16px",
-                        fontSize: 11,
-                        fontWeight: 700,
-                        color: "#AAA",
-                        textTransform: "uppercase",
-                      }}
-                    >
-                      Result
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {analysesHistory.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={5}
+                    Archived Report Context
+                  </p>
+                  <div style={{ display: "flex", gap: "2rem" }}>
+                    <div>
+                      <span style={{ fontSize: 11, color: "#888" }}>
+                        Client:
+                      </span>{" "}
+                      <span
                         style={{
-                          padding: "2rem",
-                          textAlign: "center",
-                          color: "#888",
                           fontSize: 13,
+                          fontWeight: 600,
+                          color: "#111",
                         }}
                       >
-                        No analyses run yet. Head to the workspace to get
-                        started!
-                      </td>
-                    </tr>
-                  ) : (
-                    analysesHistory.map((item) => (
-                      <tr
-                        key={item.id}
-                        style={{ borderBottom: "1px solid #F5F5F5" }}
+                        {viewingHistoryItem.client}
+                      </span>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: 11, color: "#888" }}>
+                        Platform:
+                      </span>{" "}
+                      <span
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: "#111",
+                        }}
                       >
-                        <td
+                        {viewingHistoryItem.platform}
+                      </span>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: 11, color: "#888" }}>Date:</span>{" "}
+                      <span
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: "#111",
+                        }}
+                      >
+                        {new Date(
+                          viewingHistoryItem.created_at,
+                        ).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                {viewingHistoryItem.result ? (
+                  <SingleResult
+                    creative={null}
+                    result={viewingHistoryItem.result}
+                    threshold={65}
+                    model={viewingHistoryItem.model}
+                    client={viewingHistoryItem.client}
+                    platform={viewingHistoryItem.platform}
+                    onReset={() => setViewingHistoryItem(null)}
+                    onExport={async () => {
+                      await generatePDF({
+                        creative: null,
+                        result: viewingHistoryItem.result,
+                        heatmapDataUrl: undefined,
+                        client: viewingHistoryItem.client,
+                        platform: viewingHistoryItem.platform,
+                        industry: "",
+                        threshold: 65,
+                        model: viewingHistoryItem.model,
+                        date: new Date(
+                          viewingHistoryItem.created_at,
+                        ).toLocaleDateString("en-GB"),
+                      });
+                    }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      padding: "2rem",
+                      textAlign: "center",
+                      background: "#FEF2F2",
+                      color: "#B91C1C",
+                      borderRadius: 14,
+                    }}
+                  >
+                    <p style={{ fontWeight: 600, margin: 0 }}>
+                      Legacy Report Data Missing
+                    </p>
+                    <p style={{ fontSize: 13, margin: "4px 0 0" }}>
+                      This analysis was run before full JSON results were saved
+                      to the database.
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <>
+                <h1
+                  style={{
+                    fontSize: 24,
+                    fontWeight: 600,
+                    color: "#111",
+                    margin: "0 0 6px",
+                  }}
+                >
+                  Analysis History
+                </h1>
+                <p
+                  style={{ fontSize: 14, color: "#888", marginBottom: "2rem" }}
+                >
+                  Review your past creative performance and download archived
+                  reports.
+                </p>
+                <div
+                  style={{
+                    background: "#fff",
+                    border: "1px solid #EFEFEF",
+                    borderRadius: 14,
+                    overflow: "hidden",
+                  }}
+                >
+                  <table
+                    style={{
+                      width: "100%",
+                      borderCollapse: "collapse",
+                      textAlign: "left",
+                    }}
+                  >
+                    <thead>
+                      <tr
+                        style={{
+                          background: "#FAFAFA",
+                          borderBottom: "1px solid #EFEFEF",
+                        }}
+                      >
+                        <th
                           style={{
-                            padding: "14px 16px",
-                            fontSize: 13,
-                            color: "#555",
+                            padding: "12px 16px",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: "#AAA",
+                            textTransform: "uppercase",
                           }}
                         >
-                          {new Date(item.created_at).toLocaleDateString()}
-                        </td>
-                        <td
+                          Date
+                        </th>
+                        <th
                           style={{
-                            padding: "14px 16px",
-                            fontSize: 13,
-                            fontWeight: 600,
-                            color: "#111",
+                            padding: "12px 16px",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: "#AAA",
+                            textTransform: "uppercase",
                           }}
                         >
-                          {item.client}
-                        </td>
-                        <td
+                          Client / Campaign
+                        </th>
+                        <th
                           style={{
-                            padding: "14px 16px",
-                            fontSize: 13,
-                            color: "#555",
+                            padding: "12px 16px",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: "#AAA",
+                            textTransform: "uppercase",
                           }}
                         >
-                          {item.platform}
-                        </td>
-                        <td style={{ padding: "14px 16px" }}>
-                          <span
-                            style={{
-                              fontWeight: 700,
-                              color: scoreColor(item.overall_score),
-                            }}
-                          >
-                            {item.overall_score}/100
-                          </span>
-                        </td>
-                        <td style={{ padding: "14px 16px" }}>
-                          <span
-                            style={{
-                              fontSize: 10,
-                              fontWeight: 700,
-                              padding: "3px 8px",
-                              borderRadius: 20,
-                              background: item.pass ? "#F0FDF4" : "#FEF2F2",
-                              color: item.pass ? "#15803D" : "#B91C1C",
-                            }}
-                          >
-                            {item.pass ? "PASS" : "FAIL"}
-                          </span>
-                        </td>
+                          Platform
+                        </th>
+                        <th
+                          style={{
+                            padding: "12px 16px",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: "#AAA",
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          Score
+                        </th>
+                        <th
+                          style={{
+                            padding: "12px 16px",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: "#AAA",
+                            textTransform: "uppercase",
+                            textAlign: "right",
+                          }}
+                        >
+                          Actions
+                        </th>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                    </thead>
+                    <tbody>
+                      {analysesHistory.length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan={5}
+                            style={{
+                              padding: "3rem 1rem",
+                              textAlign: "center",
+                              color: "#888",
+                              fontSize: 13,
+                            }}
+                          >
+                            No analyses run yet. Head to the workspace to get
+                            started!
+                          </td>
+                        </tr>
+                      ) : (
+                        analysesHistory.map((item) => (
+                          <tr
+                            key={item.id}
+                            style={{
+                              borderBottom: "1px solid #F5F5F5",
+                              transition: "background 0.15s",
+                            }}
+                          >
+                            <td
+                              style={{
+                                padding: "14px 16px",
+                                fontSize: 13,
+                                color: "#555",
+                              }}
+                            >
+                              {new Date(item.created_at).toLocaleDateString()}
+                            </td>
+                            <td
+                              style={{
+                                padding: "14px 16px",
+                                fontSize: 13,
+                                fontWeight: 600,
+                                color: "#111",
+                              }}
+                            >
+                              {item.client}
+                            </td>
+                            <td
+                              style={{
+                                padding: "14px 16px",
+                                fontSize: 13,
+                                color: "#555",
+                              }}
+                            >
+                              {item.platform}
+                            </td>
+                            <td style={{ padding: "14px 16px" }}>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 6,
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    fontSize: 13,
+                                    fontWeight: 700,
+                                    color: scoreColor(item.overall_score),
+                                  }}
+                                >
+                                  {item.overall_score}
+                                </span>
+                                <span
+                                  style={{
+                                    fontSize: 9,
+                                    fontWeight: 700,
+                                    padding: "2px 6px",
+                                    borderRadius: 20,
+                                    background: item.pass
+                                      ? "#F0FDF4"
+                                      : "#FEF2F2",
+                                    color: item.pass ? "#15803D" : "#B91C1C",
+                                  }}
+                                >
+                                  {item.pass ? "PASS" : "FAIL"}
+                                </span>
+                              </div>
+                            </td>
+                            <td
+                              style={{
+                                padding: "14px 16px",
+                                textAlign: "right",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "flex-end",
+                                  gap: 8,
+                                }}
+                              >
+                                <button
+                                  onClick={() => setViewingHistoryItem(item)}
+                                  style={{
+                                    fontSize: 11,
+                                    padding: "4px 10px",
+                                    borderRadius: 6,
+                                    border: "1px solid #EFEFEF",
+                                    background: "#fff",
+                                    cursor: "pointer",
+                                    color: "#444",
+                                    fontWeight: 500,
+                                  }}
+                                >
+                                  View Report
+                                </button>
+                                <button
+                                  onClick={() => deleteAnalysis(item.id)}
+                                  style={{
+                                    fontSize: 11,
+                                    padding: "4px 10px",
+                                    borderRadius: 6,
+                                    border: "1px solid #FECACA",
+                                    background: "#FEF2F2",
+                                    cursor: "pointer",
+                                    color: "#B91C1C",
+                                    fontWeight: 500,
+                                  }}
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
           </div>
         )}
 
         {/* === ANALYZER WORKSPACE === */}
         {currentView === "analyzer" && (
           <div style={{ maxWidth: 720, margin: "0 auto" }}>
-            {/* Header */}
             <div
               style={{
                 display: "flex",
@@ -3573,7 +3867,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                       ))}
                     </select>
                     <button
-                      onClick={() => setShowBrandMgr(true)}
+                      onClick={() => setCurrentView("brands")}
                       style={{
                         padding: "8px 12px",
                         borderRadius: 8,
@@ -3589,7 +3883,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                   </div>
                 ) : (
                   <button
-                    onClick={() => setShowBrandMgr(true)}
+                    onClick={() => setCurrentView("brands")}
                     style={{
                       width: "100%",
                       padding: "9px",
@@ -3791,15 +4085,12 @@ Be specific. Reference actual elements visible. No generic advice.`;
                     </button>
                   </>
                 )}
-
-                {/* The beautiful new loader! */}
                 {singleAnalysing && (
                   <AnalysisLoader label="Analysing Creative..." />
                 )}
-
                 {singleResult && (
                   <SingleResult
-                    creative={single!}
+                    creative={single}
                     result={singleResult}
                     threshold={threshold}
                     model={
@@ -3815,7 +4106,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
                     }}
                     onExport={async () => {
                       let heatmapDataUrl: string | undefined = undefined;
-
                       if (
                         single?.type === "image" &&
                         single.dataUrl &&
@@ -3823,7 +4113,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
                       ) {
                         const canvas = document.createElement("canvas");
                         const ctx = canvas.getContext("2d");
-
                         if (ctx) {
                           const img = new Image();
                           await new Promise((resolve) => {
@@ -3831,15 +4120,13 @@ Be specific. Reference actual elements visible. No generic advice.`;
                               canvas.width = img.naturalWidth;
                               canvas.height = img.naturalHeight;
                               ctx.drawImage(img, 0, 0);
-
                               singleResult.attention_zones.forEach((zone) => {
-                                const x = zone.x * img.naturalWidth;
-                                const y = zone.y * img.naturalHeight;
-                                const w = zone.w * img.naturalWidth;
-                                const h = zone.h * img.naturalHeight;
-                                const cx2 = x + w / 2;
-                                const cy2 = y + h / 2;
-
+                                const x = zone.x * img.naturalWidth,
+                                  y = zone.y * img.naturalHeight;
+                                const w = zone.w * img.naturalWidth,
+                                  h = zone.h * img.naturalHeight;
+                                const cx2 = x + w / 2,
+                                  cy2 = y + h / 2;
                                 const grad = ctx.createRadialGradient(
                                   cx2,
                                   cy2,
@@ -3856,7 +4143,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
                                       : "rgba(250,204,21,0.3)";
                                 grad.addColorStop(0, col);
                                 grad.addColorStop(1, "rgba(0,0,0,0)");
-
                                 ctx.fillStyle = grad;
                                 ctx.fillRect(
                                   x - w * 0.15,
@@ -3864,7 +4150,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
                                   w * 1.3,
                                   h * 1.3,
                                 );
-
                                 ctx.strokeStyle =
                                   zone.priority === 1
                                     ? "rgba(239,68,68,0.85)"
@@ -3878,19 +4163,17 @@ Be specific. Reference actual elements visible. No generic advice.`;
                                 ctx.setLineDash([6, 4]);
                                 ctx.strokeRect(x, y, w, h);
                                 ctx.setLineDash([]);
-
                                 const labelText = `${zone.priority}. ${zone.label}`;
                                 const fs = Math.max(
                                   12,
                                   img.naturalWidth * 0.016,
                                 );
                                 ctx.font = `bold ${fs}px system-ui`;
-                                const tw = ctx.measureText(labelText).width;
-                                const pad = 6;
-                                const bh = fs + pad * 2;
-                                const bx = x;
-                                const by = Math.max(0, y - bh - 2);
-
+                                const tw = ctx.measureText(labelText).width,
+                                  pad = 6,
+                                  bh = fs + pad * 2;
+                                const bx = x,
+                                  by = Math.max(0, y - bh - 2);
                                 ctx.fillStyle =
                                   zone.priority === 1
                                     ? "rgba(239,68,68,0.92)"
@@ -3900,7 +4183,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
                                 ctx.beginPath();
                                 ctx.roundRect(bx, by, tw + pad * 2, bh, 4);
                                 ctx.fill();
-
                                 ctx.fillStyle = "#fff";
                                 ctx.textBaseline = "middle";
                                 ctx.fillText(labelText, bx + pad, by + bh / 2);
@@ -3909,11 +4191,9 @@ Be specific. Reference actual elements visible. No generic advice.`;
                             };
                             img.src = single.dataUrl as string;
                           });
-
                           heatmapDataUrl = canvas.toDataURL("image/png");
                         }
                       }
-
                       await generatePDF({
                         creative: single,
                         result: singleResult,
