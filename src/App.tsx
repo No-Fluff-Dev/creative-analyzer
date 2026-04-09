@@ -1272,6 +1272,61 @@ interface AnalysedCreative extends CreativeFile {
   index: number;
 }
 
+function AnalysisLoader({ label }: { label: string }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "3.5rem 1rem",
+        background: "#fff",
+        border: "1px solid #EFEFEF",
+        borderRadius: 14,
+        marginTop: 10,
+      }}
+    >
+      <svg
+        width="32"
+        height="32"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="#6366F1"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        style={{ animation: "spin 1s linear infinite", marginBottom: 16 }}
+      >
+        <style>{`@keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
+        <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+      </svg>
+      <p
+        style={{
+          fontSize: 15,
+          fontWeight: 600,
+          color: "#111",
+          margin: "0 0 6px",
+        }}
+      >
+        {label}
+      </p>
+      <p
+        style={{
+          fontSize: 12,
+          color: "#888",
+          margin: 0,
+          textAlign: "center",
+          maxWidth: 280,
+          lineHeight: 1.5,
+        }}
+      >
+        Scanning visual hierarchy, cognitive load, and behavioural triggers...
+      </p>
+    </div>
+  );
+}
+
 export default function App({
   session,
 }: {
@@ -2082,7 +2137,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                 }}
               />
             )}
-            {single && !singleResult && (
+            {single && !singleResult && !singleAnalysing && (
               <>
                 <CreativePreview
                   creative={single}
@@ -2093,24 +2148,29 @@ Be specific. Reference actual elements visible. No generic advice.`;
                 />
                 <button
                   onClick={runSingle}
-                  disabled={singleAnalysing}
                   style={{
                     width: "100%",
                     padding: 13,
                     borderRadius: 12,
                     border: "none",
-                    background: singleAnalysing ? "#F5F5F5" : "#111",
-                    color: singleAnalysing ? "#AAA" : "#fff",
+                    background: "#111",
+                    color: "#fff",
                     fontSize: 14,
                     fontWeight: 600,
-                    cursor: singleAnalysing ? "not-allowed" : "pointer",
+                    cursor: "pointer",
                     marginTop: 10,
                   }}
                 >
-                  {singleAnalysing ? "Analysing…" : "Analyse creative"}
+                  Analyse creative
                 </button>
               </>
             )}
+
+            {/* The beautiful new loader! */}
+            {singleAnalysing && (
+              <AnalysisLoader label="Analysing Creative..." />
+            )}
+
             {singleResult && (
               <SingleResult
                 creative={single!}
@@ -2123,7 +2183,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
                 onExport={async () => {
                   let heatmapDataUrl: string | undefined = undefined;
 
-                  // Dynamically draw the heatmap off-screen so it works regardless of which tab is active
                   if (
                     single?.type === "image" &&
                     single.dataUrl &&
@@ -2324,16 +2383,39 @@ Be specific. Reference actual elements visible. No generic advice.`;
                     {abAnalysing === i && (
                       <div
                         style={{
-                          padding: "8px",
+                          padding: "16px",
                           textAlign: "center",
-                          background: "#FAFAFA",
+                          background: "#fff",
                           borderRadius: "0 0 14px 14px",
                           border: "1px solid #EFEFEF",
                           borderTop: "none",
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          gap: 10,
                         }}
                       >
-                        <span style={{ fontSize: 11, color: "#AAA" }}>
-                          Analysing…
+                        <svg
+                          width="20"
+                          height="20"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke={LABEL_COLORS[i]}
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          style={{ animation: "spin 1s linear infinite" }}
+                        >
+                          <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                        </svg>
+                        <span
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: "#333",
+                          }}
+                        >
+                          Analysing {LABELS[i]}…
                         </span>
                       </div>
                     )}
