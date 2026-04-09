@@ -45,7 +45,7 @@ const INDUSTRIES = [
   "Beauty & cosmetics",
 ];
 
-// --- TYPES & INTERFACES (Moved to top to fix TS Errors) ---
+// --- TYPES & INTERFACES ---
 interface BrandFile {
   id?: string;
   name: string;
@@ -98,6 +98,10 @@ interface AnalysisResult {
   top_fixes: string[];
   attention_zones: Zone[];
   industry_benchmarks?: IndustryBenchmarks;
+  creative_storage_path?: string;
+  creative_name?: string;
+  creative_type?: "image" | "video";
+  creative_mimeType?: string;
 }
 interface AnalysedCreative extends CreativeFile {
   result: AnalysisResult;
@@ -1801,6 +1805,7 @@ function SingleResult({
             </div>
           ) : (
             <>
+              {/* Creative reference */}
               {creative && creative.dataUrl && (
                 <CreativePreview
                   creative={creative}
@@ -2644,6 +2649,10 @@ export default function App({
   >([null, null]);
   const [abAnalysing, setAbAnalysing] = useState<number | null>(null);
   const [industry, setIndustry] = useState("");
+  const [historyCreative, setHistoryCreative] = useState<CreativeFile | null>(
+    null,
+  );
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   const fetchUserData = async () => {
     const { data: prof } = await supabase
@@ -2672,8 +2681,48 @@ export default function App({
       "Are you sure you want to permanently delete this report?",
     );
     if (!confirmDelete) return;
+
+    const itemToDelete = analysesHistory.find((h) => h.id === id);
+    if (itemToDelete?.result?.creative_storage_path) {
+      await supabase.storage
+        .from("brand-assets")
+        .remove([itemToDelete.result.creative_storage_path]);
+    }
+
     await supabase.from("analyses").delete().eq("id", id);
     setAnalysesHistory((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const handleViewHistory = async (item: any) => {
+    setViewingHistoryItem(item);
+    setHistoryCreative(null);
+    setIsLoadingHistory(true);
+
+    if (item.result?.creative_storage_path) {
+      try {
+        const { data, error } = await supabase.storage
+          .from("brand-assets")
+          .download(item.result.creative_storage_path);
+
+        if (data && !error) {
+          const dataUrl = await new Promise<string>((res) => {
+            const reader = new FileReader();
+            reader.onload = () => res(reader.result as string);
+            reader.readAsDataURL(data);
+          });
+          setHistoryCreative({
+            file: new File([data], item.result.creative_name || "creative"),
+            type: item.result.creative_type || "image",
+            dataUrl,
+            name: item.result.creative_name || "Archived Creative",
+            mimeType: item.result.creative_mimeType || data.type,
+          });
+        }
+      } catch (err) {
+        console.error("Failed to load archived creative:", err);
+      }
+    }
+    setIsLoadingHistory(false);
   };
 
   const buildSystem = (isVideo: boolean) => {
@@ -2681,6 +2730,7 @@ export default function App({
       .filter((f) => f.extractedText)
       .map((f) => `[Brand file: ${f.name}]\n${f.extractedText}`)
       .join("\n\n");
+
     const industrySection = industry
       ? `
   "industry_benchmarks": {
@@ -2811,7 +2861,27 @@ Be specific. Reference actual elements visible. No generic advice.`;
     score: number,
     pass: boolean,
     fullResult: AnalysisResult,
+    creative: CreativeFile | null,
   ) => {
+    let updatedResult = { ...fullResult };
+
+    if (creative && creative.file) {
+      const safeName = creative.name.replace(/[^a-zA-Z0-9.-]/g, "_");
+      const storagePath = `${session.user.id}/analyses/${Date.now()}_${safeName}`;
+      const { error } = await supabase.storage
+        .from("brand-assets")
+        .upload(storagePath, creative.file);
+
+      if (!error) {
+        updatedResult.creative_storage_path = storagePath;
+        updatedResult.creative_name = creative.name;
+        updatedResult.creative_type = creative.type;
+        updatedResult.creative_mimeType = creative.mimeType;
+      } else {
+        console.error("Failed to upload creative:", error);
+      }
+    }
+
     const creditsUsed =
       MODELS.find((m) => m.id === selectedModel)?.credits || 1;
     await supabase.from("analyses").insert({
@@ -2822,7 +2892,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
       credits_used: creditsUsed,
       overall_score: score,
       pass: pass,
-      result: fullResult,
+      result: updatedResult,
     });
     fetchUserData();
   };
@@ -2835,7 +2905,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
     try {
       const res = await callAPI(single);
       setSingleResult(res);
-      await saveAnalysisRecord(res.overall_score, res.pass, res);
+      await saveAnalysisRecord(res.overall_score, res.pass, res, single);
     } catch (err) {
       setError((err as Error).message);
     }
@@ -2856,7 +2926,12 @@ Be specific. Reference actual elements visible. No generic advice.`;
           if (n[i]) n[i] = { ...(n[i] as CreativeFile), result };
           return n;
         });
-        await saveAnalysisRecord(result.overall_score, result.pass, result);
+        await saveAnalysisRecord(
+          result.overall_score,
+          result.pass,
+          result,
+          creatives[i] as CreativeFile,
+        );
       } catch (err) {
         setError(`Creative ${LABELS[i]}: ${(err as Error).message}`);
       }
@@ -2898,11 +2973,14 @@ Be specific. Reference actual elements visible. No generic advice.`;
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
+
       const safeClient = (client || "unnamed").replace(/[^a-z0-9]/gi, "_");
       a.download = `NF_Creative_Report_${safeClient}_${new Date().toISOString().slice(0, 10)}.txt`;
+
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+
       setTimeout(() => {
         URL.revokeObjectURL(url);
       }, 1000);
@@ -3184,6 +3262,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
         fontFamily: "var(--font-sans,system-ui)",
       }}
     >
+      {/* Fallback modal if triggered inside Analyzer view */}
       {showBrandMgr && currentView !== "brands" && (
         <BrandManager
           selectedBrand={selectedBrand}
@@ -3212,6 +3291,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
           boxSizing: "border-box",
         }}
       >
+        {/* === BRAND MANAGER VIEW === */}
         {currentView === "brands" && (
           <div style={{ maxWidth: 900, margin: "0 auto" }}>
             <h1
@@ -3243,6 +3323,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
           </div>
         )}
 
+        {/* === DASHBOARD VIEW === */}
         {currentView === "dashboard" && (
           <div style={{ maxWidth: 900, margin: "0 auto" }}>
             {viewingHistoryItem ? (
@@ -3304,7 +3385,11 @@ Be specific. Reference actual elements visible. No generic advice.`;
                         Client:
                       </span>{" "}
                       <span
-                        style={{ fontSize: 13, fontWeight: 600, color: "#111" }}
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: "#111",
+                        }}
                       >
                         {viewingHistoryItem.client}
                       </span>
@@ -3314,7 +3399,11 @@ Be specific. Reference actual elements visible. No generic advice.`;
                         Platform:
                       </span>{" "}
                       <span
-                        style={{ fontSize: 13, fontWeight: 600, color: "#111" }}
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: "#111",
+                        }}
                       >
                         {viewingHistoryItem.platform}
                       </span>
@@ -3322,7 +3411,11 @@ Be specific. Reference actual elements visible. No generic advice.`;
                     <div>
                       <span style={{ fontSize: 11, color: "#888" }}>Date:</span>{" "}
                       <span
-                        style={{ fontSize: 13, fontWeight: 600, color: "#111" }}
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: "#111",
+                        }}
                       >
                         {new Date(
                           viewingHistoryItem.created_at,
@@ -3331,9 +3424,24 @@ Be specific. Reference actual elements visible. No generic advice.`;
                     </div>
                   </div>
                 </div>
-                {viewingHistoryItem.result ? (
+
+                {isLoadingHistory ? (
+                  <div
+                    style={{
+                      padding: "3rem",
+                      textAlign: "center",
+                      background: "#fff",
+                      borderRadius: 14,
+                      border: "1px solid #EFEFEF",
+                    }}
+                  >
+                    <p style={{ color: "#888", fontSize: 13 }}>
+                      Loading archived creative...
+                    </p>
+                  </div>
+                ) : viewingHistoryItem.result ? (
                   <SingleResult
-                    creative={null}
+                    creative={historyCreative}
                     result={viewingHistoryItem.result}
                     threshold={65}
                     model={viewingHistoryItem.model}
@@ -3341,10 +3449,106 @@ Be specific. Reference actual elements visible. No generic advice.`;
                     platform={viewingHistoryItem.platform}
                     onReset={() => setViewingHistoryItem(null)}
                     onExport={async () => {
+                      let heatmapDataUrl: string | undefined = undefined;
+                      if (
+                        historyCreative?.type === "image" &&
+                        historyCreative.dataUrl &&
+                        viewingHistoryItem.result?.attention_zones?.length
+                      ) {
+                        const canvas = document.createElement("canvas");
+                        const ctx = canvas.getContext("2d");
+                        if (ctx) {
+                          const img = new Image();
+                          await new Promise((resolve) => {
+                            img.onload = () => {
+                              canvas.width = img.naturalWidth;
+                              canvas.height = img.naturalHeight;
+                              ctx.drawImage(img, 0, 0);
+                              viewingHistoryItem.result.attention_zones.forEach(
+                                (zone: Zone) => {
+                                  const x = zone.x * img.naturalWidth,
+                                    y = zone.y * img.naturalHeight;
+                                  const w = zone.w * img.naturalWidth,
+                                    h = zone.h * img.naturalHeight;
+                                  const cx2 = x + w / 2,
+                                    cy2 = y + h / 2;
+                                  const grad = ctx.createRadialGradient(
+                                    cx2,
+                                    cy2,
+                                    0,
+                                    cx2,
+                                    cy2,
+                                    Math.max(w, h) * 0.65,
+                                  );
+                                  const col =
+                                    zone.priority === 1
+                                      ? "rgba(239,68,68,0.5)"
+                                      : zone.priority === 2
+                                        ? "rgba(251,146,60,0.4)"
+                                        : "rgba(250,204,21,0.3)";
+                                  grad.addColorStop(0, col);
+                                  grad.addColorStop(1, "rgba(0,0,0,0)");
+                                  ctx.fillStyle = grad;
+                                  ctx.fillRect(
+                                    x - w * 0.15,
+                                    y - h * 0.15,
+                                    w * 1.3,
+                                    h * 1.3,
+                                  );
+                                  ctx.strokeStyle =
+                                    zone.priority === 1
+                                      ? "rgba(239,68,68,0.85)"
+                                      : zone.priority === 2
+                                        ? "rgba(251,146,60,0.75)"
+                                        : "rgba(202,138,4,0.7)";
+                                  ctx.lineWidth = Math.max(
+                                    2,
+                                    img.naturalWidth * 0.003,
+                                  );
+                                  ctx.setLineDash([6, 4]);
+                                  ctx.strokeRect(x, y, w, h);
+                                  ctx.setLineDash([]);
+                                  const labelText = `${zone.priority}. ${zone.label}`;
+                                  const fs = Math.max(
+                                    12,
+                                    img.naturalWidth * 0.016,
+                                  );
+                                  ctx.font = `bold ${fs}px system-ui`;
+                                  const tw = ctx.measureText(labelText).width,
+                                    pad = 6,
+                                    bh = fs + pad * 2;
+                                  const bx = x,
+                                    by = Math.max(0, y - bh - 2);
+                                  ctx.fillStyle =
+                                    zone.priority === 1
+                                      ? "rgba(239,68,68,0.92)"
+                                      : zone.priority === 2
+                                        ? "rgba(251,146,60,0.92)"
+                                        : "rgba(202,138,4,0.92)";
+                                  ctx.beginPath();
+                                  ctx.roundRect(bx, by, tw + pad * 2, bh, 4);
+                                  ctx.fill();
+                                  ctx.fillStyle = "#fff";
+                                  ctx.textBaseline = "middle";
+                                  ctx.fillText(
+                                    labelText,
+                                    bx + pad,
+                                    by + bh / 2,
+                                  );
+                                },
+                              );
+                              resolve(true);
+                            };
+                            img.src = historyCreative.dataUrl as string;
+                          });
+                          heatmapDataUrl = canvas.toDataURL("image/png");
+                        }
+                      }
+
                       await generatePDF({
-                        creative: null,
+                        creative: historyCreative,
                         result: viewingHistoryItem.result,
-                        heatmapDataUrl: undefined,
+                        heatmapDataUrl,
                         client: viewingHistoryItem.client,
                         platform: viewingHistoryItem.platform,
                         industry: "",
@@ -3575,7 +3779,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                                 }}
                               >
                                 <button
-                                  onClick={() => setViewingHistoryItem(item)}
+                                  onClick={() => handleViewHistory(item)}
                                   style={{
                                     fontSize: 11,
                                     padding: "4px 10px",
@@ -3617,6 +3821,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
           </div>
         )}
 
+        {/* === ANALYZER WORKSPACE === */}
         {currentView === "analyzer" && (
           <div style={{ maxWidth: 720, margin: "0 auto" }}>
             <div
@@ -3644,6 +3849,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
               </div>
             </div>
 
+            {/* Mode toggle */}
             <div
               style={{
                 display: "flex",
@@ -3684,6 +3890,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
               ))}
             </div>
 
+            {/* Config */}
             <div
               style={{
                 background: "#fff",
@@ -4048,6 +4255,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
               </div>
             </div>
 
+            {/* SINGLE MODE */}
             {mode === "single" && (
               <>
                 {!single && (
@@ -4215,6 +4423,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
               </>
             )}
 
+            {/* AB MODE */}
             {mode === "ab" && (
               <>
                 <div
