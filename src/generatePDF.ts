@@ -41,6 +41,7 @@ function scoreBgColor(s: number) {
 }
 
 function hexToRgb(hex: string) {
+  if (!hex) return [0, 0, 0]; // Safety fallback
   const r = parseInt(hex.slice(1, 3), 16);
   const g = parseInt(hex.slice(3, 5), 16);
   const b = parseInt(hex.slice(5, 7), 16);
@@ -60,31 +61,33 @@ function setDrawColor(doc: jsPDF, hex: string) {
   doc.setDrawColor(r, g, b);
 }
 
-// Wrap text to fit within maxWidth
-function wrapText(doc: jsPDF, text: string, maxWidth: number): string[] {
-  return doc.splitTextToSize(text, maxWidth);
+// Wrap text to fit within maxWidth (SAFE VERSION)
+function wrapText(
+  doc: jsPDF,
+  text: string | undefined,
+  maxWidth: number,
+): string[] {
+  if (!text) return [""];
+  const result = doc.splitTextToSize(String(text), maxWidth);
+  return Array.isArray(result) ? result : [result || ""];
 }
 
 // Draw page header
 function drawHeader(doc: jsPDF, pageNum: number, totalPages: number) {
-  // Top bar
   setFill(doc, PRIMARY);
   doc.rect(0, 0, PW, 12, "F");
 
-  // Logo text
   doc.setFontSize(8);
   doc.setFont("helvetica", "bold");
   setTextColor(doc, "#FFFFFF");
   doc.text("NO FLUFF", ML, 7.5);
 
-  // Signal tag
   setFill(doc, ACCENT);
   doc.roundedRect(PW - MR - 28, 2.5, 28, 7, 1, 1, "F");
   doc.setFontSize(7);
   setTextColor(doc, "#FFFFFF");
   doc.text("SIGNAL REPORT", PW - MR - 14, 7.5, { align: "center" });
 
-  // Footer
   setFill(doc, LIGHT);
   doc.rect(0, PH - 10, PW, 10, "F");
   doc.setFontSize(7);
@@ -156,7 +159,7 @@ export interface PDFReportData {
       gap: string;
     };
   };
-  heatmapDataUrl?: string; // canvas toDataURL() from HeatmapCanvas
+  heatmapDataUrl?: string;
   client: string;
   platform: string;
   industry: string;
@@ -181,33 +184,28 @@ export async function generatePDF(data: PDFReportData) {
   const hasBenchmarks = !!result.industry_benchmarks;
   const totalPages = hasBenchmarks ? 5 : 4;
 
-  // ─────────────────────────────────────────────
   // PAGE 1 — COVER
-  // ─────────────────────────────────────────────
   drawHeader(doc, 1, totalPages);
 
-  // Big black cover block
   setFill(doc, PRIMARY);
   doc.rect(0, 12, PW, 90, "F");
 
-  // Score circle (manual)
   const cx = PW / 2,
     cy = 57,
     cr = 22;
   setFill(doc, "#1A1A1A");
   doc.circle(cx, cy, cr + 3, "F");
-  setFill(doc, scoreBgColor(result.overall_score));
+  setFill(doc, scoreBgColor(result.overall_score || 0));
   doc.circle(cx, cy, cr, "F");
   doc.setFontSize(22);
   doc.setFont("helvetica", "bold");
-  setTextColor(doc, scoreColor(result.overall_score));
-  doc.text(`${result.overall_score}`, cx, cy + 4, { align: "center" });
+  setTextColor(doc, scoreColor(result.overall_score || 0));
+  doc.text(`${result.overall_score || 0}`, cx, cy + 4, { align: "center" });
   doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
-  setTextColor(doc, scoreColor(result.overall_score));
+  setTextColor(doc, scoreColor(result.overall_score || 0));
   doc.text("/ 100", cx, cy + 10, { align: "center" });
 
-  // Pass/Fail badge
   const badgeW = 24,
     badgeH = 8;
   setFill(doc, result.pass ? GREEN : RED);
@@ -217,22 +215,24 @@ export async function generatePDF(data: PDFReportData) {
   setTextColor(doc, "#FFFFFF");
   doc.text(result.pass ? "PASS" : "FAIL", cx, cy + 19.5, { align: "center" });
 
-  // Verdict
   doc.setFontSize(10);
   doc.setFont("helvetica", "italic");
   setTextColor(doc, "#CCCCCC");
-  const verdictLines = wrapText(doc, `"${result.overall_verdict}"`, CW);
+  const verdictLines = wrapText(
+    doc,
+    `"${result.overall_verdict || "No verdict provided."}"`,
+    CW,
+  );
   doc.text(verdictLines, cx, cy + 30, { align: "center" });
 
-  // Meta info below cover block
   let y = 115;
   const metaItems = [
     ["Client / Campaign", client || "—"],
     ["Platform", platform || "—"],
     ["Industry", industry || "—"],
     ["Pass Threshold", `${threshold}/100`],
-    ["Model", model],
-    ["Date", date],
+    ["Model", model || "—"],
+    ["Date", date || "—"],
   ];
 
   const colW = CW / 2;
@@ -251,7 +251,6 @@ export async function generatePDF(data: PDFReportData) {
 
   y += 20;
 
-  // Tagline
   setFill(doc, LIGHT);
   doc.rect(ML, y, CW, 14, "F");
   doc.setFontSize(9);
@@ -270,16 +269,13 @@ export async function generatePDF(data: PDFReportData) {
     { align: "center" },
   );
 
-  // ─────────────────────────────────────────────
   // PAGE 2 — CREATIVE + DIMENSION SCORES
-  // ─────────────────────────────────────────────
   doc.addPage();
   drawHeader(doc, 2, totalPages);
   y = 20;
 
   y = sectionHeading(doc, "Creative", y);
 
-  // Creative image
   if (creative?.dataUrl && creative.type === "image") {
     try {
       const imgW = CW;
@@ -312,31 +308,28 @@ export async function generatePDF(data: PDFReportData) {
 
   y = sectionHeading(doc, "Dimension Scores", y);
 
-  // Dimension grid — 2 columns
   const dimColW = (CW - 8) / 2;
   DIMS.forEach((d, i) => {
     const col = i % 2 === 0 ? ML : ML + dimColW + 8;
     if (i % 2 === 0 && i > 0) y += 22;
 
-    const dim = result.dimensions[d.key];
+    // Safety fallback if AI forgot a dimension
+    const dim = result.dimensions?.[d.key] || {
+      score: 0,
+      recommendation: "Data missing.",
+    };
 
-    // Card bg
     setFill(doc, LIGHT);
     doc.roundedRect(col, y - 2, dimColW, 20, 2, 2, "F");
 
-    // Name
     doc.setFontSize(8);
     doc.setFont("helvetica", "bold");
     setTextColor(doc, PRIMARY);
     doc.text(d.name, col + 3, y + 4);
 
-    // Score pill
-    scorePill(doc, dim.score, col + dimColW - 21, y + 1);
+    scorePill(doc, dim.score || 0, col + dimColW - 21, y + 1);
+    scoreBar(doc, dim.score || 0, col + 3, y + 8, dimColW - 6);
 
-    // Bar
-    scoreBar(doc, dim.score, col + 3, y + 8, dimColW - 6);
-
-    // Recommendation
     doc.setFontSize(6.5);
     doc.setFont("helvetica", "normal");
     setTextColor(doc, MUTED);
@@ -346,9 +339,7 @@ export async function generatePDF(data: PDFReportData) {
 
   y += 22;
 
-  // ─────────────────────────────────────────────
   // PAGE 3 — TOP FIXES
-  // ─────────────────────────────────────────────
   doc.addPage();
   drawHeader(doc, 3, totalPages);
   y = 20;
@@ -360,15 +351,13 @@ export async function generatePDF(data: PDFReportData) {
   const fixLabels = ["Critical", "Important", "Nice to have"];
 
   (result.top_fixes || []).forEach((fix, i) => {
-    // Badge
-    setFill(doc, fixBgs[i]);
+    setFill(doc, fixBgs[i] || LIGHT);
     doc.roundedRect(ML, y, 28, 6, 1.5, 1.5, "F");
     doc.setFontSize(7);
     doc.setFont("helvetica", "bold");
-    setTextColor(doc, fixColors[i]);
-    doc.text(fixLabels[i], ML + 14, y + 4.2, { align: "center" });
+    setTextColor(doc, fixColors[i] || MUTED);
+    doc.text(fixLabels[i] || "Fix", ML + 14, y + 4.2, { align: "center" });
 
-    // Fix text
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     setTextColor(doc, PRIMARY);
@@ -377,7 +366,6 @@ export async function generatePDF(data: PDFReportData) {
 
     y += Math.max(fixLines.length * 5, 10) + 8;
 
-    // Divider
     if (i < 2) {
       setDrawColor(doc, BORDER);
       doc.setLineWidth(0.2);
@@ -388,27 +376,25 @@ export async function generatePDF(data: PDFReportData) {
   y += 10;
   y = sectionHeading(doc, "Attention Zones", y);
 
-  // Attention zones
+  const zoneColors = [RED, AMBER, "#EAB308", ACCENT, MUTED];
   (result.attention_zones || []).forEach((z, i) => {
-    const zoneColors = [RED, AMBER, "#EAB308"];
-    setFill(doc, zoneColors[i] + "22");
+    const zColor = zoneColors[i] || MUTED;
+
+    setFill(doc, zColor + "22");
     doc.roundedRect(ML, y, CW, 16, 2, 2, "F");
 
-    // Priority badge
-    setFill(doc, zoneColors[i]);
+    setFill(doc, zColor);
     doc.circle(ML + 7, y + 8, 5, "F");
     doc.setFontSize(8);
     doc.setFont("helvetica", "bold");
     setTextColor(doc, "#FFFFFF");
-    doc.text(`${z.priority}`, ML + 7, y + 10, { align: "center" });
+    doc.text(`${z.priority || i + 1}`, ML + 7, y + 10, { align: "center" });
 
-    // Label
     doc.setFontSize(9);
     doc.setFont("helvetica", "bold");
     setTextColor(doc, PRIMARY);
-    doc.text(z.label, ML + 16, y + 6);
+    doc.text(z.label || "Element", ML + 16, y + 6);
 
-    // Note
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
     setTextColor(doc, MUTED);
@@ -418,9 +404,7 @@ export async function generatePDF(data: PDFReportData) {
     y += 20;
   });
 
-  // ─────────────────────────────────────────────
   // PAGE 4 — ATTENTION MAP
-  // ─────────────────────────────────────────────
   doc.addPage();
   drawHeader(doc, 4, totalPages);
   y = 20;
@@ -466,9 +450,7 @@ export async function generatePDF(data: PDFReportData) {
     { align: "center" },
   );
 
-  // ─────────────────────────────────────────────
   // PAGE 5 — INDUSTRY BENCHMARKS (if applicable)
-  // ─────────────────────────────────────────────
   if (hasBenchmarks && result.industry_benchmarks) {
     doc.addPage();
     drawHeader(doc, 5, totalPages);
@@ -476,9 +458,6 @@ export async function generatePDF(data: PDFReportData) {
 
     y = sectionHeading(doc, `Industry Benchmarks — ${industry}`, y);
 
-    // Summary
-    setFill(doc, LIGHT);
-    doc.roundedRect(ML, y, CW, 2, 2, 2, "F"); // placeholder, will resize
     const summaryLines = wrapText(
       doc,
       result.industry_benchmarks.summary,
@@ -497,17 +476,18 @@ export async function generatePDF(data: PDFReportData) {
     doc.text(summaryLines, ML + 5, y + 10);
     y += summaryH + 8;
 
-    // Examples
     y = sectionHeading(doc, "Real-World Examples", y);
 
-    const exColors = [ACCENT, "#F59E0B"];
-    const exBgs = ["#EEF2FF", "#FFFBEB"];
+    const exColors = [ACCENT, "#F59E0B", GREEN];
+    const exBgs = ["#EEF2FF", "#FFFBEB", GREEN_BG];
 
-    result.industry_benchmarks.examples.forEach((ex, i) => {
-      // Header strip
-      setFill(doc, exBgs[i]);
+    (result.industry_benchmarks.examples || []).forEach((ex, i) => {
+      const c = exColors[i] || MUTED;
+      const bg = exBgs[i] || LIGHT;
+
+      setFill(doc, bg);
       doc.roundedRect(ML, y, CW, 8, 2, 2, "F");
-      setFill(doc, exColors[i]);
+      setFill(doc, c);
       doc.roundedRect(ML, y, 8, 8, 2, 2, "F");
       doc.setFontSize(8);
       doc.setFont("helvetica", "bold");
@@ -515,14 +495,13 @@ export async function generatePDF(data: PDFReportData) {
       doc.text(`${i + 1}`, ML + 4, y + 5.2, { align: "center" });
       doc.setFontSize(9);
       setTextColor(doc, PRIMARY);
-      doc.text(ex.brand, ML + 12, y + 3.5);
+      doc.text(ex.brand || "Brand", ML + 12, y + 3.5);
       doc.setFontSize(7.5);
       doc.setFont("helvetica", "normal");
       setTextColor(doc, MUTED);
-      doc.text(ex.campaign, ML + 12, y + 7);
+      doc.text(ex.campaign || "Campaign", ML + 12, y + 7);
       y += 11;
 
-      // Technique
       const techLines = wrapText(doc, ex.technique, CW - 10);
       const techH = techLines.length * 4.5 + 8;
       setFill(doc, "#F5F3FF");
@@ -537,7 +516,6 @@ export async function generatePDF(data: PDFReportData) {
       doc.text(techLines, ML + 4, y + 8.5);
       y += techH + 3;
 
-      // Lesson
       const lessonLines = wrapText(doc, ex.lesson, CW - 10);
       const lessonH = lessonLines.length * 4.5 + 8;
       setFill(doc, GREEN_BG);
@@ -553,7 +531,6 @@ export async function generatePDF(data: PDFReportData) {
       y += lessonH + 6;
     });
 
-    // Gap
     y = sectionHeading(doc, "The Gap", y);
     const gapLines = wrapText(doc, result.industry_benchmarks.gap, CW - 10);
     const gapH = gapLines.length * 5 + 10;
@@ -569,7 +546,11 @@ export async function generatePDF(data: PDFReportData) {
     y += gapH + 6;
   }
 
-  // Save
-  const filename = `NoFluff_Signal_${client || "Report"}_${date.replace(/\//g, "-")}.pdf`;
-  doc.save(filename);
+  // Clean filename so weird chars don't break the download
+  const safeClient = (client || "Report").replace(/[^a-z0-9]/gi, "_");
+  const safeDate = (date || new Date().toLocaleDateString("en-GB")).replace(
+    /\//g,
+    "-",
+  );
+  doc.save(`NoFluff_Signal_${safeClient}_${safeDate}.pdf`);
 }
