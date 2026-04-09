@@ -3030,7 +3030,8 @@ Be specific. Reference actual elements visible. No generic advice.`;
         position: "fixed",
         left: 0,
         top: 0,
-        overflow: "visible",
+        overflow: "hidden",
+        zIndex: 100,
       }}
     >
       <div
@@ -3210,43 +3211,51 @@ Be specific. Reference actual elements visible. No generic advice.`;
           </svg>
           {isSidebarOpen && <span>Dashboard History</span>}
         </button>
-      </nav>
-      <button
-        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        style={{
-          position: "absolute",
-          right: -12,
-          top: 24,
-          background: "#fff",
-          border: "1px solid #EFEFEF",
-          borderRadius: "50%",
-          width: 24,
-          height: 24,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          cursor: "pointer",
-          zIndex: 10,
-          boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
-        }}
-      >
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="#666"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+
+        <div style={{ flex: 1 }} />
+
+        <button
+          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
           style={{
-            transform: isSidebarOpen ? "rotate(0deg)" : "rotate(180deg)",
-            transition: "transform 0.3s ease",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: "10px",
+            borderRadius: 8,
+            border: "none",
+            background: "transparent",
+            color: "#888",
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: "pointer",
+            textAlign: "left",
+            transition: "all 0.15s",
+            justifyContent: isSidebarOpen ? "flex-start" : "center",
+            whiteSpace: "nowrap",
+            marginTop: "auto",
           }}
+          title={isSidebarOpen ? "Collapse Sidebar" : "Expand Sidebar"}
         >
-          <polyline points="15 18 9 12 15 6"></polyline>
-        </svg>
-      </button>
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ flexShrink: 0 }}
+          >
+            {isSidebarOpen ? (
+              <polyline points="15 18 9 12 15 6"></polyline>
+            ) : (
+              <polyline points="9 18 15 12 9 6"></polyline>
+            )}
+          </svg>
+          {isSidebarOpen && <span>Collapse Sidebar</span>}
+        </button>
+      </nav>
 
       <div
         style={{
@@ -3403,6 +3412,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
         minHeight: "100vh",
         background: "#FAFAFA",
         fontFamily: "var(--font-sans,system-ui)",
+        overflowX: "hidden",
       }}
     >
       {/* Fallback modal if triggered inside Analyzer view */}
@@ -3786,7 +3796,8 @@ Be specific. Reference actual elements visible. No generic advice.`;
                     background: "#fff",
                     border: "1px solid #EFEFEF",
                     borderRadius: 14,
-                    overflow: "hidden",
+                    overflowX: "auto",
+                    width: "100%",
                   }}
                 >
                   <table
@@ -3810,6 +3821,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                             fontWeight: 700,
                             color: "#AAA",
                             textTransform: "uppercase",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Date
@@ -3821,6 +3833,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                             fontWeight: 700,
                             color: "#AAA",
                             textTransform: "uppercase",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Client / Campaign
@@ -3832,6 +3845,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                             fontWeight: 700,
                             color: "#AAA",
                             textTransform: "uppercase",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Platform
@@ -3843,6 +3857,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                             fontWeight: 700,
                             color: "#AAA",
                             textTransform: "uppercase",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Industry
@@ -3854,6 +3869,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                             fontWeight: 700,
                             color: "#AAA",
                             textTransform: "uppercase",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Type
@@ -3865,6 +3881,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                             fontWeight: 700,
                             color: "#AAA",
                             textTransform: "uppercase",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Model
@@ -3876,6 +3893,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                             fontWeight: 700,
                             color: "#AAA",
                             textTransform: "uppercase",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Score
@@ -3888,6 +3906,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                             color: "#AAA",
                             textTransform: "uppercase",
                             textAlign: "right",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Actions
@@ -3924,6 +3943,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                                 padding: "14px 16px",
                                 fontSize: 13,
                                 color: "#555",
+                                whiteSpace: "nowrap",
                               }}
                             >
                               {new Date(item.created_at).toLocaleDateString()}
@@ -3934,6 +3954,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                                 fontSize: 13,
                                 fontWeight: 600,
                                 color: "#111",
+                                whiteSpace: "nowrap",
                               }}
                             >
                               {item.client}
@@ -3943,6 +3964,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                                 padding: "14px 16px",
                                 fontSize: 13,
                                 color: "#555",
+                                whiteSpace: "nowrap",
                               }}
                             >
                               {item.platform}
@@ -3952,6 +3974,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                                 padding: "14px 16px",
                                 fontSize: 13,
                                 color: "#555",
+                                whiteSpace: "nowrap",
                               }}
                             >
                               {item.industry || "—"}
@@ -3961,6 +3984,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                                 padding: "14px 16px",
                                 fontSize: 13,
                                 color: "#555",
+                                whiteSpace: "nowrap",
                               }}
                             >
                               {item.type || "Single"}
@@ -3970,13 +3994,19 @@ Be specific. Reference actual elements visible. No generic advice.`;
                                 padding: "14px 16px",
                                 fontSize: 13,
                                 color: "#555",
+                                whiteSpace: "nowrap",
                               }}
                             >
                               {MODELS.find((m) => m.id === item.model)?.name ||
                                 item.model ||
                                 "—"}
                             </td>
-                            <td style={{ padding: "14px 16px" }}>
+                            <td
+                              style={{
+                                padding: "14px 16px",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
                               <div
                                 style={{
                                   display: "flex",
@@ -4013,6 +4043,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                               style={{
                                 padding: "14px 16px",
                                 textAlign: "right",
+                                whiteSpace: "nowrap",
                               }}
                             >
                               <div
