@@ -1498,12 +1498,19 @@ Be specific. Reference actual elements visible. No generic advice.`;
     ]
       .filter(Boolean)
       .join("\n");
+
     const blob = new Blob([lines], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = `NF_Creative_Report_${client || "unnamed"}_${new Date().toISOString().slice(0, 10)}.txt`;
+
+    // CRITICAL FIX: Append the link to the document body before clicking,
+    // otherwise modern browsers will silently block the download.
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
+
     URL.revokeObjectURL(url);
   };
 
