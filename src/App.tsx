@@ -2105,13 +2105,108 @@ Be specific. Reference actual elements visible. No generic advice.`;
                   setSingleResult(null);
                 }}
                 onExport={async () => {
-                  const heatmapCanvas = document.querySelector(
-                    "canvas",
-                  ) as HTMLCanvasElement | null;
+                  let heatmapDataUrl: string | undefined = undefined;
+
+                  // Dynamically draw the heatmap off-screen so it works regardless of which tab is active
+                  if (
+                    single?.type === "image" &&
+                    single.dataUrl &&
+                    singleResult?.attention_zones?.length
+                  ) {
+                    const canvas = document.createElement("canvas");
+                    const ctx = canvas.getContext("2d");
+
+                    if (ctx) {
+                      const img = new Image();
+                      await new Promise((resolve) => {
+                        img.onload = () => {
+                          canvas.width = img.naturalWidth;
+                          canvas.height = img.naturalHeight;
+                          ctx.drawImage(img, 0, 0);
+
+                          singleResult.attention_zones.forEach((zone) => {
+                            const x = zone.x * img.naturalWidth;
+                            const y = zone.y * img.naturalHeight;
+                            const w = zone.w * img.naturalWidth;
+                            const h = zone.h * img.naturalHeight;
+                            const cx2 = x + w / 2;
+                            const cy2 = y + h / 2;
+
+                            const grad = ctx.createRadialGradient(
+                              cx2,
+                              cy2,
+                              0,
+                              cx2,
+                              cy2,
+                              Math.max(w, h) * 0.65,
+                            );
+                            const col =
+                              zone.priority === 1
+                                ? "rgba(239,68,68,0.5)"
+                                : zone.priority === 2
+                                  ? "rgba(251,146,60,0.4)"
+                                  : "rgba(250,204,21,0.3)";
+                            grad.addColorStop(0, col);
+                            grad.addColorStop(1, "rgba(0,0,0,0)");
+
+                            ctx.fillStyle = grad;
+                            ctx.fillRect(
+                              x - w * 0.15,
+                              y - h * 0.15,
+                              w * 1.3,
+                              h * 1.3,
+                            );
+
+                            ctx.strokeStyle =
+                              zone.priority === 1
+                                ? "rgba(239,68,68,0.85)"
+                                : zone.priority === 2
+                                  ? "rgba(251,146,60,0.75)"
+                                  : "rgba(202,138,4,0.7)";
+                            ctx.lineWidth = Math.max(
+                              2,
+                              img.naturalWidth * 0.003,
+                            );
+                            ctx.setLineDash([6, 4]);
+                            ctx.strokeRect(x, y, w, h);
+                            ctx.setLineDash([]);
+
+                            const labelText = `${zone.priority}. ${zone.label}`;
+                            const fs = Math.max(12, img.naturalWidth * 0.016);
+                            ctx.font = `bold ${fs}px system-ui`;
+                            const tw = ctx.measureText(labelText).width;
+                            const pad = 6;
+                            const bh = fs + pad * 2;
+                            const bx = x;
+                            const by = Math.max(0, y - bh - 2);
+
+                            ctx.fillStyle =
+                              zone.priority === 1
+                                ? "rgba(239,68,68,0.92)"
+                                : zone.priority === 2
+                                  ? "rgba(251,146,60,0.92)"
+                                  : "rgba(202,138,4,0.92)";
+                            ctx.beginPath();
+                            ctx.roundRect(bx, by, tw + pad * 2, bh, 4);
+                            ctx.fill();
+
+                            ctx.fillStyle = "#fff";
+                            ctx.textBaseline = "middle";
+                            ctx.fillText(labelText, bx + pad, by + bh / 2);
+                          });
+                          resolve(true);
+                        };
+                        img.src = single.dataUrl as string;
+                      });
+
+                      heatmapDataUrl = canvas.toDataURL("image/png");
+                    }
+                  }
+
                   await generatePDF({
                     creative: single,
                     result: singleResult,
-                    heatmapDataUrl: heatmapCanvas?.toDataURL("image/png"),
+                    heatmapDataUrl,
                     client,
                     platform,
                     industry,
