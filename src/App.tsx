@@ -1247,31 +1247,6 @@ function ModelSelector({
   );
 }
 
-interface IndustryExample {
-  brand: string;
-  campaign: string;
-  technique: string;
-  lesson: string;
-}
-interface IndustryBenchmarks {
-  summary: string;
-  examples: IndustryExample[];
-  gap: string;
-}
-interface AnalysisResult {
-  overall_score: number;
-  overall_verdict: string;
-  pass: boolean;
-  dimensions: { [key: string]: { score: number; recommendation: string } };
-  top_fixes: string[];
-  attention_zones: Zone[];
-  industry_benchmarks?: IndustryBenchmarks;
-}
-interface AnalysedCreative extends CreativeFile {
-  result: AnalysisResult;
-  index: number;
-}
-
 function AnalysisLoader({ label }: { label: string }) {
   return (
     <div
@@ -1327,1202 +1302,26 @@ function AnalysisLoader({ label }: { label: string }) {
   );
 }
 
-export default function App({
-  session,
-}: {
-  session: import("@supabase/supabase-js").Session;
-}) {
-  const [mode, setMode] = useState("single");
-  const [showBrandMgr, setShowBrandMgr] = useState(false);
-  const [brands, setBrands] = useState<BrandMap>({});
-  const [selectedBrand, setSelectedBrand] = useState("");
-  const [brandNotes, setBrandNotes] = useState("");
-  const [brandFiles, setBrandFiles] = useState<BrandFile[]>([]);
-  const [client, setClient] = useState("");
-  const [platform, setPlatform] = useState("");
-  const [threshold, setThreshold] = useState(65);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState(MODELS[1].id);
-  const [single, setSingle] = useState<CreativeFile | null>(null);
-  const [singleResult, setSingleResult] = useState<AnalysisResult | null>(null);
-  const [singleAnalysing, setSingleAnalysing] = useState(false);
-  const [creatives, setCreatives] = useState<
-    ((CreativeFile & { result?: AnalysisResult }) | null)[]
-  >([null, null]);
-  const [abAnalysing, setAbAnalysing] = useState<number | null>(null);
-  const [industry, setIndustry] = useState("");
-
-  useEffect(() => {
-    if (session?.user?.id) {
-      loadBrandsFromSupabase(session.user.id).then((b) => setBrands(b));
-    }
-  }, [session]);
-
-  const buildSystem = (isVideo: boolean) => {
-    const fileContext = brandFiles
-      .filter((f) => f.extractedText)
-      .map((f) => `[Brand file: ${f.name}]\n${f.extractedText}`)
-      .join("\n\n");
-
-    const industrySection = industry
-      ? `
-  "industry_benchmarks": {
-    "summary": "<2-3 sentences on what the best ${industry} campaigns globally are doing in 2024-2025, based on current web knowledge>",
-    "examples": [
-      {
-        "brand": "<real brand name>",
-        "campaign": "<real campaign name>",
-        "technique": "<what creative or psychological technique makes it work>",
-        "lesson": "<one direct sentence on what this specific creative could learn from it>"
-      },
-      {
-        "brand": "<real brand name>",
-        "campaign": "<real campaign name>",
-        "technique": "<technique>",
-        "lesson": "<lesson>"
-      }
-    ],
-    "gap": "<single sentence — the biggest difference between this creative and what top ${industry} players are doing>"
-  },`
-      : "";
-
-    return `You are a senior creative strategist at No Fluff, a behavioural marketing agency for D2C brands. Analyse advertising creatives through consumer psychology, visual hierarchy, and conversion optimisation.${industry ? ` Use your web search tool to find current 2024-2025 ${industry} campaign examples before completing the industry_benchmarks section.` : ""}
-
-Return ONLY raw JSON. No markdown. No backticks. No explanation. Start with { end with }.
-
-{
-  "overall_score": <integer 0-100>,
-  "overall_verdict": "<one punchy sentence>",
-  "pass": <true if score >= ${threshold}, else false>,
-  "dimensions": {
-    "visual_hierarchy": { "score": <0-100>, "recommendation": "<specific 1-2 sentence observation>" },
-    "clarity_readability": { "score": <0-100>, "recommendation": "<specific observation>" },
-    "three_second_test": { "score": <0-100>, "recommendation": "<specific observation>" },
-    "behavioural_triggers": { "score": <0-100>, "recommendation": "<psychology principles present or missing>" },
-    "cta_strength": { "score": <0-100>, "recommendation": "<specific observation>" },
-    "cognitive_load": { "score": <0-100>, "recommendation": "<specific observation>" },
-    "emotional_resonance": { "score": <0-100>, "recommendation": "<specific observation>" },
-    "brand_consistency": { "score": <0-100>, "recommendation": "<specific observation>" }
-  },
-  "top_fixes": ["<most impactful fix>", "<second fix>", "<third fix>"],
-  "attention_zones": [
-    { "priority": 1, "label": "<element e.g. Headline>", "x": <0.0-1.0>, "y": <0.0-1.0>, "w": <0.0-1.0>, "h": <0.0-1.0>, "note": "<why this draws attention>" },
-    { "priority": 2, "label": "<element>", "x": <0.0-1.0>, "y": <0.0-1.0>, "w": <0.0-1.0>, "h": <0.0-1.0>, "note": "<note>" },
-    { "priority": 3, "label": "<element>", "x": <0.0-1.0>, "y": <0.0-1.0>, "w": <0.0-1.0>, "h": <0.0-1.0>, "note": "<note>" }
-  ]${industry ? `,${industrySection}` : ""}
-}
-
-x/y = top-left corner as fraction of image width/height. w/h = width/height as fraction.
-${platform ? `Platform: ${platform}.` : ""}${client ? ` Client: ${client}.` : ""}${industry ? ` Industry: ${industry}.` : ""}${brandNotes ? ` Brand notes: ${brandNotes}.` : ""}${fileContext ? `\n\nBrand guideline documents:\n${fileContext}` : ""}${isVideo ? " Video creative — benchmark against best-practice standards for the format." : ""}
-Be specific. Reference actual elements visible. No generic advice.`;
-  };
-
-  const callAPI = async (creative: CreativeFile): Promise<AnalysisResult> => {
-    const isVideo = creative.type === "video";
-    const contentParts: object[] = [];
-    const brandImageFiles = brandFiles.filter(
-      (f) => f.type.startsWith("image/") && f.dataUrl,
-    );
-    for (const bf of brandImageFiles) {
-      const raw = bf.dataUrl.split(",")[1];
-      contentParts.push({
-        type: "image",
-        source: { type: "base64", media_type: bf.type, data: raw },
-      });
-      contentParts.push({ type: "text", text: `[Brand asset: ${bf.name}]` });
-    }
-    if (!isVideo) {
-      const raw = await toBase64Raw(creative.file);
-      contentParts.push({
-        type: "image",
-        source: { type: "base64", media_type: creative.mimeType, data: raw },
-      });
-      contentParts.push({
-        type: "text",
-        text: "Analyse this creative. Return raw JSON only, starting with {",
-      });
-    } else {
-      contentParts.push({
-        type: "text",
-        text: `Video file: "${creative.name}". Provide the JSON analysis. Raw JSON only, starting with {`,
-      });
-    }
-    const messages = [
-      {
-        role: "user",
-        content: isVideo ? contentParts[contentParts.length - 1] : contentParts,
-      },
-    ];
-    const requestBody: Record<string, unknown> = {
-      model: selectedModel,
-      max_tokens: 4000,
-      system: buildSystem(isVideo),
-      messages,
-    };
-
-    if (industry) {
-      requestBody.tools = [{ type: "web_search_20250305", name: "web_search" }];
-    }
-
-    const resp = await fetch("/api/analyse", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(requestBody),
-    });
-
-    if (!resp.ok) {
-      const e = await resp.json().catch(() => ({}));
-      throw new Error(e.error?.message || `API error ${resp.status}`);
-    }
-    const data = await resp.json();
-    // Extract text from all content blocks (handles tool_use + text mixed responses)
-    const rawText = (data.content || [])
-      .filter((b: { type: string }) => b.type === "text")
-      .map((b: { text?: string }) => b.text || "")
-      .join("")
-      .trim();
-    const start = rawText.indexOf("{"),
-      end = rawText.lastIndexOf("}");
-    if (start === -1 || end === -1)
-      throw new Error("No JSON found in response");
-    const parsed = JSON.parse(rawText.slice(start, end + 1));
-    if (!parsed.dimensions || !parsed.overall_score)
-      throw new Error("Incomplete analysis returned — please try again.");
-    return parsed;
-  };
-
-  const runSingle = async () => {
-    if (!single) return;
-    setSingleAnalysing(true);
-    setError(null);
-    setSingleResult(null);
-    try {
-      setSingleResult(await callAPI(single));
-    } catch (err) {
-      setError((err as Error).message);
-    }
-    setSingleAnalysing(false);
-  };
-
-  const runAB = async () => {
-    const filled = creatives.filter(Boolean);
-    if (filled.length < 2) return;
-    setError(null);
-    for (let i = 0; i < creatives.length; i++) {
-      if (!creatives[i]) continue;
-      setAbAnalysing(i);
-      try {
-        const result = await callAPI(creatives[i] as CreativeFile);
-        setCreatives((prev) => {
-          const n = [...prev];
-          if (n[i]) n[i] = { ...(n[i] as CreativeFile), result };
-          return n;
-        });
-      } catch (err) {
-        setError(`Creative ${LABELS[i]}: ${(err as Error).message}`);
-      }
-    }
-    setAbAnalysing(null);
-  };
-
-  const exportReport = (items: AnalysedCreative[]) => {
-    try {
-      const lines = [
-        "NO FLUFF CREATIVE ANALYSER — REPORT",
-        "=====================================",
-        `Date: ${new Date().toLocaleDateString("en-GB")}`,
-        client ? `Client: ${client}` : "",
-        platform ? `Platform: ${platform}` : "",
-        "",
-        ...items.map((r) =>
-          [
-            `${items.length > 1 ? `--- CREATIVE ${LABELS[r.index]} ---` : "--- ANALYSIS ---"}`,
-            `Score: ${r.result?.overall_score || 0}/100 — ${r.result?.pass ? "PASS" : "FAIL"} (threshold ${threshold})`,
-            `Verdict: ${r.result?.overall_verdict || "N/A"}`,
-            "",
-            "Dimensions:",
-            ...DIMS.map(
-              (d) =>
-                `  ${d.name}: ${r.result?.dimensions?.[d.key]?.score || 0}/100\n    → ${r.result?.dimensions?.[d.key]?.recommendation || "N/A"}`,
-            ),
-            "",
-            "Top fixes:",
-            ...(r.result?.top_fixes || []).map((f, j) => `  ${j + 1}. ${f}`),
-            "",
-          ].join("\n"),
-        ),
-      ]
-        .filter(Boolean)
-        .join("\n");
-
-      const blob = new Blob([lines], { type: "text/plain;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-
-      // Clean the client name so special characters don't break the filename
-      const safeClient = (client || "unnamed").replace(/[^a-z0-9]/gi, "_");
-      a.download = `NF_Creative_Report_${safeClient}_${new Date().toISOString().slice(0, 10)}.txt`;
-
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-
-      // FIX: Give the browser 1 second to catch the download stream before destroying the file
-      setTimeout(() => {
-        URL.revokeObjectURL(url);
-      }, 1000);
-    } catch (err) {
-      console.error("Export failed:", err);
-      alert("Export failed. Please check the console for details.");
-    }
-  };
-
-  const brandList = Object.keys(brands);
-  const analysedCreatives = creatives
-    .map((c, i) =>
-      c && (c as AnalysedCreative).result
-        ? ({ ...c, index: i } as AnalysedCreative)
-        : null,
-    )
-    .filter((c): c is AnalysedCreative => c !== null);
-  const winner =
-    analysedCreatives.length > 1
-      ? analysedCreatives.reduce((a, b) =>
-          a.result.overall_score > b.result.overall_score ? a : b,
-        )
-      : null;
-
-  return (
-    <div
-      style={{
-        fontFamily: "var(--font-sans,system-ui)",
-        background: "#FAFAFA",
-        minHeight: "100vh",
-        padding: "2rem 1rem",
-      }}
-    >
-      {showBrandMgr && (
-        <BrandManager
-          selectedBrand={selectedBrand}
-          onSelect={(n, notes, files) => {
-            setSelectedBrand(n);
-            setBrandNotes(notes || "");
-            setBrandFiles(files || []);
-            if (n) setClient(n);
-          }}
-          onClose={() => setShowBrandMgr(false)}
-          onUpdated={(b) => setBrands(b)}
-          userId={session.user.id}
-        />
-      )}
-      <div style={{ maxWidth: 720, margin: "0 auto" }}>
-        {/* Header */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            marginBottom: "1.75rem",
-          }}
-        >
-          <div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                marginBottom: 4,
-              }}
-            >
-              <div
-                style={{
-                  width: 7,
-                  height: 7,
-                  borderRadius: "50%",
-                  background: "#111",
-                }}
-              />
-              <span
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  letterSpacing: "0.1em",
-                  color: "#AAA",
-                  textTransform: "uppercase",
-                }}
-              >
-                No Fluff
-              </span>
-            </div>
-            <h1
-              style={{
-                fontSize: 22,
-                fontWeight: 600,
-                color: "#111",
-                margin: 0,
-              }}
-            >
-              Creative Analyser
-            </h1>
-            <p style={{ fontSize: 13, color: "#999", marginTop: 4 }}>
-              Pre-flight analysis powered by behavioural science
-            </p>
-          </div>
-          <div
-            style={{
-              display: "flex",
-              gap: 8,
-              alignItems: "center",
-              marginTop: 4,
-            }}
-          >
-            <button
-              onClick={() => setShowBrandMgr(true)}
-              style={{
-                padding: "8px 14px",
-                borderRadius: 10,
-                border: "1px solid #EFEFEF",
-                background: "#fff",
-                fontSize: 12,
-                fontWeight: 600,
-                color: "#555",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                flexShrink: 0,
-              }}
-            >
-              <svg
-                width="13"
-                height="13"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-              </svg>
-              Brand guidelines
-            </button>
-            <button
-              onClick={() => supabase.auth.signOut()}
-              style={{
-                padding: "8px 14px",
-                borderRadius: 10,
-                border: "1px solid #EFEFEF",
-                background: "#fff",
-                fontSize: 12,
-                fontWeight: 600,
-                color: "#888",
-                cursor: "pointer",
-              }}
-            >
-              Sign out
-            </button>
-          </div>
-        </div>
-
-        {/* Mode toggle */}
-        <div
-          style={{
-            display: "flex",
-            gap: 6,
-            marginBottom: "1.25rem",
-            background: "#EFEFEF",
-            borderRadius: 10,
-            padding: 4,
-          }}
-        >
-          {[
-            ["single", "Single creative"],
-            ["ab", "A/B comparison"],
-          ].map(([m, l]) => (
-            <button
-              key={m}
-              onClick={() => {
-                setMode(m);
-                setError(null);
-              }}
-              style={{
-                flex: 1,
-                padding: "8px 0",
-                borderRadius: 8,
-                border: "none",
-                fontSize: 13,
-                fontWeight: 500,
-                background: mode === m ? "#fff" : "transparent",
-                color: mode === m ? "#111" : "#888",
-                boxShadow: mode === m ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
-                cursor: "pointer",
-                transition: "all 0.15s",
-              }}
-            >
-              {l}
-            </button>
-          ))}
-        </div>
-
-        {/* Config */}
-        <div
-          style={{
-            background: "#fff",
-            border: "1px solid #F0F0F0",
-            borderRadius: 14,
-            padding: "1.25rem",
-            marginBottom: "1.25rem",
-            display: "flex",
-            flexDirection: "column",
-            gap: 12,
-          }}
-        >
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr 1fr",
-              gap: 10,
-            }}
-          >
-            <div>
-              <label
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  color: "#AAA",
-                  display: "block",
-                  marginBottom: 5,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.06em",
-                }}
-              >
-                Client / campaign
-              </label>
-              <input
-                value={client}
-                onChange={(e) => setClient(e.target.value)}
-                placeholder="e.g. Sirf Coffee — Diwali"
-                style={{
-                  width: "100%",
-                  padding: "8px 12px",
-                  border: "1px solid #EFEFEF",
-                  borderRadius: 8,
-                  fontSize: 13,
-                  color: "#222",
-                  background: "#FAFAFA",
-                  outline: "none",
-                  boxSizing: "border-box",
-                }}
-              />
-            </div>
-            <div>
-              <label
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  color: "#AAA",
-                  display: "block",
-                  marginBottom: 5,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.06em",
-                }}
-              >
-                Platform
-              </label>
-              <select
-                value={platform}
-                onChange={(e) => setPlatform(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "8px 12px",
-                  border: "1px solid #EFEFEF",
-                  borderRadius: 8,
-                  fontSize: 13,
-                  color: platform ? "#222" : "#AAA",
-                  background: "#FAFAFA",
-                  outline: "none",
-                }}
-              >
-                <option value="">Select platform</option>
-                {PLATFORMS.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  color: "#AAA",
-                  display: "block",
-                  marginBottom: 5,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.06em",
-                }}
-              >
-                Industry
-              </label>
-              <select
-                value={industry}
-                onChange={(e) => setIndustry(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "8px 12px",
-                  border: `1px solid ${industry ? "#6366F1" : "#EFEFEF"}`,
-                  borderRadius: 8,
-                  fontSize: 13,
-                  color: industry ? "#6366F1" : "#AAA",
-                  background: "#FAFAFA",
-                  outline: "none",
-                }}
-              >
-                <option value="">Select industry…</option>
-                {INDUSTRIES.map((i) => (
-                  <option key={i} value={i}>
-                    {i}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div>
-            <label
-              style={{
-                fontSize: 10,
-                fontWeight: 700,
-                color: "#AAA",
-                display: "block",
-                marginBottom: 5,
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-              }}
-            >
-              Model
-            </label>
-            <ModelSelector value={selectedModel} onChange={setSelectedModel} />
-          </div>
-          <div>
-            <label
-              style={{
-                fontSize: 10,
-                fontWeight: 700,
-                color: "#AAA",
-                display: "block",
-                marginBottom: 5,
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-              }}
-            >
-              Brand guidelines
-            </label>
-            {brandList.length > 0 ? (
-              <div style={{ display: "flex", gap: 8 }}>
-                <select
-                  value={selectedBrand}
-                  onChange={(e) => {
-                    const n = e.target.value;
-                    setSelectedBrand(n);
-                    setBrandNotes(brands[n]?.notes || "");
-                    setBrandFiles(brands[n]?.files || []);
-                    if (n) setClient(n);
-                  }}
-                  style={{
-                    flex: 1,
-                    padding: "8px 12px",
-                    border: `1px solid ${selectedBrand ? "#6366F1" : "#EFEFEF"}`,
-                    borderRadius: 8,
-                    fontSize: 13,
-                    color: selectedBrand ? "#6366F1" : "#AAA",
-                    background: "#FAFAFA",
-                    outline: "none",
-                  }}
-                >
-                  <option value="">Select saved brand…</option>
-                  {brandList.map((b) => (
-                    <option key={b} value={b}>
-                      {b}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  onClick={() => setShowBrandMgr(true)}
-                  style={{
-                    padding: "8px 12px",
-                    borderRadius: 8,
-                    border: "1px solid #EFEFEF",
-                    background: "#fff",
-                    fontSize: 12,
-                    color: "#666",
-                    cursor: "pointer",
-                  }}
-                >
-                  Manage
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => setShowBrandMgr(true)}
-                style={{
-                  width: "100%",
-                  padding: "9px",
-                  borderRadius: 8,
-                  border: "1px dashed #DDD",
-                  background: "#FAFAFA",
-                  fontSize: 13,
-                  color: "#888",
-                  cursor: "pointer",
-                }}
-              >
-                + Save a brand guideline
-              </button>
-            )}
-            {selectedBrand && (brandNotes || brandFiles.length > 0) && (
-              <div
-                style={{
-                  marginTop: 6,
-                  background: "#F5F3FF",
-                  padding: "8px 10px",
-                  borderRadius: 6,
-                }}
-              >
-                {brandNotes && (
-                  <p
-                    style={{
-                      fontSize: 11,
-                      color: "#6366F1",
-                      margin: 0,
-                      lineHeight: 1.4,
-                    }}
-                  >
-                    Using: <strong>{selectedBrand}</strong> —{" "}
-                    {brandNotes.length > 80
-                      ? brandNotes.slice(0, 80) + "…"
-                      : brandNotes}
-                  </p>
-                )}
-                {brandFiles.length > 0 && (
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: 4,
-                      flexWrap: "wrap",
-                      marginTop: brandNotes ? 5 : 0,
-                    }}
-                  >
-                    {brandFiles.map((f, i) => (
-                      <span
-                        key={i}
-                        style={{
-                          fontSize: 10,
-                          padding: "2px 6px",
-                          borderRadius: 4,
-                          background: "#E0DBFF",
-                          color: "#6366F1",
-                        }}
-                      >
-                        {f.type.startsWith("image/")
-                          ? "🖼️"
-                          : f.type === "application/pdf"
-                            ? "📄"
-                            : "📝"}{" "}
-                        {f.name.length > 18
-                          ? f.name.slice(0, 18) + "…"
-                          : f.name}
-                        {f.extractedText && (
-                          <span style={{ color: "#10B981" }}> ✓</span>
-                        )}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-          {!selectedBrand && (
-            <div>
-              <label
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  color: "#AAA",
-                  display: "block",
-                  marginBottom: 5,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.06em",
-                }}
-              >
-                Or enter brand notes manually
-              </label>
-              <textarea
-                value={brandNotes}
-                onChange={(e) => setBrandNotes(e.target.value)}
-                placeholder="e.g. Primary red #E63030, bold sans-serif, no lifestyle imagery…"
-                rows={2}
-                style={{
-                  width: "100%",
-                  padding: "8px 12px",
-                  border: "1px solid #EFEFEF",
-                  borderRadius: 8,
-                  fontSize: 13,
-                  color: "#222",
-                  background: "#FAFAFA",
-                  outline: "none",
-                  resize: "vertical",
-                  fontFamily: "inherit",
-                  boxSizing: "border-box",
-                }}
-              />
-            </div>
-          )}
-          <div>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                marginBottom: 6,
-              }}
-            >
-              <label
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  color: "#AAA",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.06em",
-                }}
-              >
-                Pass threshold
-              </label>
-              <span style={{ fontSize: 12, fontWeight: 600, color: "#222" }}>
-                {threshold}/100
-              </span>
-            </div>
-            <input
-              type="range"
-              min={40}
-              max={90}
-              step={5}
-              value={threshold}
-              onChange={(e) => setThreshold(Number(e.target.value))}
-              style={{ width: "100%", accentColor: "#111" }}
-            />
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                fontSize: 10,
-                color: "#CCC",
-                marginTop: 2,
-              }}
-            >
-              <span>40 — lenient</span>
-              <span>90 — strict</span>
-            </div>
-          </div>
-        </div>
-
-        {/* SINGLE MODE */}
-        {mode === "single" && (
-          <>
-            {!single && (
-              <UploadZone
-                onFile={(f) => {
-                  setSingle(f);
-                  setSingleResult(null);
-                  setError(null);
-                }}
-              />
-            )}
-            {single && !singleResult && !singleAnalysing && (
-              <>
-                <CreativePreview
-                  creative={single}
-                  onRemove={() => {
-                    setSingle(null);
-                    setSingleResult(null);
-                  }}
-                />
-                <button
-                  onClick={runSingle}
-                  style={{
-                    width: "100%",
-                    padding: 13,
-                    borderRadius: 12,
-                    border: "none",
-                    background: "#111",
-                    color: "#fff",
-                    fontSize: 14,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    marginTop: 10,
-                  }}
-                >
-                  Analyse creative
-                </button>
-              </>
-            )}
-
-            {/* The beautiful new loader! */}
-            {singleAnalysing && (
-              <AnalysisLoader label="Analysing Creative..." />
-            )}
-
-            {singleResult && (
-              <SingleResult
-                creative={single!}
-                result={singleResult}
-                threshold={threshold}
-                onReset={() => {
-                  setSingle(null);
-                  setSingleResult(null);
-                }}
-                onExport={async () => {
-                  let heatmapDataUrl: string | undefined = undefined;
-
-                  if (
-                    single?.type === "image" &&
-                    single.dataUrl &&
-                    singleResult?.attention_zones?.length
-                  ) {
-                    const canvas = document.createElement("canvas");
-                    const ctx = canvas.getContext("2d");
-
-                    if (ctx) {
-                      const img = new Image();
-                      await new Promise((resolve) => {
-                        img.onload = () => {
-                          canvas.width = img.naturalWidth;
-                          canvas.height = img.naturalHeight;
-                          ctx.drawImage(img, 0, 0);
-
-                          singleResult.attention_zones.forEach((zone) => {
-                            const x = zone.x * img.naturalWidth;
-                            const y = zone.y * img.naturalHeight;
-                            const w = zone.w * img.naturalWidth;
-                            const h = zone.h * img.naturalHeight;
-                            const cx2 = x + w / 2;
-                            const cy2 = y + h / 2;
-
-                            const grad = ctx.createRadialGradient(
-                              cx2,
-                              cy2,
-                              0,
-                              cx2,
-                              cy2,
-                              Math.max(w, h) * 0.65,
-                            );
-                            const col =
-                              zone.priority === 1
-                                ? "rgba(239,68,68,0.5)"
-                                : zone.priority === 2
-                                  ? "rgba(251,146,60,0.4)"
-                                  : "rgba(250,204,21,0.3)";
-                            grad.addColorStop(0, col);
-                            grad.addColorStop(1, "rgba(0,0,0,0)");
-
-                            ctx.fillStyle = grad;
-                            ctx.fillRect(
-                              x - w * 0.15,
-                              y - h * 0.15,
-                              w * 1.3,
-                              h * 1.3,
-                            );
-
-                            ctx.strokeStyle =
-                              zone.priority === 1
-                                ? "rgba(239,68,68,0.85)"
-                                : zone.priority === 2
-                                  ? "rgba(251,146,60,0.75)"
-                                  : "rgba(202,138,4,0.7)";
-                            ctx.lineWidth = Math.max(
-                              2,
-                              img.naturalWidth * 0.003,
-                            );
-                            ctx.setLineDash([6, 4]);
-                            ctx.strokeRect(x, y, w, h);
-                            ctx.setLineDash([]);
-
-                            const labelText = `${zone.priority}. ${zone.label}`;
-                            const fs = Math.max(12, img.naturalWidth * 0.016);
-                            ctx.font = `bold ${fs}px system-ui`;
-                            const tw = ctx.measureText(labelText).width;
-                            const pad = 6;
-                            const bh = fs + pad * 2;
-                            const bx = x;
-                            const by = Math.max(0, y - bh - 2);
-
-                            ctx.fillStyle =
-                              zone.priority === 1
-                                ? "rgba(239,68,68,0.92)"
-                                : zone.priority === 2
-                                  ? "rgba(251,146,60,0.92)"
-                                  : "rgba(202,138,4,0.92)";
-                            ctx.beginPath();
-                            ctx.roundRect(bx, by, tw + pad * 2, bh, 4);
-                            ctx.fill();
-
-                            ctx.fillStyle = "#fff";
-                            ctx.textBaseline = "middle";
-                            ctx.fillText(labelText, bx + pad, by + bh / 2);
-                          });
-                          resolve(true);
-                        };
-                        img.src = single.dataUrl as string;
-                      });
-
-                      heatmapDataUrl = canvas.toDataURL("image/png");
-                    }
-                  }
-
-                  await generatePDF({
-                    creative: single,
-                    result: singleResult,
-                    heatmapDataUrl,
-                    client,
-                    platform,
-                    industry,
-                    threshold,
-                    model:
-                      MODELS.find((m) => m.id === selectedModel)?.name ||
-                      selectedModel,
-                    date: new Date().toLocaleDateString("en-GB"),
-                  });
-                }}
-              />
-            )}
-          </>
-        )}
-
-        {/* AB MODE */}
-        {mode === "ab" && (
-          <>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns:
-                  creatives.length <= 2 ? "1fr 1fr" : "1fr 1fr 1fr",
-                gap: 10,
-                marginBottom: "1rem",
-              }}
-            >
-              {creatives.map((c, i) =>
-                c ? (
-                  <div key={i}>
-                    <CreativePreview
-                      creative={c as CreativeFile}
-                      onRemove={() =>
-                        setCreatives((prev) => {
-                          const n = [...prev];
-                          n[i] = null;
-                          return n;
-                        })
-                      }
-                      label={LABELS[i]}
-                      labelColor={LABEL_COLORS[i]}
-                      compact
-                    />
-                    {(c as AnalysedCreative).result && (
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 8,
-                          padding: "8px 10px",
-                          background: "#fff",
-                          border: "1px solid #EFEFEF",
-                          borderTop: "none",
-                          borderRadius: "0 0 14px 14px",
-                        }}
-                      >
-                        <RadialScore
-                          score={(c as AnalysedCreative).result.overall_score}
-                          size={38}
-                          color={LABEL_COLORS[i]}
-                        />
-                        <div style={{ flex: 1 }}>
-                          <p
-                            style={{
-                              fontSize: 12,
-                              fontWeight: 700,
-                              color: LABEL_COLORS[i],
-                              margin: 0,
-                            }}
-                          >
-                            {(c as AnalysedCreative).result.overall_score}/100
-                          </p>
-                          <p style={{ fontSize: 10, color: "#888", margin: 0 }}>
-                            {verdictText(
-                              (c as AnalysedCreative).result.overall_score,
-                            )}
-                          </p>
-                        </div>
-                        <span
-                          style={{
-                            fontSize: 9,
-                            fontWeight: 700,
-                            padding: "2px 7px",
-                            borderRadius: 20,
-                            background: (c as AnalysedCreative).result.pass
-                              ? "#F0FDF4"
-                              : "#FEF2F2",
-                            color: (c as AnalysedCreative).result.pass
-                              ? "#15803D"
-                              : "#B91C1C",
-                          }}
-                        >
-                          {(c as AnalysedCreative).result.pass
-                            ? "PASS"
-                            : "FAIL"}
-                        </span>
-                      </div>
-                    )}
-                    {abAnalysing === i && (
-                      <div
-                        style={{
-                          padding: "16px",
-                          textAlign: "center",
-                          background: "#fff",
-                          borderRadius: "0 0 14px 14px",
-                          border: "1px solid #EFEFEF",
-                          borderTop: "none",
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          gap: 10,
-                        }}
-                      >
-                        <svg
-                          width="20"
-                          height="20"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke={LABEL_COLORS[i]}
-                          strokeWidth="2.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          style={{ animation: "spin 1s linear infinite" }}
-                        >
-                          <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                        </svg>
-                        <span
-                          style={{
-                            fontSize: 12,
-                            fontWeight: 600,
-                            color: "#333",
-                          }}
-                        >
-                          Analysing {LABELS[i]}…
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <UploadZone
-                    key={i}
-                    onFile={(f) =>
-                      setCreatives((prev) => {
-                        const n = [...prev];
-                        n[i] = f;
-                        return n;
-                      })
-                    }
-                    label={LABELS[i]}
-                    labelColor={LABEL_COLORS[i]}
-                  />
-                ),
-              )}
-            </div>
-            <div style={{ display: "flex", gap: 8, marginBottom: "1rem" }}>
-              {creatives.length < 4 && (
-                <button
-                  onClick={() => setCreatives((prev) => [...prev, null])}
-                  style={{
-                    flex: 1,
-                    padding: "10px",
-                    borderRadius: 10,
-                    border: "1px dashed #DDD",
-                    background: "#fff",
-                    fontSize: 13,
-                    color: "#888",
-                    cursor: "pointer",
-                  }}
-                >
-                  + Add {LABELS[creatives.length]}
-                </button>
-              )}
-              <button
-                onClick={runAB}
-                disabled={
-                  creatives.filter(Boolean).length < 2 || abAnalysing !== null
-                }
-                style={{
-                  flex: 2,
-                  padding: "10px",
-                  borderRadius: 10,
-                  border: "none",
-                  background:
-                    creatives.filter(Boolean).length < 2 || abAnalysing !== null
-                      ? "#F5F5F5"
-                      : "#111",
-                  color:
-                    creatives.filter(Boolean).length < 2 || abAnalysing !== null
-                      ? "#AAA"
-                      : "#fff",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                {abAnalysing !== null
-                  ? `Analysing ${LABELS[abAnalysing]}…`
-                  : `Analyse all (${creatives.filter(Boolean).length})`}
-              </button>
-            </div>
-            {analysedCreatives.length >= 2 && (
-              <ABResults
-                analysedCreatives={analysedCreatives}
-                winner={winner}
-                threshold={threshold}
-                onExport={() => exportReport(analysedCreatives)}
-              />
-            )}
-          </>
-        )}
-        {error && (
-          <div
-            style={{
-              marginTop: 10,
-              padding: "12px 16px",
-              background: "#FEF2F2",
-              borderRadius: 10,
-              fontSize: 13,
-              color: "#B91C1C",
-            }}
-          >
-            {error}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function SingleResult({
   creative,
   result,
   threshold,
   onReset,
   onExport,
+  model,
+  client,
+  platform,
+  industry,
 }: {
   creative: CreativeFile;
   result: AnalysisResult;
   threshold: number;
   onReset: () => void;
   onExport: () => void;
+  model?: string;
+  client?: string;
+  platform?: string;
+  industry?: string;
 }) {
   const [tab, setTab] = useState("analysis");
   const passed = result.pass;
@@ -2657,7 +1456,10 @@ function SingleResult({
               }}
             >
               {DIMS.map((d) => {
-                const dim = result.dimensions[d.key];
+                const dim = result.dimensions[d.key] || {
+                  score: 0,
+                  recommendation: "Data missing.",
+                };
                 const { bg, text } = scoreBg(dim.score);
                 return (
                   <div
@@ -3405,7 +2207,7 @@ function ABResults({
           </div>
           {DIMS.map((d) => {
             const scores = analysedCreatives.map(
-              (c) => c.result.dimensions[d.key].score,
+              (c) => c.result.dimensions[d.key]?.score || 0,
             );
             const maxScore = Math.max(...scores);
             return (
@@ -3425,7 +2227,7 @@ function ABResults({
                   {d.name}
                 </span>
                 {analysedCreatives.map((c) => {
-                  const s = c.result.dimensions[d.key].score;
+                  const s = c.result.dimensions[d.key]?.score || 0;
                   const isWin = s === maxScore;
                   return (
                     <div key={c.index} style={{ textAlign: "center" }}>
@@ -3638,7 +2440,10 @@ function ABResults({
                   compact
                 />
                 {DIMS.map((d) => {
-                  const dim = c.result.dimensions[d.key];
+                  const dim = c.result.dimensions[d.key] || {
+                    score: 0,
+                    recommendation: "Data missing.",
+                  };
                   const { bg, text } = scoreBg(dim.score);
                   return (
                     <div
@@ -3676,7 +2481,8 @@ function ABResults({
                         >
                           {others.map((o) => {
                             const diff =
-                              dim.score - o.result.dimensions[d.key].score;
+                              dim.score -
+                              (o.result.dimensions[d.key]?.score || 0);
                             return (
                               <span
                                 key={o.index}
@@ -3757,6 +2563,1600 @@ function ABResults({
       >
         Export full comparison report
       </button>
+    </div>
+  );
+}
+
+interface IndustryExample {
+  brand: string;
+  campaign: string;
+  technique: string;
+  lesson: string;
+}
+interface IndustryBenchmarks {
+  summary: string;
+  examples: IndustryExample[];
+  gap: string;
+}
+interface AnalysisResult {
+  overall_score: number;
+  overall_verdict: string;
+  pass: boolean;
+  dimensions: { [key: string]: { score: number; recommendation: string } };
+  top_fixes: string[];
+  attention_zones: Zone[];
+  industry_benchmarks?: IndustryBenchmarks;
+}
+interface AnalysedCreative extends CreativeFile {
+  result: AnalysisResult;
+  index: number;
+}
+
+export default function App({
+  session,
+}: {
+  session: import("@supabase/supabase-js").Session;
+}) {
+  const [currentView, setCurrentView] = useState<"analyzer" | "dashboard">(
+    "analyzer",
+  );
+  const [profile, setProfile] = useState<any>(null);
+  const [analysesHistory, setAnalysesHistory] = useState<any[]>([]);
+
+  const [mode, setMode] = useState("single");
+  const [showBrandMgr, setShowBrandMgr] = useState(false);
+  const [brands, setBrands] = useState<BrandMap>({});
+  const [selectedBrand, setSelectedBrand] = useState("");
+  const [brandNotes, setBrandNotes] = useState("");
+  const [brandFiles, setBrandFiles] = useState<BrandFile[]>([]);
+  const [client, setClient] = useState("");
+  const [platform, setPlatform] = useState("");
+  const [threshold, setThreshold] = useState(65);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState(MODELS[1].id);
+  const [single, setSingle] = useState<CreativeFile | null>(null);
+  const [singleResult, setSingleResult] = useState<AnalysisResult | null>(null);
+  const [singleAnalysing, setSingleAnalysing] = useState(false);
+  const [creatives, setCreatives] = useState<
+    ((CreativeFile & { result?: AnalysisResult }) | null)[]
+  >([null, null]);
+  const [abAnalysing, setAbAnalysing] = useState<number | null>(null);
+  const [industry, setIndustry] = useState("");
+
+  const fetchUserData = async () => {
+    const { data: prof } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", session.user.id)
+      .single();
+    if (prof) setProfile(prof);
+    const { data: hist } = await supabase
+      .from("analyses")
+      .select("*")
+      .eq("user_id", session.user.id)
+      .order("created_at", { ascending: false });
+    if (hist) setAnalysesHistory(hist);
+  };
+
+  useEffect(() => {
+    if (session?.user?.id) {
+      loadBrandsFromSupabase(session.user.id).then((b) => setBrands(b));
+      fetchUserData();
+    }
+  }, [session, currentView]);
+
+  const buildSystem = (isVideo: boolean) => {
+    const fileContext = brandFiles
+      .filter((f) => f.extractedText)
+      .map((f) => `[Brand file: ${f.name}]\n${f.extractedText}`)
+      .join("\n\n");
+
+    const industrySection = industry
+      ? `
+  "industry_benchmarks": {
+    "summary": "<2-3 sentences on what the best ${industry} campaigns globally are doing in 2024-2025, based on current web knowledge>",
+    "examples": [
+      {
+        "brand": "<real brand name>",
+        "campaign": "<real campaign name>",
+        "technique": "<what creative or psychological technique makes it work>",
+        "lesson": "<one direct sentence on what this specific creative could learn from it>"
+      },
+      {
+        "brand": "<real brand name>",
+        "campaign": "<real campaign name>",
+        "technique": "<technique>",
+        "lesson": "<lesson>"
+      }
+    ],
+    "gap": "<single sentence — the biggest difference between this creative and what top ${industry} players are doing>"
+  },`
+      : "";
+
+    return `You are a senior creative strategist at No Fluff, a behavioural marketing agency for D2C brands. Analyse advertising creatives through consumer psychology, visual hierarchy, and conversion optimisation.${industry ? ` Use your web search tool to find current 2024-2025 ${industry} campaign examples before completing the industry_benchmarks section.` : ""}
+
+Return ONLY raw JSON. No markdown. No backticks. No explanation. Start with { end with }.
+
+{
+  "overall_score": <integer 0-100>,
+  "overall_verdict": "<one punchy sentence>",
+  "pass": <true if score >= ${threshold}, else false>,
+  "dimensions": {
+    "visual_hierarchy": { "score": <0-100>, "recommendation": "<specific 1-2 sentence observation>" },
+    "clarity_readability": { "score": <0-100>, "recommendation": "<specific observation>" },
+    "three_second_test": { "score": <0-100>, "recommendation": "<specific observation>" },
+    "behavioural_triggers": { "score": <0-100>, "recommendation": "<psychology principles present or missing>" },
+    "cta_strength": { "score": <0-100>, "recommendation": "<specific observation>" },
+    "cognitive_load": { "score": <0-100>, "recommendation": "<specific observation>" },
+    "emotional_resonance": { "score": <0-100>, "recommendation": "<specific observation>" },
+    "brand_consistency": { "score": <0-100>, "recommendation": "<specific observation>" }
+  },
+  "top_fixes": ["<most impactful fix>", "<second fix>", "<third fix>"],
+  "attention_zones": [
+    { "priority": 1, "label": "<element e.g. Headline>", "x": <0.0-1.0>, "y": <0.0-1.0>, "w": <0.0-1.0>, "h": <0.0-1.0>, "note": "<why this draws attention>" },
+    { "priority": 2, "label": "<element>", "x": <0.0-1.0>, "y": <0.0-1.0>, "w": <0.0-1.0>, "h": <0.0-1.0>, "note": "<note>" },
+    { "priority": 3, "label": "<element>", "x": <0.0-1.0>, "y": <0.0-1.0>, "w": <0.0-1.0>, "h": <0.0-1.0>, "note": "<note>" }
+  ]${industry ? `,${industrySection}` : ""}
+}
+
+x/y = top-left corner as fraction of image width/height. w/h = width/height as fraction.
+${platform ? `Platform: ${platform}.` : ""}${client ? ` Client: ${client}.` : ""}${industry ? ` Industry: ${industry}.` : ""}${brandNotes ? ` Brand notes: ${brandNotes}.` : ""}${fileContext ? `\n\nBrand guideline documents:\n${fileContext}` : ""}${isVideo ? " Video creative — benchmark against best-practice standards for the format." : ""}
+Be specific. Reference actual elements visible. No generic advice.`;
+  };
+
+  const callAPI = async (creative: CreativeFile): Promise<AnalysisResult> => {
+    const isVideo = creative.type === "video";
+    const contentParts: object[] = [];
+    const brandImageFiles = brandFiles.filter(
+      (f) => f.type.startsWith("image/") && f.dataUrl,
+    );
+    for (const bf of brandImageFiles) {
+      const raw = bf.dataUrl.split(",")[1];
+      contentParts.push({
+        type: "image",
+        source: { type: "base64", media_type: bf.type, data: raw },
+      });
+      contentParts.push({ type: "text", text: `[Brand asset: ${bf.name}]` });
+    }
+    if (!isVideo) {
+      const raw = await toBase64Raw(creative.file);
+      contentParts.push({
+        type: "image",
+        source: { type: "base64", media_type: creative.mimeType, data: raw },
+      });
+      contentParts.push({
+        type: "text",
+        text: "Analyse this creative. Return raw JSON only, starting with {",
+      });
+    } else {
+      contentParts.push({
+        type: "text",
+        text: `Video file: "${creative.name}". Provide the JSON analysis. Raw JSON only, starting with {`,
+      });
+    }
+    const messages = [
+      {
+        role: "user",
+        content: isVideo ? contentParts[contentParts.length - 1] : contentParts,
+      },
+    ];
+    const requestBody: Record<string, unknown> = {
+      model: selectedModel,
+      max_tokens: 4000,
+      system: buildSystem(isVideo),
+      messages,
+    };
+
+    if (industry) {
+      requestBody.tools = [{ type: "web_search_20250305", name: "web_search" }];
+    }
+
+    const resp = await fetch("/api/analyse", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!resp.ok) {
+      const e = await resp.json().catch(() => ({}));
+      throw new Error(e.error?.message || `API error ${resp.status}`);
+    }
+    const data = await resp.json();
+    const rawText = (data.content || [])
+      .filter((b: { type: string }) => b.type === "text")
+      .map((b: { text?: string }) => b.text || "")
+      .join("")
+      .trim();
+    const start = rawText.indexOf("{"),
+      end = rawText.lastIndexOf("}");
+    if (start === -1 || end === -1)
+      throw new Error("No JSON found in response");
+    const parsed = JSON.parse(rawText.slice(start, end + 1));
+    if (!parsed.dimensions || !parsed.overall_score)
+      throw new Error("Incomplete analysis returned — please try again.");
+    return parsed;
+  };
+
+  const saveAnalysisRecord = async (score: number, pass: boolean) => {
+    const creditsUsed =
+      MODELS.find((m) => m.id === selectedModel)?.credits || 1;
+    await supabase.from("analyses").insert({
+      user_id: session.user.id,
+      client: client || "Unnamed Analysis",
+      platform: platform || "Unknown",
+      model: selectedModel,
+      credits_used: creditsUsed,
+      overall_score: score,
+      pass: pass,
+    });
+    fetchUserData();
+  };
+
+  const runSingle = async () => {
+    if (!single) return;
+    setSingleAnalysing(true);
+    setError(null);
+    setSingleResult(null);
+    try {
+      const res = await callAPI(single);
+      setSingleResult(res);
+      await saveAnalysisRecord(res.overall_score, res.pass);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+    setSingleAnalysing(false);
+  };
+
+  const runAB = async () => {
+    const filled = creatives.filter(Boolean);
+    if (filled.length < 2) return;
+    setError(null);
+    for (let i = 0; i < creatives.length; i++) {
+      if (!creatives[i]) continue;
+      setAbAnalysing(i);
+      try {
+        const result = await callAPI(creatives[i] as CreativeFile);
+        setCreatives((prev) => {
+          const n = [...prev];
+          if (n[i]) n[i] = { ...(n[i] as CreativeFile), result };
+          return n;
+        });
+        await saveAnalysisRecord(result.overall_score, result.pass);
+      } catch (err) {
+        setError(`Creative ${LABELS[i]}: ${(err as Error).message}`);
+      }
+    }
+    setAbAnalysing(null);
+  };
+
+  const exportReport = (items: AnalysedCreative[]) => {
+    try {
+      const lines = [
+        "NO FLUFF CREATIVE ANALYSER — REPORT",
+        "=====================================",
+        `Date: ${new Date().toLocaleDateString("en-GB")}`,
+        client ? `Client: ${client}` : "",
+        platform ? `Platform: ${platform}` : "",
+        "",
+        ...items.map((r) =>
+          [
+            `${items.length > 1 ? `--- CREATIVE ${LABELS[r.index]} ---` : "--- ANALYSIS ---"}`,
+            `Score: ${r.result?.overall_score || 0}/100 — ${r.result?.pass ? "PASS" : "FAIL"} (threshold ${threshold})`,
+            `Verdict: ${r.result?.overall_verdict || "N/A"}`,
+            "",
+            "Dimensions:",
+            ...DIMS.map(
+              (d) =>
+                `  ${d.name}: ${r.result?.dimensions?.[d.key]?.score || 0}/100\n    → ${r.result?.dimensions?.[d.key]?.recommendation || "N/A"}`,
+            ),
+            "",
+            "Top fixes:",
+            ...(r.result?.top_fixes || []).map((f, j) => `  ${j + 1}. ${f}`),
+            "",
+          ].join("\n"),
+        ),
+      ]
+        .filter(Boolean)
+        .join("\n");
+
+      const blob = new Blob([lines], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+
+      const safeClient = (client || "unnamed").replace(/[^a-z0-9]/gi, "_");
+      a.download = `NF_Creative_Report_${safeClient}_${new Date().toISOString().slice(0, 10)}.txt`;
+
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+      }, 1000);
+    } catch (err) {
+      console.error("Export failed:", err);
+      alert("Export failed. Please check the console for details.");
+    }
+  };
+
+  const brandList = Object.keys(brands);
+  const analysedCreatives = creatives
+    .map((c, i) =>
+      c && (c as AnalysedCreative).result
+        ? ({ ...c, index: i } as AnalysedCreative)
+        : null,
+    )
+    .filter((c): c is AnalysedCreative => c !== null);
+  const winner =
+    analysedCreatives.length > 1
+      ? analysedCreatives.reduce((a, b) =>
+          a.result.overall_score > b.result.overall_score ? a : b,
+        )
+      : null;
+
+  const Sidebar = () => (
+    <aside
+      style={{
+        width: 260,
+        background: "#fff",
+        borderRight: "1px solid #EFEFEF",
+        display: "flex",
+        flexDirection: "column",
+        height: "100vh",
+        position: "fixed",
+        left: 0,
+        top: 0,
+      }}
+    >
+      <div style={{ padding: "1.5rem", borderBottom: "1px solid #EFEFEF" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div
+            style={{
+              width: 24,
+              height: 24,
+              borderRadius: 6,
+              background: "#111",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <span style={{ color: "#fff", fontSize: 12, fontWeight: 800 }}>
+              NF
+            </span>
+          </div>
+          <span
+            style={{ fontSize: 14, fontWeight: 700, letterSpacing: "0.05em" }}
+          >
+            PREFLYGHT
+          </span>
+        </div>
+      </div>
+
+      <nav
+        style={{
+          padding: "1rem",
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          gap: 6,
+        }}
+      >
+        <button
+          onClick={() => setCurrentView("analyzer")}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: "10px 14px",
+            borderRadius: 8,
+            border: "none",
+            background: currentView === "analyzer" ? "#F5F3FF" : "transparent",
+            color: currentView === "analyzer" ? "#6366F1" : "#555",
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: "pointer",
+            textAlign: "left",
+            transition: "all 0.15s",
+          }}
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+          </svg>
+          Analyzer Workspace
+        </button>
+        <button
+          onClick={() => setCurrentView("dashboard")}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: "10px 14px",
+            borderRadius: 8,
+            border: "none",
+            background: currentView === "dashboard" ? "#F5F3FF" : "transparent",
+            color: currentView === "dashboard" ? "#6366F1" : "#555",
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: "pointer",
+            textAlign: "left",
+            transition: "all 0.15s",
+          }}
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="3" y1="9" x2="21" y2="9"></line>
+            <line x1="9" y1="21" x2="9" y2="9"></line>
+          </svg>
+          Dashboard History
+        </button>
+      </nav>
+
+      <div
+        style={{
+          padding: "1.5rem",
+          borderTop: "1px solid #EFEFEF",
+          background: "#FAFAFA",
+        }}
+      >
+        <div style={{ marginBottom: 12 }}>
+          <p
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              color: "#AAA",
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+              margin: "0 0 6px",
+            }}
+          >
+            Remaining Credits
+          </p>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+            <span style={{ fontSize: 24, fontWeight: 700, color: "#111" }}>
+              {profile?.credits_remaining || 0}
+            </span>
+            <span style={{ fontSize: 12, color: "#888" }}>/ tokens</span>
+          </div>
+        </div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginTop: 16,
+          }}
+        >
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <span
+              style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: "#222",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                maxWidth: "150px",
+              }}
+            >
+              {profile?.full_name || session.user.email?.split("@")[0]}
+            </span>
+            <span
+              style={{
+                fontSize: 11,
+                color: "#888",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                maxWidth: "150px",
+              }}
+            >
+              {profile?.company || "User"}
+            </span>
+          </div>
+          <button
+            onClick={() => supabase.auth.signOut()}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "#AAA",
+            }}
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </aside>
+  );
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        minHeight: "100vh",
+        background: "#FAFAFA",
+        fontFamily: "var(--font-sans,system-ui)",
+      }}
+    >
+      {showBrandMgr && (
+        <BrandManager
+          selectedBrand={selectedBrand}
+          onSelect={(n, notes, files) => {
+            setSelectedBrand(n);
+            setBrandNotes(notes || "");
+            setBrandFiles(files || []);
+            if (n) setClient(n);
+          }}
+          onClose={() => setShowBrandMgr(false)}
+          onUpdated={(b) => setBrands(b)}
+          userId={session.user.id}
+        />
+      )}
+
+      <Sidebar />
+
+      <main
+        style={{
+          marginLeft: 260,
+          flex: 1,
+          padding: "3rem",
+          height: "100vh",
+          overflowY: "auto",
+          boxSizing: "border-box",
+        }}
+      >
+        {/* === DASHBOARD VIEW === */}
+        {currentView === "dashboard" && (
+          <div style={{ maxWidth: 900, margin: "0 auto" }}>
+            <h1
+              style={{
+                fontSize: 24,
+                fontWeight: 600,
+                color: "#111",
+                margin: "0 0 6px",
+              }}
+            >
+              Analysis Dashboard
+            </h1>
+            <p style={{ fontSize: 14, color: "#888", marginBottom: "2rem" }}>
+              Review your past creative performance and credit usage.
+            </p>
+
+            <div
+              style={{
+                background: "#fff",
+                border: "1px solid #EFEFEF",
+                borderRadius: 14,
+                overflow: "hidden",
+              }}
+            >
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  textAlign: "left",
+                }}
+              >
+                <thead>
+                  <tr
+                    style={{
+                      background: "#FAFAFA",
+                      borderBottom: "1px solid #EFEFEF",
+                    }}
+                  >
+                    <th
+                      style={{
+                        padding: "12px 16px",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: "#AAA",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      Date
+                    </th>
+                    <th
+                      style={{
+                        padding: "12px 16px",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: "#AAA",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      Client / Campaign
+                    </th>
+                    <th
+                      style={{
+                        padding: "12px 16px",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: "#AAA",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      Platform
+                    </th>
+                    <th
+                      style={{
+                        padding: "12px 16px",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: "#AAA",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      Score
+                    </th>
+                    <th
+                      style={{
+                        padding: "12px 16px",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: "#AAA",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      Result
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {analysesHistory.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        style={{
+                          padding: "2rem",
+                          textAlign: "center",
+                          color: "#888",
+                          fontSize: 13,
+                        }}
+                      >
+                        No analyses run yet. Head to the workspace to get
+                        started!
+                      </td>
+                    </tr>
+                  ) : (
+                    analysesHistory.map((item) => (
+                      <tr
+                        key={item.id}
+                        style={{ borderBottom: "1px solid #F5F5F5" }}
+                      >
+                        <td
+                          style={{
+                            padding: "14px 16px",
+                            fontSize: 13,
+                            color: "#555",
+                          }}
+                        >
+                          {new Date(item.created_at).toLocaleDateString()}
+                        </td>
+                        <td
+                          style={{
+                            padding: "14px 16px",
+                            fontSize: 13,
+                            fontWeight: 600,
+                            color: "#111",
+                          }}
+                        >
+                          {item.client}
+                        </td>
+                        <td
+                          style={{
+                            padding: "14px 16px",
+                            fontSize: 13,
+                            color: "#555",
+                          }}
+                        >
+                          {item.platform}
+                        </td>
+                        <td style={{ padding: "14px 16px" }}>
+                          <span
+                            style={{
+                              fontWeight: 700,
+                              color: scoreColor(item.overall_score),
+                            }}
+                          >
+                            {item.overall_score}/100
+                          </span>
+                        </td>
+                        <td style={{ padding: "14px 16px" }}>
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              padding: "3px 8px",
+                              borderRadius: 20,
+                              background: item.pass ? "#F0FDF4" : "#FEF2F2",
+                              color: item.pass ? "#15803D" : "#B91C1C",
+                            }}
+                          >
+                            {item.pass ? "PASS" : "FAIL"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* === ANALYZER WORKSPACE === */}
+        {currentView === "analyzer" && (
+          <div style={{ maxWidth: 720, margin: "0 auto" }}>
+            {/* Header */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                marginBottom: "1.75rem",
+              }}
+            >
+              <div>
+                <h1
+                  style={{
+                    fontSize: 24,
+                    fontWeight: 600,
+                    color: "#111",
+                    margin: 0,
+                  }}
+                >
+                  Analyzer Workspace
+                </h1>
+                <p style={{ fontSize: 14, color: "#888", marginTop: 4 }}>
+                  Pre-flight analysis powered by behavioural science
+                </p>
+              </div>
+            </div>
+
+            {/* Mode toggle */}
+            <div
+              style={{
+                display: "flex",
+                gap: 6,
+                marginBottom: "1.25rem",
+                background: "#EFEFEF",
+                borderRadius: 10,
+                padding: 4,
+              }}
+            >
+              {[
+                ["single", "Single creative"],
+                ["ab", "A/B comparison"],
+              ].map(([m, l]) => (
+                <button
+                  key={m}
+                  onClick={() => {
+                    setMode(m);
+                    setError(null);
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: "8px 0",
+                    borderRadius: 8,
+                    border: "none",
+                    fontSize: 13,
+                    fontWeight: 500,
+                    background: mode === m ? "#fff" : "transparent",
+                    color: mode === m ? "#111" : "#888",
+                    boxShadow:
+                      mode === m ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+                    cursor: "pointer",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
+
+            {/* Config */}
+            <div
+              style={{
+                background: "#fff",
+                border: "1px solid #F0F0F0",
+                borderRadius: 14,
+                padding: "1.25rem",
+                marginBottom: "1.25rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
+              }}
+            >
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr 1fr",
+                  gap: 10,
+                }}
+              >
+                <div>
+                  <label
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: "#AAA",
+                      display: "block",
+                      marginBottom: 5,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                    }}
+                  >
+                    Client / campaign
+                  </label>
+                  <input
+                    value={client}
+                    onChange={(e) => setClient(e.target.value)}
+                    placeholder="e.g. Sirf Coffee — Diwali"
+                    style={{
+                      width: "100%",
+                      padding: "8px 12px",
+                      border: "1px solid #EFEFEF",
+                      borderRadius: 8,
+                      fontSize: 13,
+                      color: "#222",
+                      background: "#FAFAFA",
+                      outline: "none",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                </div>
+                <div>
+                  <label
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: "#AAA",
+                      display: "block",
+                      marginBottom: 5,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                    }}
+                  >
+                    Platform
+                  </label>
+                  <select
+                    value={platform}
+                    onChange={(e) => setPlatform(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "8px 12px",
+                      border: "1px solid #EFEFEF",
+                      borderRadius: 8,
+                      fontSize: 13,
+                      color: platform ? "#222" : "#AAA",
+                      background: "#FAFAFA",
+                      outline: "none",
+                    }}
+                  >
+                    <option value="">Select platform</option>
+                    {PLATFORMS.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: "#AAA",
+                      display: "block",
+                      marginBottom: 5,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                    }}
+                  >
+                    Industry
+                  </label>
+                  <select
+                    value={industry}
+                    onChange={(e) => setIndustry(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "8px 12px",
+                      border: `1px solid ${industry ? "#6366F1" : "#EFEFEF"}`,
+                      borderRadius: 8,
+                      fontSize: 13,
+                      color: industry ? "#6366F1" : "#AAA",
+                      background: "#FAFAFA",
+                      outline: "none",
+                    }}
+                  >
+                    <option value="">Select industry…</option>
+                    {INDUSTRIES.map((i) => (
+                      <option key={i} value={i}>
+                        {i}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: "#AAA",
+                    display: "block",
+                    marginBottom: 5,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                  }}
+                >
+                  Model
+                </label>
+                <ModelSelector
+                  value={selectedModel}
+                  onChange={setSelectedModel}
+                />
+              </div>
+              <div>
+                <label
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: "#AAA",
+                    display: "block",
+                    marginBottom: 5,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                  }}
+                >
+                  Brand guidelines
+                </label>
+                {brandList.length > 0 ? (
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <select
+                      value={selectedBrand}
+                      onChange={(e) => {
+                        const n = e.target.value;
+                        setSelectedBrand(n);
+                        setBrandNotes(brands[n]?.notes || "");
+                        setBrandFiles(brands[n]?.files || []);
+                        if (n) setClient(n);
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: "8px 12px",
+                        border: `1px solid ${selectedBrand ? "#6366F1" : "#EFEFEF"}`,
+                        borderRadius: 8,
+                        fontSize: 13,
+                        color: selectedBrand ? "#6366F1" : "#AAA",
+                        background: "#FAFAFA",
+                        outline: "none",
+                      }}
+                    >
+                      <option value="">Select saved brand…</option>
+                      {brandList.map((b) => (
+                        <option key={b} value={b}>
+                          {b}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => setShowBrandMgr(true)}
+                      style={{
+                        padding: "8px 12px",
+                        borderRadius: 8,
+                        border: "1px solid #EFEFEF",
+                        background: "#fff",
+                        fontSize: 12,
+                        color: "#666",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Manage
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowBrandMgr(true)}
+                    style={{
+                      width: "100%",
+                      padding: "9px",
+                      borderRadius: 8,
+                      border: "1px dashed #DDD",
+                      background: "#FAFAFA",
+                      fontSize: 13,
+                      color: "#888",
+                      cursor: "pointer",
+                    }}
+                  >
+                    + Save a brand guideline
+                  </button>
+                )}
+                {selectedBrand && (brandNotes || brandFiles.length > 0) && (
+                  <div
+                    style={{
+                      marginTop: 6,
+                      background: "#F5F3FF",
+                      padding: "8px 10px",
+                      borderRadius: 6,
+                    }}
+                  >
+                    {brandNotes && (
+                      <p
+                        style={{
+                          fontSize: 11,
+                          color: "#6366F1",
+                          margin: 0,
+                          lineHeight: 1.4,
+                        }}
+                      >
+                        Using: <strong>{selectedBrand}</strong> —{" "}
+                        {brandNotes.length > 80
+                          ? brandNotes.slice(0, 80) + "…"
+                          : brandNotes}
+                      </p>
+                    )}
+                    {brandFiles.length > 0 && (
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 4,
+                          flexWrap: "wrap",
+                          marginTop: brandNotes ? 5 : 0,
+                        }}
+                      >
+                        {brandFiles.map((f, i) => (
+                          <span
+                            key={i}
+                            style={{
+                              fontSize: 10,
+                              padding: "2px 6px",
+                              borderRadius: 4,
+                              background: "#E0DBFF",
+                              color: "#6366F1",
+                            }}
+                          >
+                            {f.type.startsWith("image/")
+                              ? "🖼️"
+                              : f.type === "application/pdf"
+                                ? "📄"
+                                : "📝"}{" "}
+                            {f.name.length > 18
+                              ? f.name.slice(0, 18) + "…"
+                              : f.name}
+                            {f.extractedText && (
+                              <span style={{ color: "#10B981" }}> ✓</span>
+                            )}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              {!selectedBrand && (
+                <div>
+                  <label
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: "#AAA",
+                      display: "block",
+                      marginBottom: 5,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                    }}
+                  >
+                    Or enter brand notes manually
+                  </label>
+                  <textarea
+                    value={brandNotes}
+                    onChange={(e) => setBrandNotes(e.target.value)}
+                    placeholder="e.g. Primary red #E63030, bold sans-serif, no lifestyle imagery…"
+                    rows={2}
+                    style={{
+                      width: "100%",
+                      padding: "8px 12px",
+                      border: "1px solid #EFEFEF",
+                      borderRadius: 8,
+                      fontSize: 13,
+                      color: "#222",
+                      background: "#FAFAFA",
+                      outline: "none",
+                      resize: "vertical",
+                      fontFamily: "inherit",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                </div>
+              )}
+              <div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    marginBottom: 6,
+                  }}
+                >
+                  <label
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: "#AAA",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                    }}
+                  >
+                    Pass threshold
+                  </label>
+                  <span
+                    style={{ fontSize: 12, fontWeight: 600, color: "#222" }}
+                  >
+                    {threshold}/100
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={40}
+                  max={90}
+                  step={5}
+                  value={threshold}
+                  onChange={(e) => setThreshold(Number(e.target.value))}
+                  style={{ width: "100%", accentColor: "#111" }}
+                />
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    fontSize: 10,
+                    color: "#CCC",
+                    marginTop: 2,
+                  }}
+                >
+                  <span>40 — lenient</span>
+                  <span>90 — strict</span>
+                </div>
+              </div>
+            </div>
+
+            {/* SINGLE MODE */}
+            {mode === "single" && (
+              <>
+                {!single && (
+                  <UploadZone
+                    onFile={(f) => {
+                      setSingle(f);
+                      setSingleResult(null);
+                      setError(null);
+                    }}
+                  />
+                )}
+                {single && !singleResult && !singleAnalysing && (
+                  <>
+                    <CreativePreview
+                      creative={single}
+                      onRemove={() => {
+                        setSingle(null);
+                        setSingleResult(null);
+                      }}
+                    />
+                    <button
+                      onClick={runSingle}
+                      style={{
+                        width: "100%",
+                        padding: 13,
+                        borderRadius: 12,
+                        border: "none",
+                        background: "#111",
+                        color: "#fff",
+                        fontSize: 14,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        marginTop: 10,
+                      }}
+                    >
+                      Analyse creative
+                    </button>
+                  </>
+                )}
+
+                {/* The beautiful new loader! */}
+                {singleAnalysing && (
+                  <AnalysisLoader label="Analysing Creative..." />
+                )}
+
+                {singleResult && (
+                  <SingleResult
+                    creative={single!}
+                    result={singleResult}
+                    threshold={threshold}
+                    model={
+                      MODELS.find((m) => m.id === selectedModel)?.name ||
+                      selectedModel
+                    }
+                    client={client}
+                    platform={platform}
+                    industry={industry}
+                    onReset={() => {
+                      setSingle(null);
+                      setSingleResult(null);
+                    }}
+                    onExport={async () => {
+                      let heatmapDataUrl: string | undefined = undefined;
+
+                      if (
+                        single?.type === "image" &&
+                        single.dataUrl &&
+                        singleResult?.attention_zones?.length
+                      ) {
+                        const canvas = document.createElement("canvas");
+                        const ctx = canvas.getContext("2d");
+
+                        if (ctx) {
+                          const img = new Image();
+                          await new Promise((resolve) => {
+                            img.onload = () => {
+                              canvas.width = img.naturalWidth;
+                              canvas.height = img.naturalHeight;
+                              ctx.drawImage(img, 0, 0);
+
+                              singleResult.attention_zones.forEach((zone) => {
+                                const x = zone.x * img.naturalWidth;
+                                const y = zone.y * img.naturalHeight;
+                                const w = zone.w * img.naturalWidth;
+                                const h = zone.h * img.naturalHeight;
+                                const cx2 = x + w / 2;
+                                const cy2 = y + h / 2;
+
+                                const grad = ctx.createRadialGradient(
+                                  cx2,
+                                  cy2,
+                                  0,
+                                  cx2,
+                                  cy2,
+                                  Math.max(w, h) * 0.65,
+                                );
+                                const col =
+                                  zone.priority === 1
+                                    ? "rgba(239,68,68,0.5)"
+                                    : zone.priority === 2
+                                      ? "rgba(251,146,60,0.4)"
+                                      : "rgba(250,204,21,0.3)";
+                                grad.addColorStop(0, col);
+                                grad.addColorStop(1, "rgba(0,0,0,0)");
+
+                                ctx.fillStyle = grad;
+                                ctx.fillRect(
+                                  x - w * 0.15,
+                                  y - h * 0.15,
+                                  w * 1.3,
+                                  h * 1.3,
+                                );
+
+                                ctx.strokeStyle =
+                                  zone.priority === 1
+                                    ? "rgba(239,68,68,0.85)"
+                                    : zone.priority === 2
+                                      ? "rgba(251,146,60,0.75)"
+                                      : "rgba(202,138,4,0.7)";
+                                ctx.lineWidth = Math.max(
+                                  2,
+                                  img.naturalWidth * 0.003,
+                                );
+                                ctx.setLineDash([6, 4]);
+                                ctx.strokeRect(x, y, w, h);
+                                ctx.setLineDash([]);
+
+                                const labelText = `${zone.priority}. ${zone.label}`;
+                                const fs = Math.max(
+                                  12,
+                                  img.naturalWidth * 0.016,
+                                );
+                                ctx.font = `bold ${fs}px system-ui`;
+                                const tw = ctx.measureText(labelText).width;
+                                const pad = 6;
+                                const bh = fs + pad * 2;
+                                const bx = x;
+                                const by = Math.max(0, y - bh - 2);
+
+                                ctx.fillStyle =
+                                  zone.priority === 1
+                                    ? "rgba(239,68,68,0.92)"
+                                    : zone.priority === 2
+                                      ? "rgba(251,146,60,0.92)"
+                                      : "rgba(202,138,4,0.92)";
+                                ctx.beginPath();
+                                ctx.roundRect(bx, by, tw + pad * 2, bh, 4);
+                                ctx.fill();
+
+                                ctx.fillStyle = "#fff";
+                                ctx.textBaseline = "middle";
+                                ctx.fillText(labelText, bx + pad, by + bh / 2);
+                              });
+                              resolve(true);
+                            };
+                            img.src = single.dataUrl as string;
+                          });
+
+                          heatmapDataUrl = canvas.toDataURL("image/png");
+                        }
+                      }
+
+                      await generatePDF({
+                        creative: single,
+                        result: singleResult,
+                        heatmapDataUrl,
+                        client,
+                        platform,
+                        industry,
+                        threshold,
+                        model:
+                          MODELS.find((m) => m.id === selectedModel)?.name ||
+                          selectedModel,
+                        date: new Date().toLocaleDateString("en-GB"),
+                      });
+                    }}
+                  />
+                )}
+              </>
+            )}
+
+            {/* AB MODE */}
+            {mode === "ab" && (
+              <>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns:
+                      creatives.length <= 2 ? "1fr 1fr" : "1fr 1fr 1fr",
+                    gap: 10,
+                    marginBottom: "1rem",
+                  }}
+                >
+                  {creatives.map((c, i) =>
+                    c ? (
+                      <div key={i}>
+                        <CreativePreview
+                          creative={c as CreativeFile}
+                          onRemove={() =>
+                            setCreatives((prev) => {
+                              const n = [...prev];
+                              n[i] = null;
+                              return n;
+                            })
+                          }
+                          label={LABELS[i]}
+                          labelColor={LABEL_COLORS[i]}
+                          compact
+                        />
+                        {(c as AnalysedCreative).result && (
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
+                              padding: "8px 10px",
+                              background: "#fff",
+                              border: "1px solid #EFEFEF",
+                              borderTop: "none",
+                              borderRadius: "0 0 14px 14px",
+                            }}
+                          >
+                            <RadialScore
+                              score={
+                                (c as AnalysedCreative).result.overall_score
+                              }
+                              size={38}
+                              color={LABEL_COLORS[i]}
+                            />
+                            <div style={{ flex: 1 }}>
+                              <p
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                  color: LABEL_COLORS[i],
+                                  margin: 0,
+                                }}
+                              >
+                                {(c as AnalysedCreative).result.overall_score}
+                                /100
+                              </p>
+                              <p
+                                style={{
+                                  fontSize: 10,
+                                  color: "#888",
+                                  margin: 0,
+                                }}
+                              >
+                                {verdictText(
+                                  (c as AnalysedCreative).result.overall_score,
+                                )}
+                              </p>
+                            </div>
+                            <span
+                              style={{
+                                fontSize: 9,
+                                fontWeight: 700,
+                                padding: "2px 7px",
+                                borderRadius: 20,
+                                background: (c as AnalysedCreative).result.pass
+                                  ? "#F0FDF4"
+                                  : "#FEF2F2",
+                                color: (c as AnalysedCreative).result.pass
+                                  ? "#15803D"
+                                  : "#B91C1C",
+                              }}
+                            >
+                              {(c as AnalysedCreative).result.pass
+                                ? "PASS"
+                                : "FAIL"}
+                            </span>
+                          </div>
+                        )}
+                        {abAnalysing === i && (
+                          <div
+                            style={{
+                              padding: "16px",
+                              textAlign: "center",
+                              background: "#fff",
+                              borderRadius: "0 0 14px 14px",
+                              border: "1px solid #EFEFEF",
+                              borderTop: "none",
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: "center",
+                              gap: 10,
+                            }}
+                          >
+                            <svg
+                              width="20"
+                              height="20"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke={LABEL_COLORS[i]}
+                              strokeWidth="2.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              style={{ animation: "spin 1s linear infinite" }}
+                            >
+                              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                            </svg>
+                            <span
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 600,
+                                color: "#333",
+                              }}
+                            >
+                              Analysing {LABELS[i]}…
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <UploadZone
+                        key={i}
+                        onFile={(f) =>
+                          setCreatives((prev) => {
+                            const n = [...prev];
+                            n[i] = f;
+                            return n;
+                          })
+                        }
+                        label={LABELS[i]}
+                        labelColor={LABEL_COLORS[i]}
+                      />
+                    ),
+                  )}
+                </div>
+                <div style={{ display: "flex", gap: 8, marginBottom: "1rem" }}>
+                  {creatives.length < 4 && (
+                    <button
+                      onClick={() => setCreatives((prev) => [...prev, null])}
+                      style={{
+                        flex: 1,
+                        padding: "10px",
+                        borderRadius: 10,
+                        border: "1px dashed #DDD",
+                        background: "#fff",
+                        fontSize: 13,
+                        color: "#888",
+                        cursor: "pointer",
+                      }}
+                    >
+                      + Add {LABELS[creatives.length]}
+                    </button>
+                  )}
+                  <button
+                    onClick={runAB}
+                    disabled={
+                      creatives.filter(Boolean).length < 2 ||
+                      abAnalysing !== null
+                    }
+                    style={{
+                      flex: 2,
+                      padding: "10px",
+                      borderRadius: 10,
+                      border: "none",
+                      background:
+                        creatives.filter(Boolean).length < 2 ||
+                        abAnalysing !== null
+                          ? "#F5F5F5"
+                          : "#111",
+                      color:
+                        creatives.filter(Boolean).length < 2 ||
+                        abAnalysing !== null
+                          ? "#AAA"
+                          : "#fff",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {abAnalysing !== null
+                      ? `Analysing ${LABELS[abAnalysing]}…`
+                      : `Analyse all (${creatives.filter(Boolean).length})`}
+                  </button>
+                </div>
+                {analysedCreatives.length >= 2 && (
+                  <ABResults
+                    analysedCreatives={analysedCreatives}
+                    winner={winner}
+                    threshold={threshold}
+                    onExport={() => exportReport(analysedCreatives)}
+                  />
+                )}
+              </>
+            )}
+            {error && (
+              <div
+                style={{
+                  marginTop: 10,
+                  padding: "12px 16px",
+                  background: "#FEF2F2",
+                  borderRadius: 10,
+                  fontSize: 13,
+                  color: "#B91C1C",
+                }}
+              >
+                {error}
+              </div>
+            )}
+          </div>
+        )}
+      </main>
     </div>
   );
 }
