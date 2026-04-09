@@ -3015,10 +3015,13 @@ Be specific. Reference actual elements visible. No generic advice.`;
         )
       : null;
 
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
   const Sidebar = () => (
     <aside
       style={{
-        width: 260,
+        width: isSidebarOpen ? 260 : 76,
+        transition: "width 0.3s ease",
         background: "#fff",
         borderRight: "1px solid #EFEFEF",
         display: "flex",
@@ -3027,10 +3030,66 @@ Be specific. Reference actual elements visible. No generic advice.`;
         position: "fixed",
         left: 0,
         top: 0,
+        overflow: "visible",
       }}
     >
-      <div style={{ padding: "1.5rem", borderBottom: "1px solid #EFEFEF" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <button
+        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+        style={{
+          position: "absolute",
+          right: -12,
+          top: 24,
+          background: "#fff",
+          border: "1px solid #EFEFEF",
+          borderRadius: "50%",
+          width: 24,
+          height: 24,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: "pointer",
+          zIndex: 10,
+          boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+        }}
+      >
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#666"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={{
+            transform: isSidebarOpen ? "rotate(0deg)" : "rotate(180deg)",
+            transition: "transform 0.3s ease",
+          }}
+        >
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+      </button>
+
+      <div
+        style={{
+          padding: isSidebarOpen ? "1.5rem" : "1.5rem 0",
+          display: "flex",
+          justifyContent: isSidebarOpen ? "space-between" : "center",
+          alignItems: "center",
+          borderBottom: "1px solid #EFEFEF",
+          overflow: "hidden",
+          whiteSpace: "nowrap",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            justifyContent: "center",
+            width: "100%",
+          }}
+        >
           <div
             style={{
               width: 24,
@@ -3040,27 +3099,31 @@ Be specific. Reference actual elements visible. No generic advice.`;
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
+              flexShrink: 0,
             }}
           >
             <span style={{ color: "#fff", fontSize: 12, fontWeight: 800 }}>
               NF
             </span>
           </div>
-          <span
-            style={{ fontSize: 14, fontWeight: 700, letterSpacing: "0.05em" }}
-          >
-            PREFLYGHT
-          </span>
+          {isSidebarOpen && (
+            <span
+              style={{ fontSize: 14, fontWeight: 700, letterSpacing: "0.05em" }}
+            >
+              PREFLYGHT
+            </span>
+          )}
         </div>
       </div>
 
       <nav
         style={{
-          padding: "1rem",
+          padding: "1rem 0.5rem",
           flex: 1,
           display: "flex",
           flexDirection: "column",
           gap: 6,
+          overflow: "hidden",
         }}
       >
         <button
@@ -3072,7 +3135,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
             display: "flex",
             alignItems: "center",
             gap: 12,
-            padding: "10px 14px",
+            padding: "10px",
             borderRadius: 8,
             border: "none",
             background: currentView === "analyzer" ? "#F5F3FF" : "transparent",
@@ -3082,7 +3145,10 @@ Be specific. Reference actual elements visible. No generic advice.`;
             cursor: "pointer",
             textAlign: "left",
             transition: "all 0.15s",
+            justifyContent: isSidebarOpen ? "flex-start" : "center",
+            whiteSpace: "nowrap",
           }}
+          title={!isSidebarOpen ? "Analyzer Workspace" : undefined}
         >
           <svg
             width="18"
@@ -3093,11 +3159,12 @@ Be specific. Reference actual elements visible. No generic advice.`;
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
+            style={{ flexShrink: 0 }}
           >
             <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
             <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
           </svg>
-          Analyzer Workspace
+          {isSidebarOpen && <span>Analyzer Workspace</span>}
         </button>
         <button
           onClick={() => {
@@ -3108,7 +3175,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
             display: "flex",
             alignItems: "center",
             gap: 12,
-            padding: "10px 14px",
+            padding: "10px",
             borderRadius: 8,
             border: "none",
             background: currentView === "brands" ? "#F5F3FF" : "transparent",
@@ -3118,7 +3185,10 @@ Be specific. Reference actual elements visible. No generic advice.`;
             cursor: "pointer",
             textAlign: "left",
             transition: "all 0.15s",
+            justifyContent: isSidebarOpen ? "flex-start" : "center",
+            whiteSpace: "nowrap",
           }}
+          title={!isSidebarOpen ? "Brand Assets" : undefined}
         >
           <svg
             width="18"
@@ -3129,11 +3199,12 @@ Be specific. Reference actual elements visible. No generic advice.`;
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
+            style={{ flexShrink: 0 }}
           >
             <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
             <line x1="7" y1="7" x2="7.01" y2="7"></line>
           </svg>
-          Brand Assets
+          {isSidebarOpen && <span>Brand Assets</span>}
         </button>
         <button
           onClick={() => {
@@ -3144,7 +3215,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
             display: "flex",
             alignItems: "center",
             gap: 12,
-            padding: "10px 14px",
+            padding: "10px",
             borderRadius: 8,
             border: "none",
             background: currentView === "dashboard" ? "#F5F3FF" : "transparent",
@@ -3154,7 +3225,10 @@ Be specific. Reference actual elements visible. No generic advice.`;
             cursor: "pointer",
             textAlign: "left",
             transition: "all 0.15s",
+            justifyContent: isSidebarOpen ? "flex-start" : "center",
+            whiteSpace: "nowrap",
           }}
+          title={!isSidebarOpen ? "Dashboard History" : undefined}
         >
           <svg
             width="18"
@@ -3165,100 +3239,160 @@ Be specific. Reference actual elements visible. No generic advice.`;
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
+            style={{ flexShrink: 0 }}
           >
             <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
             <line x1="3" y1="9" x2="21" y2="9"></line>
             <line x1="9" y1="21" x2="9" y2="9"></line>
           </svg>
-          Dashboard History
+          {isSidebarOpen && <span>Dashboard History</span>}
         </button>
       </nav>
 
       <div
         style={{
-          padding: "1.5rem",
+          padding: isSidebarOpen ? "1.5rem" : "1.5rem 0.5rem",
           borderTop: "1px solid #EFEFEF",
           background: "#FAFAFA",
+          overflow: "hidden",
         }}
       >
-        <div style={{ marginBottom: 12 }}>
-          <p
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              color: "#AAA",
-              textTransform: "uppercase",
-              letterSpacing: "0.05em",
-              margin: "0 0 6px",
-            }}
-          >
-            Remaining Credits
-          </p>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-            <span style={{ fontSize: 24, fontWeight: 700, color: "#111" }}>
-              {profile?.credits_remaining || 0}
-            </span>
-            <span style={{ fontSize: 12, color: "#888" }}>/ tokens</span>
-          </div>
-        </div>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginTop: 16,
-          }}
-        >
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            <span
+        {isSidebarOpen ? (
+          <>
+            <div style={{ marginBottom: 12 }}>
+              <p
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: "#AAA",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  margin: "0 0 6px",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Remaining Credits
+              </p>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "baseline",
+                  gap: 6,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <span style={{ fontSize: 24, fontWeight: 700, color: "#111" }}>
+                  {profile?.credits_remaining || 0}
+                </span>
+                <span style={{ fontSize: 12, color: "#888" }}>/ tokens</span>
+              </div>
+            </div>
+            <div
               style={{
-                fontSize: 13,
-                fontWeight: 600,
-                color: "#222",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-                maxWidth: "150px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginTop: 16,
               }}
             >
-              {profile?.full_name || session.user.email?.split("@")[0]}
-            </span>
-            <span
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                <span
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "#222",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    maxWidth: "150px",
+                  }}
+                >
+                  {profile?.full_name || session.user.email?.split("@")[0]}
+                </span>
+                <span
+                  style={{
+                    fontSize: 11,
+                    color: "#888",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    maxWidth: "150px",
+                  }}
+                >
+                  {profile?.company || "User"}
+                </span>
+              </div>
+              <button
+                onClick={() => supabase.auth.signOut()}
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "#AAA",
+                }}
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                  <polyline points="16 17 21 12 16 7"></polyline>
+                  <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+              </button>
+            </div>
+          </>
+        ) : (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 16,
+            }}
+          >
+            <div
               style={{
+                background: "#EFEFEF",
+                padding: "4px 8px",
+                borderRadius: 12,
                 fontSize: 11,
-                color: "#888",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-                maxWidth: "150px",
+                fontWeight: 700,
+                color: "#111",
               }}
+              title="Remaining Credits"
             >
-              {profile?.company || "User"}
-            </span>
+              {profile?.credits_remaining || 0}
+            </div>
+            <button
+              onClick={() => supabase.auth.signOut()}
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                color: "#AAA",
+              }}
+              title="Sign out"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                <polyline points="16 17 21 12 16 7"></polyline>
+                <line x1="21" y1="12" x2="9" y2="12"></line>
+              </svg>
+            </button>
           </div>
-          <button
-            onClick={() => supabase.auth.signOut()}
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              color: "#AAA",
-            }}
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-              <polyline points="16 17 21 12 16 7"></polyline>
-              <line x1="21" y1="12" x2="9" y2="12"></line>
-            </svg>
-          </button>
-        </div>
+        )}
       </div>
     </aside>
   );
@@ -3293,7 +3427,8 @@ Be specific. Reference actual elements visible. No generic advice.`;
 
       <main
         style={{
-          marginLeft: 260,
+          marginLeft: isSidebarOpen ? 260 : 76,
+          transition: "margin-left 0.3s ease",
           flex: 1,
           padding: "3rem",
           height: "100vh",
@@ -3303,7 +3438,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
       >
         {/* === BRAND MANAGER VIEW === */}
         {currentView === "brands" && (
-          <div style={{ maxWidth: 900, margin: "0 auto" }}>
+          <div style={{ width: "100%", maxWidth: 1000, margin: "0 auto" }}>
             <h1
               style={{
                 fontSize: 24,
@@ -3335,9 +3470,9 @@ Be specific. Reference actual elements visible. No generic advice.`;
 
         {/* === DASHBOARD VIEW === */}
         {currentView === "dashboard" && (
-          <div style={{ maxWidth: 900, margin: "0 auto" }}>
+          <div style={{ width: "100%", margin: "0 auto" }}>
             {viewingHistoryItem ? (
-              <div>
+              <div style={{ maxWidth: 900, margin: "0 auto" }}>
                 <button
                   onClick={() => setViewingHistoryItem(null)}
                   style={{
@@ -3934,7 +4069,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
 
         {/* === ANALYZER WORKSPACE === */}
         {currentView === "analyzer" && (
-          <div style={{ maxWidth: 720, margin: "0 auto" }}>
+          <div style={{ maxWidth: 800, margin: "0 auto" }}>
             <div
               style={{
                 display: "flex",
