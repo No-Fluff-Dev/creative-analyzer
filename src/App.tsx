@@ -2862,6 +2862,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
     pass: boolean,
     fullResult: AnalysisResult,
     creative: CreativeFile | null,
+    analysisType: string,
   ) => {
     let updatedResult = { ...fullResult };
 
@@ -2888,6 +2889,8 @@ Be specific. Reference actual elements visible. No generic advice.`;
       user_id: session.user.id,
       client: client || "Unnamed Analysis",
       platform: platform || "Unknown",
+      industry: industry || "Unknown",
+      type: analysisType,
       model: selectedModel,
       credits_used: creditsUsed,
       overall_score: score,
@@ -2905,7 +2908,13 @@ Be specific. Reference actual elements visible. No generic advice.`;
     try {
       const res = await callAPI(single);
       setSingleResult(res);
-      await saveAnalysisRecord(res.overall_score, res.pass, res, single);
+      await saveAnalysisRecord(
+        res.overall_score,
+        res.pass,
+        res,
+        single,
+        "Single",
+      );
     } catch (err) {
       setError((err as Error).message);
     }
@@ -2931,6 +2940,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
           result.pass,
           result,
           creatives[i] as CreativeFile,
+          "A/B Comparison",
         );
       } catch (err) {
         setError(`Creative ${LABELS[i]}: ${(err as Error).message}`);
@@ -3379,7 +3389,9 @@ Be specific. Reference actual elements visible. No generic advice.`;
                   >
                     Archived Report Context
                   </p>
-                  <div style={{ display: "flex", gap: "2rem" }}>
+                  <div
+                    style={{ display: "flex", gap: "2rem", flexWrap: "wrap" }}
+                  >
                     <div>
                       <span style={{ fontSize: 11, color: "#888" }}>
                         Client:
@@ -3406,6 +3418,37 @@ Be specific. Reference actual elements visible. No generic advice.`;
                         }}
                       >
                         {viewingHistoryItem.platform}
+                      </span>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: 11, color: "#888" }}>
+                        Industry:
+                      </span>{" "}
+                      <span
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: "#111",
+                        }}
+                      >
+                        {viewingHistoryItem.industry || "—"}
+                      </span>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: 11, color: "#888" }}>
+                        Model:
+                      </span>{" "}
+                      <span
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: "#111",
+                        }}
+                      >
+                        {MODELS.find((m) => m.id === viewingHistoryItem.model)
+                          ?.name ||
+                          viewingHistoryItem.model ||
+                          "—"}
                       </span>
                     </div>
                     <div>
@@ -3444,9 +3487,13 @@ Be specific. Reference actual elements visible. No generic advice.`;
                     creative={historyCreative}
                     result={viewingHistoryItem.result}
                     threshold={65}
-                    model={viewingHistoryItem.model}
+                    model={
+                      MODELS.find((m) => m.id === viewingHistoryItem.model)
+                        ?.name || viewingHistoryItem.model
+                    }
                     client={viewingHistoryItem.client}
                     platform={viewingHistoryItem.platform}
+                    industry={viewingHistoryItem.industry}
                     onReset={() => setViewingHistoryItem(null)}
                     onExport={async () => {
                       let heatmapDataUrl: string | undefined = undefined;
@@ -3551,9 +3598,11 @@ Be specific. Reference actual elements visible. No generic advice.`;
                         heatmapDataUrl,
                         client: viewingHistoryItem.client,
                         platform: viewingHistoryItem.platform,
-                        industry: "",
+                        industry: viewingHistoryItem.industry || "",
                         threshold: 65,
-                        model: viewingHistoryItem.model,
+                        model:
+                          MODELS.find((m) => m.id === viewingHistoryItem.model)
+                            ?.name || viewingHistoryItem.model,
                         date: new Date(
                           viewingHistoryItem.created_at,
                         ).toLocaleDateString("en-GB"),
@@ -3662,6 +3711,39 @@ Be specific. Reference actual elements visible. No generic advice.`;
                             textTransform: "uppercase",
                           }}
                         >
+                          Industry
+                        </th>
+                        <th
+                          style={{
+                            padding: "12px 16px",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: "#AAA",
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          Type
+                        </th>
+                        <th
+                          style={{
+                            padding: "12px 16px",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: "#AAA",
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          Model
+                        </th>
+                        <th
+                          style={{
+                            padding: "12px 16px",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: "#AAA",
+                            textTransform: "uppercase",
+                          }}
+                        >
                           Score
                         </th>
                         <th
@@ -3682,7 +3764,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                       {analysesHistory.length === 0 ? (
                         <tr>
                           <td
-                            colSpan={5}
+                            colSpan={8}
                             style={{
                               padding: "3rem 1rem",
                               textAlign: "center",
@@ -3730,6 +3812,35 @@ Be specific. Reference actual elements visible. No generic advice.`;
                               }}
                             >
                               {item.platform}
+                            </td>
+                            <td
+                              style={{
+                                padding: "14px 16px",
+                                fontSize: 13,
+                                color: "#555",
+                              }}
+                            >
+                              {item.industry || "—"}
+                            </td>
+                            <td
+                              style={{
+                                padding: "14px 16px",
+                                fontSize: 13,
+                                color: "#555",
+                              }}
+                            >
+                              {item.type || "Single"}
+                            </td>
+                            <td
+                              style={{
+                                padding: "14px 16px",
+                                fontSize: 13,
+                                color: "#555",
+                              }}
+                            >
+                              {MODELS.find((m) => m.id === item.model)?.name ||
+                                item.model ||
+                                "—"}
                             </td>
                             <td style={{ padding: "14px 16px" }}>
                               <div
