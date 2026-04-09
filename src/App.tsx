@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { supabase } from "./supabase";
 import { generatePDF } from "./generatePDF";
 
+// --- CONSTANTS ---
 const DIMS = [
   { key: "visual_hierarchy", name: "Visual hierarchy" },
   { key: "clarity_readability", name: "Clarity & readability" },
@@ -44,6 +45,66 @@ const INDUSTRIES = [
   "Beauty & cosmetics",
 ];
 
+// --- TYPES & INTERFACES (Moved to top to fix TS Errors) ---
+interface BrandFile {
+  id?: string;
+  name: string;
+  type: string;
+  dataUrl: string;
+  extractedText: string;
+  storagePath?: string;
+}
+interface Brand {
+  id?: string;
+  notes: string;
+  updatedAt: number;
+  files?: BrandFile[];
+}
+interface BrandMap {
+  [name: string]: Brand;
+}
+interface Zone {
+  priority: number;
+  label: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  note: string;
+}
+interface CreativeFile {
+  file: File;
+  type: "image" | "video";
+  dataUrl: string | null;
+  name: string;
+  mimeType: string;
+}
+interface IndustryExample {
+  brand: string;
+  campaign: string;
+  technique: string;
+  lesson: string;
+}
+interface IndustryBenchmarks {
+  summary: string;
+  examples: IndustryExample[];
+  gap: string;
+}
+interface AnalysisResult {
+  overall_score: number;
+  overall_verdict: string;
+  pass: boolean;
+  dimensions: { [key: string]: { score: number; recommendation: string } };
+  top_fixes: string[];
+  attention_zones: Zone[];
+  industry_benchmarks?: IndustryBenchmarks;
+}
+interface AnalysedCreative extends CreativeFile {
+  result: AnalysisResult;
+  index: number;
+}
+
+// --- UTILITIES ---
 function scoreColor(s: number) {
   return s >= 75 ? "#22C55E" : s >= 50 ? "#F59E0B" : "#EF4444";
 }
@@ -108,24 +169,6 @@ async function extractDocxText(file: File): Promise<string> {
   }
 }
 
-interface BrandFile {
-  id?: string;
-  name: string;
-  type: string;
-  dataUrl: string;
-  extractedText: string;
-  storagePath?: string;
-}
-interface Brand {
-  id?: string;
-  notes: string;
-  updatedAt: number;
-  files?: BrandFile[];
-}
-interface BrandMap {
-  [name: string]: Brand;
-}
-
 async function loadBrandsFromSupabase(userId: string): Promise<BrandMap> {
   const { data: brands, error } = await supabase
     .from("brands")
@@ -170,16 +213,7 @@ async function loadBrandsFromSupabase(userId: string): Promise<BrandMap> {
   return brandMap;
 }
 
-interface Zone {
-  priority: number;
-  label: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  note: string;
-}
-
+// --- COMPONENTS ---
 function RadialScore({
   score,
   size = 72,
@@ -840,14 +874,6 @@ function BrandManager({
       {content}
     </div>
   );
-}
-
-interface CreativeFile {
-  file: File;
-  type: "image" | "video";
-  dataUrl: string | null;
-  name: string;
-  mimeType: string;
 }
 
 function UploadZone({
@@ -2592,7 +2618,6 @@ export default function App({
 }: {
   session: import("@supabase/supabase-js").Session;
 }) {
-  // App Navigation
   const [currentView, setCurrentView] = useState<
     "analyzer" | "dashboard" | "brands"
   >("analyzer");
@@ -2656,7 +2681,6 @@ export default function App({
       .filter((f) => f.extractedText)
       .map((f) => `[Brand file: ${f.name}]\n${f.extractedText}`)
       .join("\n\n");
-
     const industrySection = industry
       ? `
   "industry_benchmarks": {
@@ -2874,14 +2898,11 @@ Be specific. Reference actual elements visible. No generic advice.`;
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-
       const safeClient = (client || "unnamed").replace(/[^a-z0-9]/gi, "_");
       a.download = `NF_Creative_Report_${safeClient}_${new Date().toISOString().slice(0, 10)}.txt`;
-
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-
       setTimeout(() => {
         URL.revokeObjectURL(url);
       }, 1000);
@@ -3163,7 +3184,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
         fontFamily: "var(--font-sans,system-ui)",
       }}
     >
-      {/* Fallback modal if triggered inside Analyzer view */}
       {showBrandMgr && currentView !== "brands" && (
         <BrandManager
           selectedBrand={selectedBrand}
@@ -3192,7 +3212,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
           boxSizing: "border-box",
         }}
       >
-        {/* === BRAND MANAGER VIEW === */}
         {currentView === "brands" && (
           <div style={{ maxWidth: 900, margin: "0 auto" }}>
             <h1
@@ -3224,7 +3243,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
           </div>
         )}
 
-        {/* === DASHBOARD VIEW === */}
         {currentView === "dashboard" && (
           <div style={{ maxWidth: 900, margin: "0 auto" }}>
             {viewingHistoryItem ? (
@@ -3286,11 +3304,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                         Client:
                       </span>{" "}
                       <span
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 600,
-                          color: "#111",
-                        }}
+                        style={{ fontSize: 13, fontWeight: 600, color: "#111" }}
                       >
                         {viewingHistoryItem.client}
                       </span>
@@ -3300,11 +3314,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                         Platform:
                       </span>{" "}
                       <span
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 600,
-                          color: "#111",
-                        }}
+                        style={{ fontSize: 13, fontWeight: 600, color: "#111" }}
                       >
                         {viewingHistoryItem.platform}
                       </span>
@@ -3312,11 +3322,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                     <div>
                       <span style={{ fontSize: 11, color: "#888" }}>Date:</span>{" "}
                       <span
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 600,
-                          color: "#111",
-                        }}
+                        style={{ fontSize: 13, fontWeight: 600, color: "#111" }}
                       >
                         {new Date(
                           viewingHistoryItem.created_at,
@@ -3611,7 +3617,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
           </div>
         )}
 
-        {/* === ANALYZER WORKSPACE === */}
         {currentView === "analyzer" && (
           <div style={{ maxWidth: 720, margin: "0 auto" }}>
             <div
@@ -3639,7 +3644,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
               </div>
             </div>
 
-            {/* Mode toggle */}
             <div
               style={{
                 display: "flex",
@@ -3680,7 +3684,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
               ))}
             </div>
 
-            {/* Config */}
             <div
               style={{
                 background: "#fff",
@@ -4045,7 +4048,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
               </div>
             </div>
 
-            {/* SINGLE MODE */}
             {mode === "single" && (
               <>
                 {!single && (
@@ -4213,7 +4215,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
               </>
             )}
 
-            {/* AB MODE */}
             {mode === "ab" && (
               <>
                 <div
