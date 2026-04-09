@@ -72,6 +72,20 @@ function wrapText(
   return Array.isArray(result) ? result : [result || ""];
 }
 
+// Helper to get image dimensions dynamically to maintain aspect ratio
+function getImageDimensions(
+  dataUrl: string,
+): Promise<{ w: number; h: number }> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      resolve({ w: img.naturalWidth, h: img.naturalHeight });
+    };
+    img.onerror = () => resolve({ w: 0, h: 0 });
+    img.src = dataUrl;
+  });
+}
+
 // Draw page header
 function drawHeader(doc: jsPDF, pageNum: number, totalPages: number) {
   setFill(doc, PRIMARY);
@@ -86,7 +100,7 @@ function drawHeader(doc: jsPDF, pageNum: number, totalPages: number) {
   doc.roundedRect(PW - MR - 28, 2.5, 28, 7, 1, 1, "F");
   doc.setFontSize(7);
   setTextColor(doc, "#FFFFFF");
-  doc.text("SIGNAL REPORT", PW - MR - 14, 7.5, { align: "center" });
+  doc.text("Preflyght REPORT", PW - MR - 14, 7.5, { align: "center" });
 
   setFill(doc, LIGHT);
   doc.rect(0, PH - 10, PW, 10, "F");
@@ -278,19 +292,31 @@ export async function generatePDF(data: PDFReportData) {
 
   if (creative?.dataUrl && creative.type === "image") {
     try {
-      const imgW = CW;
-      const imgH = 70;
-      doc.addImage(
-        creative.dataUrl,
-        "JPEG",
-        ML,
-        y,
-        imgW,
-        imgH,
-        undefined,
-        "FAST",
-      );
-      y += imgH + 8;
+      const dims = await getImageDimensions(creative.dataUrl);
+      if (dims.w > 0 && dims.h > 0) {
+        const maxW = CW;
+        const maxH = 70;
+        // Calculate the ratio needed to fit within the box while preserving aspect ratio
+        const ratio = Math.min(maxW / dims.w, maxH / dims.h);
+        const imgW = dims.w * ratio;
+        const imgH = dims.h * ratio;
+        // Center it horizontally
+        const offsetX = ML + (CW - imgW) / 2;
+
+        doc.addImage(
+          creative.dataUrl,
+          "JPEG",
+          offsetX,
+          y,
+          imgW,
+          imgH,
+          undefined,
+          "FAST",
+        );
+        y += imgH + 8;
+      } else {
+        y += 8; // Fallback padding
+      }
     } catch {}
   } else {
     setFill(doc, LIGHT);
@@ -313,7 +339,6 @@ export async function generatePDF(data: PDFReportData) {
     const col = i % 2 === 0 ? ML : ML + dimColW + 8;
     if (i % 2 === 0 && i > 0) y += 22;
 
-    // Safety fallback if AI forgot a dimension
     const dim = result.dimensions?.[d.key] || {
       score: 0,
       recommendation: "Data missing.",
@@ -413,9 +438,31 @@ export async function generatePDF(data: PDFReportData) {
 
   if (heatmapDataUrl) {
     try {
+      const dims = await getImageDimensions(heatmapDataUrl);
       const maxH = hasBenchmarks ? 140 : 200;
-      doc.addImage(heatmapDataUrl, "PNG", ML, y, CW, maxH, undefined, "FAST");
-      y += maxH + 6;
+
+      if (dims.w > 0 && dims.h > 0) {
+        // Calculate the ratio needed to fit within the box while preserving aspect ratio
+        const ratio = Math.min(CW / dims.w, maxH / dims.h);
+        const imgW = dims.w * ratio;
+        const imgH = dims.h * ratio;
+        // Center it horizontally
+        const offsetX = ML + (CW - imgW) / 2;
+
+        doc.addImage(
+          heatmapDataUrl,
+          "PNG",
+          offsetX,
+          y,
+          imgW,
+          imgH,
+          undefined,
+          "FAST",
+        );
+        y += imgH + 6;
+      } else {
+        y += 6; // Fallback padding
+      }
     } catch {}
   } else if (creative?.type === "video") {
     setFill(doc, LIGHT);
@@ -546,11 +593,10 @@ export async function generatePDF(data: PDFReportData) {
     y += gapH + 6;
   }
 
-  // Clean filename so weird chars don't break the download
   const safeClient = (client || "Report").replace(/[^a-z0-9]/gi, "_");
   const safeDate = (date || new Date().toLocaleDateString("en-GB")).replace(
     /\//g,
     "-",
   );
-  doc.save(`NoFluff_Signal_${safeClient}_${safeDate}.pdf`);
+  doc.save(`NoFluff_Preflyght_${safeClient}_${safeDate}.pdf`);
 }
