@@ -50,7 +50,7 @@ function Root() {
               animation: "pulse 1.5s infinite",
             }}
           />
-          <p style={{ fontSize: 13, color: "#AAA" }}>Loading Signal…</p>
+          <p style={{ fontSize: 13, color: "#AAA" }}>Loading Preflyght…</p>
         </div>
       </div>
     );
