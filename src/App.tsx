@@ -1471,47 +1471,56 @@ Be specific. Reference actual elements visible. No generic advice.`;
   };
 
   const exportReport = (items: AnalysedCreative[]) => {
-    const lines = [
-      "NO FLUFF CREATIVE ANALYSER — REPORT",
-      "=====================================",
-      `Date: ${new Date().toLocaleDateString("en-GB")}`,
-      client ? `Client: ${client}` : "",
-      platform ? `Platform: ${platform}` : "",
-      "",
-      ...items.map((r, i) =>
-        [
-          `${items.length > 1 ? `--- CREATIVE ${LABELS[i]} ---` : "--- ANALYSIS ---"}`,
-          `Score: ${r.result.overall_score}/100 — ${r.result.pass ? "PASS" : "FAIL"} (threshold ${threshold})`,
-          `Verdict: ${r.result.overall_verdict}`,
-          "",
-          "Dimensions:",
-          ...DIMS.map(
-            (d) =>
-              `  ${d.name}: ${r.result.dimensions[d.key].score}/100\n    → ${r.result.dimensions[d.key].recommendation}`,
-          ),
-          "",
-          "Top fixes:",
-          ...(r.result.top_fixes || []).map((f, j) => `  ${j + 1}. ${f}`),
-          "",
-        ].join("\n"),
-      ),
-    ]
-      .filter(Boolean)
-      .join("\n");
+    try {
+      const lines = [
+        "NO FLUFF CREATIVE ANALYSER — REPORT",
+        "=====================================",
+        `Date: ${new Date().toLocaleDateString("en-GB")}`,
+        client ? `Client: ${client}` : "",
+        platform ? `Platform: ${platform}` : "",
+        "",
+        ...items.map((r) =>
+          [
+            `${items.length > 1 ? `--- CREATIVE ${LABELS[r.index]} ---` : "--- ANALYSIS ---"}`,
+            `Score: ${r.result?.overall_score || 0}/100 — ${r.result?.pass ? "PASS" : "FAIL"} (threshold ${threshold})`,
+            `Verdict: ${r.result?.overall_verdict || "N/A"}`,
+            "",
+            "Dimensions:",
+            ...DIMS.map(
+              (d) =>
+                `  ${d.name}: ${r.result?.dimensions?.[d.key]?.score || 0}/100\n    → ${r.result?.dimensions?.[d.key]?.recommendation || "N/A"}`,
+            ),
+            "",
+            "Top fixes:",
+            ...(r.result?.top_fixes || []).map((f, j) => `  ${j + 1}. ${f}`),
+            "",
+          ].join("\n"),
+        ),
+      ]
+        .filter(Boolean)
+        .join("\n");
 
-    const blob = new Blob([lines], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `NF_Creative_Report_${client || "unnamed"}_${new Date().toISOString().slice(0, 10)}.txt`;
+      const blob = new Blob([lines], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
 
-    // CRITICAL FIX: Append the link to the document body before clicking,
-    // otherwise modern browsers will silently block the download.
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+      // Clean the client name so special characters don't break the filename
+      const safeClient = (client || "unnamed").replace(/[^a-z0-9]/gi, "_");
+      a.download = `NF_Creative_Report_${safeClient}_${new Date().toISOString().slice(0, 10)}.txt`;
 
-    URL.revokeObjectURL(url);
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      // FIX: Give the browser 1 second to catch the download stream before destroying the file
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+      }, 1000);
+    } catch (err) {
+      console.error("Export failed:", err);
+      alert("Export failed. Please check the console for details.");
+    }
   };
 
   const brandList = Object.keys(brands);
