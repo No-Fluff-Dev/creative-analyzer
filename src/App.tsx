@@ -2737,30 +2737,30 @@ function TeamManager({ session }: { session: any }) {
 
   return (
     <div style={{ maxWidth: 800, margin: "0 auto" }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-end",
-          marginBottom: "2rem",
-        }}
-      >
-        <div>
-          <h1
-            style={{
-              fontSize: 24,
-              fontWeight: 600,
-              color: "#111",
-              margin: "0 0 6px",
-            }}
-          >
-            Teams & Credits
-          </h1>
-          <p style={{ fontSize: 14, color: "#888", margin: 0 }}>
-            Manage your teams, invite members, and allocate credits.
-          </p>
-        </div>
-        {!showCreate && (
+      <div style={{ textAlign: "center", marginBottom: "2rem" }}>
+        <h1
+          style={{
+            fontSize: 24,
+            fontWeight: 600,
+            color: "#111",
+            margin: "0 0 6px",
+          }}
+        >
+          Teams & Credits
+        </h1>
+        <p style={{ fontSize: 14, color: "#888", margin: 0 }}>
+          Manage your teams, invite members, and allocate credits.
+        </p>
+      </div>
+
+      {!showCreate && (
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            marginBottom: "1rem",
+          }}
+        >
           <button
             onClick={() => setShowCreate(true)}
             style={{
@@ -2776,8 +2776,8 @@ function TeamManager({ session }: { session: any }) {
           >
             + Create Workspace
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {showCreate && (
         <div
