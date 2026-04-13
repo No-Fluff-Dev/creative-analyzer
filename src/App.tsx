@@ -2690,7 +2690,7 @@ function TeamManager({ session }: { session: any }) {
       <div
         style={{
           display: "flex",
-          flexWrap: "wrap", // 👈 allow wrapping
+          flexWrap: "wrap",
           justifyContent: "center",
           alignItems: "flex-end",
           marginBottom: "2rem",
@@ -2714,9 +2714,15 @@ function TeamManager({ session }: { session: any }) {
         </div>
 
         {!showCreate && (
-          <div style={{ width: "100%", marginTop: 12 }}>
+          <div
+            style={{
+              width: "100%",
+              marginTop: 12,
+              display: "flex",
+              justifyContent: "flex-end",
+            }}
+          >
             {" "}
-            {/* 👈 forces new line */}
             <button
               onClick={() => setShowCreate(true)}
               style={{
