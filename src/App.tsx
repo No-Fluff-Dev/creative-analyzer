@@ -2653,15 +2653,47 @@ function TeamManager({ session }: { session: any }) {
 
   const fetchMyTeams = async () => {
     setLoading(true);
-    // Fetch teams and their parent organization data
-    const { data } = await supabase
+
+    // 1. Try the full nested query
+    const { data, error } = await supabase
       .from("team_members")
       .select(
-        "role, joined_at, teams(id, name, credits_pool, org_id, organisations(name, credits_pool))",
+        `
+        role, 
+        joined_at, 
+        teams (
+          id, 
+          name, 
+          credits_pool, 
+          org_id, 
+          organisations (
+            name, 
+            credits_pool
+          )
+        )
+      `,
       )
       .eq("user_id", session.user.id);
 
-    if (data) setTeams(data);
+    if (error) {
+      console.error("Supabase full query failed:", error);
+
+      // 2. If the nested join fails (usually due to schema cache), try a simpler fallback query
+      const fallback = await supabase
+        .from("team_members")
+        .select("role, joined_at, teams(*)")
+        .eq("user_id", session.user.id);
+
+      if (fallback.error) {
+        console.error("Supabase fallback query failed:", fallback.error);
+        alert("Could not load your teams. Check browser console for details.");
+      } else if (fallback.data) {
+        setTeams(fallback.data);
+      }
+    } else if (data) {
+      setTeams(data);
+    }
+
     setLoading(false);
   };
 
