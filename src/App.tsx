@@ -2690,7 +2690,7 @@ function TeamManager({ session }: { session: any }) {
       <div
         style={{
           display: "flex",
-          flexDirection: "column",
+          flexWrap: "wrap", // 👈 allow wrapping
           justifyContent: "center",
           alignItems: "flex-end",
           marginBottom: "2rem",
@@ -2712,23 +2712,27 @@ function TeamManager({ session }: { session: any }) {
             Manage your teams, invite members, and allocate credits.
           </p>
         </div>
+
         {!showCreate && (
-          <button
-            onClick={() => setShowCreate(true)}
-            style={{
-              marginTop: "12px",
-              padding: "10px 16px",
-              borderRadius: 8,
-              border: "none",
-              background: "#111",
-              color: "#fff",
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            + Create Workspace
-          </button>
+          <div style={{ width: "100%", marginTop: 12 }}>
+            {" "}
+            {/* 👈 forces new line */}
+            <button
+              onClick={() => setShowCreate(true)}
+              style={{
+                padding: "10px 16px",
+                borderRadius: 8,
+                border: "none",
+                background: "#111",
+                color: "#fff",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              + Create Workspace
+            </button>
+          </div>
         )}
       </div>
 
