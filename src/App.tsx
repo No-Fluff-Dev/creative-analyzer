@@ -2618,13 +2618,180 @@ function ABResults({
   );
 }
 
+function TeamManager({ session }: { session: any }) {
+  const [teams, setTeams] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [inviteLink, setInviteLink] = useState("");
+
+  useEffect(() => {
+    fetchMyTeams();
+  }, []);
+
+  const fetchMyTeams = async () => {
+    setLoading(true);
+    // Fetch teams where the user is a member
+    const { data } = await supabase
+      .from("team_members")
+      .select("role, joined_at, teams(id, name, credits_pool)")
+      .eq("user_id", session.user.id);
+
+    if (data) setTeams(data);
+    setLoading(false);
+  };
+
+  const generateInvite = async (teamId: string) => {
+    const { data, error } = await supabase
+      .from("team_invites")
+      .insert({ team_id: teamId, created_by: session.user.id })
+      .select("token")
+      .single();
+
+    if (data) {
+      const link = `${window.location.origin}/?invite=${data.token}`;
+      setInviteLink(link);
+      navigator.clipboard.writeText(link);
+      alert("Multi-use invite link copied to clipboard!");
+    } else {
+      alert("Failed to generate invite link.");
+    }
+  };
+
+  if (loading) return <p style={{ color: "#888" }}>Loading teams...</p>;
+
+  return (
+    <div style={{ maxWidth: 800, margin: "0 auto" }}>
+      <h1
+        style={{
+          fontSize: 24,
+          fontWeight: 600,
+          color: "#111",
+          margin: "0 0 6px",
+        }}
+      >
+        Teams & Credits
+      </h1>
+      <p style={{ fontSize: 14, color: "#888", marginBottom: "2rem" }}>
+        Manage your teams, invite members, and allocate credits.
+      </p>
+
+      {teams.length === 0 ? (
+        <div
+          style={{
+            padding: "3rem",
+            background: "#fff",
+            borderRadius: 14,
+            textAlign: "center",
+            border: "1px solid #EFEFEF",
+          }}
+        >
+          <p style={{ color: "#888", fontSize: 14 }}>
+            You are not part of any teams yet.
+          </p>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {teams.map((t, i) => (
+            <div
+              key={i}
+              style={{
+                background: "#fff",
+                border: "1px solid #EFEFEF",
+                borderRadius: 14,
+                padding: "1.5rem",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                  marginBottom: 16,
+                }}
+              >
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 16, color: "#111" }}>
+                    {t.teams.name}
+                  </h3>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: t.role === "admin" ? "#6366F1" : "#888",
+                      background: t.role === "admin" ? "#F5F3FF" : "#F4F4F5",
+                      padding: "2px 8px",
+                      borderRadius: 20,
+                      display: "inline-block",
+                      marginTop: 8,
+                    }}
+                  >
+                    {t.role.toUpperCase()}
+                  </span>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <p
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: "#AAA",
+                      textTransform: "uppercase",
+                      margin: "0 0 4px",
+                    }}
+                  >
+                    Team Credits
+                  </p>
+                  <p
+                    style={{
+                      fontSize: 20,
+                      fontWeight: 700,
+                      margin: 0,
+                      color: "#111",
+                    }}
+                  >
+                    {t.teams.credits_pool}
+                  </p>
+                </div>
+              </div>
+
+              {t.role === "admin" && (
+                <div
+                  style={{
+                    borderTop: "1px solid #F5F5F5",
+                    paddingTop: 16,
+                    marginTop: 16,
+                  }}
+                >
+                  <button
+                    onClick={() => generateInvite(t.teams.id)}
+                    style={{
+                      background: "#111",
+                      color: "#fff",
+                      border: "none",
+                      padding: "8px 14px",
+                      borderRadius: 8,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Generate Invite Link
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App({
   session,
 }: {
   session: import("@supabase/supabase-js").Session;
 }) {
   const [currentView, setCurrentView] = useState<
-    "analyzer" | "dashboard" | "brands" | "profile"
+    "analyzer" | "dashboard" | "brands" | "profile" | "teams"
   >("analyzer");
   const [profile, setProfile] = useState<any>(null);
   const [analysesHistory, setAnalysesHistory] = useState<any[]>([]);
@@ -2682,6 +2849,25 @@ export default function App({
     if (session?.user?.id) {
       loadBrandsFromSupabase(session.user.id).then((b) => setBrands(b));
       fetchUserData();
+
+      // Check for team invites in the URL
+      const params = new URLSearchParams(window.location.search);
+      const inviteToken = params.get("invite");
+
+      if (inviteToken) {
+        supabase
+          .rpc("join_team_via_invite", { invite_token: inviteToken })
+          .then(({ data, error }) => {
+            if (error) alert("Failed to join team.");
+            else if (data?.success) {
+              alert("Successfully joined the team!");
+              setCurrentView("teams"); // Redirect them to their new team page
+              window.history.replaceState({}, document.title, "/"); // Clean the URL
+            } else {
+              alert(data?.error || "Invalid invite link.");
+            }
+          });
+      }
     }
   }, [session, currentView]);
 
@@ -3201,6 +3387,48 @@ Be specific. Reference actual elements visible. No generic advice.`;
         </button>
         <button
           onClick={() => {
+            setCurrentView("teams");
+            setViewingHistoryItem(null);
+          }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: "10px",
+            borderRadius: 8,
+            border: "none",
+            background: currentView === "teams" ? "#F5F3FF" : "transparent",
+            color: currentView === "teams" ? "#6366F1" : "#555",
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: "pointer",
+            textAlign: "left",
+            transition: "all 0.15s",
+            justifyContent: isSidebarOpen ? "flex-start" : "center",
+            whiteSpace: "nowrap",
+          }}
+          title={!isSidebarOpen ? "Teams" : undefined}
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ flexShrink: 0 }}
+          >
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+          {isSidebarOpen && <span>Teams & Credits</span>}
+        </button>
+        <button
+          onClick={() => {
             setCurrentView("dashboard");
             setViewingHistoryItem(null);
           }}
@@ -3514,6 +3742,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
           boxSizing: "border-box",
         }}
       >
+        {currentView === "teams" && <TeamManager session={session} />}
         {/* === BRAND MANAGER VIEW === */}
         {currentView === "brands" && (
           <div style={{ width: "100%", maxWidth: 1000, margin: "0 auto" }}>
