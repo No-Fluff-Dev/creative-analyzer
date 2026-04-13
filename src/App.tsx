@@ -2622,14 +2622,17 @@ function TeamManager({ session }: { session: any }) {
   const [teams, setTeams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // --- NEW STATE FOR ORG CREATION ---
+  // --- ORG CREATION ---
   const [showCreate, setShowCreate] = useState(false);
   const [orgName, setOrgName] = useState("");
   const [teamName, setTeamName] = useState("");
   const [creating, setCreating] = useState(false);
 
-  // --- NEW STATE FOR INVITE MODAL ---
-  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  // --- INVITE MODAL ---
+  const [inviteTargetTeam, setInviteTargetTeam] = useState<string | null>(null);
+  const [inviteExpiration, setInviteExpiration] = useState<
+    "never" | "24h" | "7d"
+  >("never");
   const [activeInviteLink, setActiveInviteLink] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [sendingInvite, setSendingInvite] = useState(false);
@@ -2638,16 +2641,24 @@ function TeamManager({ session }: { session: any }) {
     msg: string;
   } | null>(null);
 
+  // --- MANAGE TEAM MODAL ---
+  const [manageTeam, setManageTeam] = useState<any | null>(null);
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const [allocAmount, setAllocAmount] = useState("");
+  const [allocating, setAllocating] = useState(false);
+
   useEffect(() => {
     fetchMyTeams();
   }, []);
 
   const fetchMyTeams = async () => {
     setLoading(true);
-    // Fetch teams where the user is a member
+    // Fetch teams and their parent organization data
     const { data } = await supabase
       .from("team_members")
-      .select("role, joined_at, teams(id, name, credits_pool)")
+      .select(
+        "role, joined_at, teams(id, name, credits_pool, org_id, organisations(name, credits_pool))",
+      )
       .eq("user_id", session.user.id);
 
     if (data) setTeams(data);
@@ -2670,26 +2681,47 @@ function TeamManager({ session }: { session: any }) {
       setOrgName("");
       setTeamName("");
       setShowCreate(false);
-      fetchMyTeams(); // Refresh the list
+      fetchMyTeams();
     }
     setCreating(false);
   };
 
-  const generateInvite = async (teamId: string) => {
+  const openInviteModal = (teamId: string) => {
+    setInviteTargetTeam(teamId);
+    setActiveInviteLink("");
+    setInviteStatus(null);
+    setInviteEmail("");
+    setInviteExpiration("never");
+  };
+
+  const generateInvite = async () => {
+    if (!inviteTargetTeam) return;
+
+    let expiresAt = null;
+    if (inviteExpiration === "24h") {
+      expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    } else if (inviteExpiration === "7d") {
+      expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    }
+
     const { data, error } = await supabase
       .from("team_invites")
-      .insert({ team_id: teamId, created_by: session.user.id })
+      .insert({
+        team_id: inviteTargetTeam,
+        created_by: session.user.id,
+        expires_at: expiresAt,
+      })
       .select("token")
       .single();
 
     if (data) {
       const link = `${window.location.origin}/?invite=${data.token}`;
       setActiveInviteLink(link);
-      setInviteModalOpen(true);
-      setInviteStatus(null);
-      setInviteEmail("");
     } else {
-      alert("Failed to generate invite link.");
+      setInviteStatus({
+        type: "error",
+        msg: "Failed to generate invite link.",
+      });
     }
   };
 
@@ -2710,14 +2742,10 @@ function TeamManager({ session }: { session: any }) {
     setInviteStatus(null);
 
     try {
-      // Trick: Use Supabase Magic Link to send the email, then redirect them to the invite URL!
       const { error } = await supabase.auth.signInWithOtp({
         email: inviteEmail.trim(),
-        options: {
-          emailRedirectTo: activeInviteLink,
-        },
+        options: { emailRedirectTo: activeInviteLink },
       });
-
       if (error) throw error;
       setInviteStatus({
         type: "success",
@@ -2733,34 +2761,76 @@ function TeamManager({ session }: { session: any }) {
     setSendingInvite(false);
   };
 
+  const openManageModal = async (teamData: any) => {
+    setManageTeam(teamData);
+    // Fetch members. Fails gracefully if profiles join isn't perfect.
+    const { data } = await supabase
+      .from("team_members")
+      .select(`id, role, user_id, profiles!left(full_name, email)`)
+      .eq("team_id", teamData.teams.id);
+    if (data) setTeamMembers(data);
+  };
+
+  const updateMemberRole = async (memberId: string, newRole: string) => {
+    await supabase
+      .from("team_members")
+      .update({ role: newRole })
+      .eq("id", memberId);
+    setTeamMembers((prev) =>
+      prev.map((m) => (m.id === memberId ? { ...m, role: newRole } : m)),
+    );
+  };
+
+  const handleAllocateCredits = async () => {
+    const amt = parseInt(allocAmount);
+    if (!amt || amt <= 0 || !manageTeam) return;
+    setAllocating(true);
+
+    const { data, error } = await supabase.rpc("allocate_credits_to_team", {
+      p_org_id: manageTeam.teams.org_id,
+      p_team_id: manageTeam.teams.id,
+      p_amount: amt,
+    });
+
+    if (error || !data?.success) {
+      alert(error?.message || data?.error || "Allocation failed");
+    } else {
+      alert(`Successfully allocated ${amt} credits to team!`);
+      setAllocAmount("");
+      fetchMyTeams(); // Refreshes org and team credit UI naturally
+      setManageTeam(null); // Close modal to refresh stale state easily
+    }
+    setAllocating(false);
+  };
+
   if (loading) return <p style={{ color: "#888" }}>Loading teams...</p>;
 
   return (
     <div style={{ maxWidth: 800, margin: "0 auto" }}>
-      <div style={{ textAlign: "center", marginBottom: "2rem" }}>
-        <h1
-          style={{
-            fontSize: 24,
-            fontWeight: 600,
-            color: "#111",
-            margin: "0 0 6px",
-          }}
-        >
-          Teams & Credits
-        </h1>
-        <p style={{ fontSize: 14, color: "#888", margin: 0 }}>
-          Manage your teams, invite members, and allocate credits.
-        </p>
-      </div>
-
-      {!showCreate && (
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "flex-end",
-            marginBottom: "1rem",
-          }}
-        >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-end",
+          marginBottom: "2rem",
+        }}
+      >
+        <div>
+          <h1
+            style={{
+              fontSize: 24,
+              fontWeight: 600,
+              color: "#111",
+              margin: "0 0 6px",
+            }}
+          >
+            Teams & Credits
+          </h1>
+          <p style={{ fontSize: 14, color: "#888", margin: 0 }}>
+            Manage your teams, invite members, and allocate credits.
+          </p>
+        </div>
+        {!showCreate && (
           <button
             onClick={() => setShowCreate(true)}
             style={{
@@ -2776,8 +2846,8 @@ function TeamManager({ session }: { session: any }) {
           >
             + Create Workspace
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
       {showCreate && (
         <div
@@ -2948,6 +3018,9 @@ function TeamManager({ session }: { session: any }) {
                   <h3 style={{ margin: 0, fontSize: 16, color: "#111" }}>
                     {t.teams.name}
                   </h3>
+                  <p style={{ fontSize: 12, color: "#888", margin: "2px 0 0" }}>
+                    Org: {t.teams.organisations?.name}
+                  </p>
                   <span
                     style={{
                       fontSize: 11,
@@ -2994,11 +3067,14 @@ function TeamManager({ session }: { session: any }) {
                     borderTop: "1px solid #F5F5F5",
                     paddingTop: 16,
                     marginTop: 16,
+                    display: "flex",
+                    gap: 8,
                   }}
                 >
                   <button
-                    onClick={() => generateInvite(t.teams.id)}
+                    onClick={() => openInviteModal(t.teams.id)}
                     style={{
+                      flex: 1,
                       background: "#111",
                       color: "#fff",
                       border: "none",
@@ -3009,7 +3085,23 @@ function TeamManager({ session }: { session: any }) {
                       cursor: "pointer",
                     }}
                   >
-                    Generate Invite Link
+                    Invite Member
+                  </button>
+                  <button
+                    onClick={() => openManageModal(t)}
+                    style={{
+                      flex: 1,
+                      background: "#fff",
+                      color: "#444",
+                      border: "1px solid #EFEFEF",
+                      padding: "8px 14px",
+                      borderRadius: 8,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Manage Team & Credits
                   </button>
                 </div>
               )}
@@ -3018,8 +3110,165 @@ function TeamManager({ session }: { session: any }) {
         </div>
       )}
 
+      {/* --- MANAGE TEAM MODAL --- */}
+      {manageTeam && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.5)",
+            zIndex: 1000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "1rem",
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 16,
+              padding: "2rem",
+              width: "100%",
+              maxWidth: 480,
+              boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
+              position: "relative",
+              maxHeight: "85vh",
+              overflowY: "auto",
+            }}
+          >
+            <button
+              onClick={() => setManageTeam(null)}
+              style={{
+                position: "absolute",
+                top: 16,
+                right: 16,
+                background: "none",
+                border: "none",
+                fontSize: 18,
+                cursor: "pointer",
+                color: "#888",
+              }}
+            >
+              ✕
+            </button>
+            <h2 style={{ margin: "0 0 16px", fontSize: 20, color: "#111" }}>
+              Manage Workspace
+            </h2>
+
+            {/* Credit Transfer Section */}
+            <div
+              style={{
+                background: "#FAFAFA",
+                borderRadius: 12,
+                padding: "1.25rem",
+                border: "1px solid #EFEFEF",
+                marginBottom: "1.5rem",
+              }}
+            >
+              <h4 style={{ margin: "0 0 12px", fontSize: 13, color: "#444" }}>
+                Allocate Credits to Team
+              </h4>
+              <p style={{ fontSize: 12, color: "#888", marginBottom: 12 }}>
+                Your Organization has{" "}
+                <strong>{manageTeam.teams.organisations?.credits_pool}</strong>{" "}
+                total credits available.
+              </p>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  type="number"
+                  placeholder="Amount"
+                  value={allocAmount}
+                  onChange={(e) => setAllocAmount(e.target.value)}
+                  style={{
+                    flex: 1,
+                    padding: "10px",
+                    borderRadius: 8,
+                    border: "1px solid #EFEFEF",
+                    fontSize: 13,
+                    outline: "none",
+                  }}
+                />
+                <button
+                  onClick={handleAllocateCredits}
+                  disabled={allocating}
+                  style={{
+                    padding: "0 16px",
+                    borderRadius: 8,
+                    border: "none",
+                    background: "#6366F1",
+                    color: "#fff",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  {allocating ? "Moving..." : "Transfer"}
+                </button>
+              </div>
+            </div>
+
+            {/* Team Members List */}
+            <h4 style={{ margin: "0 0 12px", fontSize: 13, color: "#444" }}>
+              Team Members
+            </h4>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {teamMembers.map((member) => (
+                <div
+                  key={member.id}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "10px",
+                    border: "1px solid #EFEFEF",
+                    borderRadius: 8,
+                  }}
+                >
+                  <div>
+                    <p
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: "#111",
+                        margin: 0,
+                      }}
+                    >
+                      {member.profiles?.full_name || member.user_id}
+                    </p>
+                    <p style={{ fontSize: 11, color: "#888", margin: 0 }}>
+                      {member.profiles?.email || "User"}
+                    </p>
+                  </div>
+                  {member.user_id !== session.user.id && (
+                    <select
+                      value={member.role}
+                      onChange={(e) =>
+                        updateMemberRole(member.id, e.target.value)
+                      }
+                      style={{
+                        padding: "4px 8px",
+                        borderRadius: 6,
+                        border: "1px solid #EFEFEF",
+                        fontSize: 11,
+                        background: "#FAFAFA",
+                      }}
+                    >
+                      <option value="member">Member</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* --- INVITE MODAL OVERLAY --- */}
-      {inviteModalOpen && (
+      {inviteTargetTeam && (
         <div
           style={{
             position: "fixed",
@@ -3047,7 +3296,7 @@ function TeamManager({ session }: { session: any }) {
             }}
           >
             <button
-              onClick={() => setInviteModalOpen(false)}
+              onClick={() => setInviteTargetTeam(null)}
               style={{
                 position: "absolute",
                 top: 16,
@@ -3066,129 +3315,183 @@ function TeamManager({ session }: { session: any }) {
               Invite Team Member
             </h2>
             <p style={{ margin: "0 0 20px", fontSize: 13, color: "#666" }}>
-              Share this link or send it directly via email.
+              Generate a secure link to join this team.
             </p>
 
-            {/* Copy Link Section */}
-            <div style={{ marginBottom: "1.5rem" }}>
-              <label
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: "#AAA",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                  marginBottom: 6,
-                  display: "block",
-                }}
+            {!activeInviteLink ? (
+              <div
+                style={{ display: "flex", flexDirection: "column", gap: 12 }}
               >
-                Invite Link
-              </label>
-              <div style={{ display: "flex", gap: 8 }}>
-                <input
-                  readOnly
-                  value={activeInviteLink}
+                <label
                   style={{
-                    flex: 1,
-                    padding: "10px 12px",
-                    border: "1px solid #EFEFEF",
-                    borderRadius: 8,
-                    fontSize: 13,
-                    background: "#FAFAFA",
-                    color: "#555",
-                    outline: "none",
-                  }}
-                />
-                <button
-                  onClick={copyToClipboard}
-                  style={{
-                    padding: "0 16px",
-                    borderRadius: 8,
-                    border: "none",
-                    background: "#F5F3FF",
-                    color: "#6366F1",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: "pointer",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: "#AAA",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
                   }}
                 >
-                  Copy
-                </button>
-              </div>
-            </div>
-
-            <div
-              style={{ height: 1, background: "#EFEFEF", margin: "1.5rem 0" }}
-            />
-
-            {/* Email Invite Section */}
-            <div>
-              <label
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: "#AAA",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                  marginBottom: 6,
-                  display: "block",
-                }}
-              >
-                Send via Email
-              </label>
-              <div style={{ display: "flex", gap: 8 }}>
-                <input
-                  type="email"
-                  placeholder="colleague@company.com"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
+                  Link Expiration
+                </label>
+                <select
+                  value={inviteExpiration}
+                  onChange={(e: any) => setInviteExpiration(e.target.value)}
                   style={{
-                    flex: 1,
-                    padding: "10px 12px",
-                    border: "1px solid #EFEFEF",
+                    padding: "10px",
                     borderRadius: 8,
+                    border: "1px solid #EFEFEF",
                     fontSize: 13,
-                    outline: "none",
-                    boxSizing: "border-box",
                   }}
-                />
+                >
+                  <option value="never">Never expires</option>
+                  <option value="24h">Expires in 24 hours</option>
+                  <option value="7d">Expires in 7 days</option>
+                </select>
                 <button
-                  onClick={sendEmailInvite}
-                  disabled={sendingInvite || !inviteEmail}
+                  onClick={generateInvite}
                   style={{
-                    padding: "0 16px",
+                    padding: "10px",
                     borderRadius: 8,
                     border: "none",
                     background: "#111",
                     color: "#fff",
                     fontSize: 13,
                     fontWeight: 600,
-                    cursor:
-                      sendingInvite || !inviteEmail ? "not-allowed" : "pointer",
-                    opacity: sendingInvite || !inviteEmail ? 0.7 : 1,
+                    cursor: "pointer",
+                    marginTop: 8,
                   }}
                 >
-                  {sendingInvite ? "Sending..." : "Send"}
+                  Generate Invite Link
                 </button>
               </div>
-            </div>
+            ) : (
+              <>
+                <div style={{ marginBottom: "1.5rem" }}>
+                  <label
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: "#AAA",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      marginBottom: 6,
+                      display: "block",
+                    }}
+                  >
+                    Invite Link
+                  </label>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input
+                      readOnly
+                      value={activeInviteLink}
+                      style={{
+                        flex: 1,
+                        padding: "10px 12px",
+                        border: "1px solid #EFEFEF",
+                        borderRadius: 8,
+                        fontSize: 13,
+                        background: "#FAFAFA",
+                        color: "#555",
+                        outline: "none",
+                      }}
+                    />
+                    <button
+                      onClick={copyToClipboard}
+                      style={{
+                        padding: "0 16px",
+                        borderRadius: 8,
+                        border: "none",
+                        background: "#F5F3FF",
+                        color: "#6366F1",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </div>
 
-            {inviteStatus && (
-              <div
-                style={{
-                  marginTop: 16,
-                  padding: "10px 12px",
-                  borderRadius: 8,
-                  fontSize: 12,
-                  fontWeight: 500,
-                  background:
-                    inviteStatus.type === "success" ? "#F0FDF4" : "#FEF2F2",
-                  color:
-                    inviteStatus.type === "success" ? "#15803D" : "#B91C1C",
-                }}
-              >
-                {inviteStatus.msg}
-              </div>
+                <div
+                  style={{
+                    height: 1,
+                    background: "#EFEFEF",
+                    margin: "1.5rem 0",
+                  }}
+                />
+
+                <div>
+                  <label
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: "#AAA",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      marginBottom: 6,
+                      display: "block",
+                    }}
+                  >
+                    Send via Email
+                  </label>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input
+                      type="email"
+                      placeholder="colleague@company.com"
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                      style={{
+                        flex: 1,
+                        padding: "10px 12px",
+                        border: "1px solid #EFEFEF",
+                        borderRadius: 8,
+                        fontSize: 13,
+                        outline: "none",
+                        boxSizing: "border-box",
+                      }}
+                    />
+                    <button
+                      onClick={sendEmailInvite}
+                      disabled={sendingInvite || !inviteEmail}
+                      style={{
+                        padding: "0 16px",
+                        borderRadius: 8,
+                        border: "none",
+                        background: "#111",
+                        color: "#fff",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        cursor:
+                          sendingInvite || !inviteEmail
+                            ? "not-allowed"
+                            : "pointer",
+                        opacity: sendingInvite || !inviteEmail ? 0.7 : 1,
+                      }}
+                    >
+                      {sendingInvite ? "Sending..." : "Send"}
+                    </button>
+                  </div>
+                </div>
+
+                {inviteStatus && (
+                  <div
+                    style={{
+                      marginTop: 16,
+                      padding: "10px 12px",
+                      borderRadius: 8,
+                      fontSize: 12,
+                      fontWeight: 500,
+                      background:
+                        inviteStatus.type === "success" ? "#F0FDF4" : "#FEF2F2",
+                      color:
+                        inviteStatus.type === "success" ? "#15803D" : "#B91C1C",
+                    }}
+                  >
+                    {inviteStatus.msg}
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
