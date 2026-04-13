@@ -2690,9 +2690,10 @@ function TeamManager({ session }: { session: any }) {
       <div
         style={{
           display: "flex",
-          justifyContent: "space-between",
+          justifyContent: "center",
           alignItems: "flex-end",
           marginBottom: "2rem",
+          textAlign: "center",
         }}
       >
         <div>
@@ -2710,6 +2711,7 @@ function TeamManager({ session }: { session: any }) {
             Manage your teams, invite members, and allocate credits.
           </p>
         </div>
+        <br></br>
         {!showCreate && (
           <button
             onClick={() => setShowCreate(true)}
@@ -4757,9 +4759,10 @@ Be specific. Reference actual elements visible. No generic advice.`;
             <div
               style={{
                 display: "flex",
-                justifyContent: "space-between",
+                justifyContent: "center",
                 alignItems: "flex-start",
                 marginBottom: "1.75rem",
+                textAlign: "center",
               }}
             >
               <div>
