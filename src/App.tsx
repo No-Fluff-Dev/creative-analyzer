@@ -2623,6 +2623,12 @@ function TeamManager({ session }: { session: any }) {
   const [loading, setLoading] = useState(true);
   const [inviteLink, setInviteLink] = useState("");
 
+  // --- NEW STATE FOR ORG CREATION ---
+  const [showCreate, setShowCreate] = useState(false);
+  const [orgName, setOrgName] = useState("");
+  const [teamName, setTeamName] = useState("");
+  const [creating, setCreating] = useState(false);
+
   useEffect(() => {
     fetchMyTeams();
   }, []);
@@ -2637,6 +2643,27 @@ function TeamManager({ session }: { session: any }) {
 
     if (data) setTeams(data);
     setLoading(false);
+  };
+
+  const handleCreate = async () => {
+    if (!orgName.trim() || !teamName.trim()) return;
+    setCreating(true);
+    const { data, error } = await supabase.rpc("create_org_and_team", {
+      org_name: orgName.trim(),
+      team_name: teamName.trim(),
+    });
+
+    if (error || !data?.success) {
+      alert(
+        "Error creating organization: " + (error?.message || "Unknown error"),
+      );
+    } else {
+      setOrgName("");
+      setTeamName("");
+      setShowCreate(false);
+      fetchMyTeams(); // Refresh the list
+    }
+    setCreating(false);
   };
 
   const generateInvite = async (teamId: string) => {
@@ -2660,21 +2687,165 @@ function TeamManager({ session }: { session: any }) {
 
   return (
     <div style={{ maxWidth: 800, margin: "0 auto" }}>
-      <h1
+      <div
         style={{
-          fontSize: 24,
-          fontWeight: 600,
-          color: "#111",
-          margin: "0 0 6px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-end",
+          marginBottom: "2rem",
         }}
       >
-        Teams & Credits
-      </h1>
-      <p style={{ fontSize: 14, color: "#888", marginBottom: "2rem" }}>
-        Manage your teams, invite members, and allocate credits.
-      </p>
+        <div>
+          <h1
+            style={{
+              fontSize: 24,
+              fontWeight: 600,
+              color: "#111",
+              margin: "0 0 6px",
+            }}
+          >
+            Teams & Credits
+          </h1>
+          <p style={{ fontSize: 14, color: "#888", margin: 0 }}>
+            Manage your teams, invite members, and allocate credits.
+          </p>
+        </div>
+        {!showCreate && (
+          <button
+            onClick={() => setShowCreate(true)}
+            style={{
+              padding: "10px 16px",
+              borderRadius: 8,
+              border: "none",
+              background: "#111",
+              color: "#fff",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            + Create Workspace
+          </button>
+        )}
+      </div>
 
-      {teams.length === 0 ? (
+      {showCreate && (
+        <div
+          style={{
+            background: "#fff",
+            border: "1px solid #EFEFEF",
+            borderRadius: 14,
+            padding: "1.5rem",
+            marginBottom: "2rem",
+          }}
+        >
+          <h3 style={{ margin: "0 0 16px", fontSize: 16 }}>
+            Create New Organization & Team
+          </h3>
+          <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
+            <div style={{ flex: 1 }}>
+              <label
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: "#888",
+                  display: "block",
+                  marginBottom: 6,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                }}
+              >
+                Organization Name
+              </label>
+              <input
+                value={orgName}
+                onChange={(e) => setOrgName(e.target.value)}
+                placeholder="e.g. Acme Corp"
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  border: "1px solid #EFEFEF",
+                  borderRadius: 8,
+                  fontSize: 13,
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: "#888",
+                  display: "block",
+                  marginBottom: 6,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                }}
+              >
+                First Team Name
+              </label>
+              <input
+                value={teamName}
+                onChange={(e) => setTeamName(e.target.value)}
+                placeholder="e.g. Growth Team"
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  border: "1px solid #EFEFEF",
+                  borderRadius: 8,
+                  fontSize: 13,
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={handleCreate}
+              disabled={creating || !orgName.trim() || !teamName.trim()}
+              style={{
+                flex: 1,
+                padding: "10px",
+                borderRadius: 8,
+                border: "none",
+                background: "#6366F1",
+                color: "#fff",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor:
+                  creating || !orgName.trim() || !teamName.trim()
+                    ? "not-allowed"
+                    : "pointer",
+                opacity:
+                  creating || !orgName.trim() || !teamName.trim() ? 0.7 : 1,
+              }}
+            >
+              {creating ? "Creating..." : "Create Workspace"}
+            </button>
+            <button
+              onClick={() => setShowCreate(false)}
+              style={{
+                flex: 1,
+                padding: "10px",
+                borderRadius: 8,
+                border: "1px solid #EFEFEF",
+                background: "#fff",
+                color: "#555",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {teams.length === 0 && !showCreate ? (
         <div
           style={{
             padding: "3rem",
@@ -2684,9 +2855,24 @@ function TeamManager({ session }: { session: any }) {
             border: "1px solid #EFEFEF",
           }}
         >
-          <p style={{ color: "#888", fontSize: 14 }}>
+          <p style={{ color: "#888", fontSize: 14, marginBottom: 16 }}>
             You are not part of any teams yet.
           </p>
+          <button
+            onClick={() => setShowCreate(true)}
+            style={{
+              padding: "10px 16px",
+              borderRadius: 8,
+              border: "none",
+              background: "#6366F1",
+              color: "#fff",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            Create Your First Workspace
+          </button>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
