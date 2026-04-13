@@ -2711,11 +2711,11 @@ function TeamManager({ session }: { session: any }) {
             Manage your teams, invite members, and allocate credits.
           </p>
         </div>
-        <br></br>
         {!showCreate && (
           <button
             onClick={() => setShowCreate(true)}
             style={{
+              marginTop: "12px",
               padding: "10px 16px",
               borderRadius: 8,
               border: "none",
