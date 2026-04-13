@@ -8,10 +8,19 @@ const GREEN_BG = "#F0FDF4";
 const RED = "#B91C1C";
 const RED_BG = "#FEF2F2";
 const AMBER = "#B45309";
-const AMBER_BG = "#FFFBEB";
 
 function scoreColor(s: number) {
   return s >= 75 ? GREEN : s >= 50 ? AMBER : RED;
+}
+
+function modelName(id: string) {
+  if (!id) return "—";
+  return id
+    .replace(/^claude-/, "Claude ")
+    .replace(/-(\d{8})$/, "")
+    .replace(/-/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .trim();
 }
 
 // ─── PIN GATE ───────────────────────────────────────────────
@@ -29,11 +38,8 @@ function PinGate({ onUnlock }: { onUnlock: () => void }) {
       body: JSON.stringify({ pin }),
     });
     const data = await resp.json();
-    if (data.ok) {
-      onUnlock();
-    } else {
-      setError("Incorrect PIN. Access denied.");
-    }
+    if (data.ok) onUnlock();
+    else setError("Incorrect PIN. Access denied.");
     setLoading(false);
   };
 
@@ -50,24 +56,26 @@ function PinGate({ onUnlock }: { onUnlock: () => void }) {
     >
       <div
         style={{
-          width: 360,
+          width: 380,
           background: "#111",
-          borderRadius: 16,
-          padding: "2rem",
-          border: "1px solid #222",
+          borderRadius: 20,
+          padding: "2.5rem",
+          border: "1px solid #1E1E1E",
+          boxShadow: "0 25px 60px rgba(0,0,0,0.5)",
         }}
       >
         <div style={{ textAlign: "center", marginBottom: "2rem" }}>
           <div
             style={{
-              width: 48,
-              height: 48,
-              borderRadius: 12,
+              width: 52,
+              height: 52,
+              borderRadius: 14,
               background: ACCENT,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              margin: "0 auto 12px",
+              margin: "0 auto 16px",
+              boxShadow: `0 8px 20px ${ACCENT}40`,
             }}
           >
             <svg
@@ -83,52 +91,83 @@ function PinGate({ onUnlock }: { onUnlock: () => void }) {
             </svg>
           </div>
           <h1
-            style={{ fontSize: 20, fontWeight: 700, color: "#fff", margin: 0 }}
+            style={{
+              fontSize: 22,
+              fontWeight: 700,
+              color: "#fff",
+              margin: "0 0 6px",
+            }}
           >
             Admin Access
           </h1>
-          <p style={{ fontSize: 13, color: "#666", marginTop: 4 }}>
+          <p style={{ fontSize: 13, color: "#555", margin: 0 }}>
             No Fluff · Preflyght
           </p>
         </div>
-        <input
-          type="password"
-          value={pin}
-          onChange={(e) => setPin(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && verify()}
-          placeholder="Enter admin PIN"
-          style={{
-            width: "100%",
-            padding: "12px",
-            borderRadius: 8,
-            border: "1px solid #333",
-            background: "#1A1A1A",
-            color: "#fff",
-            fontSize: 14,
-            outline: "none",
-            boxSizing: "border-box",
-            marginBottom: 10,
-          }}
-        />
+        <div style={{ marginBottom: 12 }}>
+          <label
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              color: "#555",
+              display: "block",
+              marginBottom: 6,
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+            }}
+          >
+            Admin PIN
+          </label>
+          <input
+            type="password"
+            value={pin}
+            onChange={(e) => setPin(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && verify()}
+            placeholder="••••••••"
+            style={{
+              width: "100%",
+              padding: "12px 14px",
+              borderRadius: 10,
+              border: "1px solid #2A2A2A",
+              background: "#1A1A1A",
+              color: "#fff",
+              fontSize: 14,
+              outline: "none",
+              boxSizing: "border-box",
+            }}
+          />
+        </div>
         {error && (
-          <p style={{ fontSize: 12, color: RED, marginBottom: 10 }}>{error}</p>
+          <p
+            style={{
+              fontSize: 12,
+              color: "#F87171",
+              marginBottom: 12,
+              padding: "8px 12px",
+              background: "#2A1010",
+              borderRadius: 8,
+            }}
+          >
+            {error}
+          </p>
         )}
         <button
           onClick={verify}
           disabled={loading || !pin}
           style={{
             width: "100%",
-            padding: "12px",
-            borderRadius: 8,
+            padding: "13px",
+            borderRadius: 10,
             border: "none",
-            background: pin && !loading ? ACCENT : "#333",
-            color: "#fff",
+            background: pin && !loading ? ACCENT : "#1E1E1E",
+            color: pin && !loading ? "#fff" : "#444",
             fontSize: 14,
             fontWeight: 600,
             cursor: pin && !loading ? "pointer" : "not-allowed",
+            transition: "all 0.15s",
           }}
         >
-          {loading ? "Verifying…" : "Unlock"}
+          {loading ? "Verifying…" : "Unlock Dashboard"}
         </button>
       </div>
     </div>
@@ -141,38 +180,83 @@ function StatCard({
   value,
   sub,
   color = "#111",
+  accent,
 }: {
   label: string;
   value: string | number;
   sub?: string;
   color?: string;
+  accent?: string;
 }) {
   return (
     <div
       style={{
         background: "#fff",
         border: "1px solid #F0F0F0",
-        borderRadius: 12,
-        padding: "1.25rem",
+        borderRadius: 14,
+        padding: "1.5rem",
+        position: "relative",
+        overflow: "hidden",
       }}
     >
+      {accent && (
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 3,
+            background: accent,
+            borderRadius: "14px 14px 0 0",
+          }}
+        />
+      )}
       <p
         style={{
           fontSize: 11,
           fontWeight: 700,
           color: "#AAA",
           textTransform: "uppercase",
-          letterSpacing: "0.06em",
-          margin: "0 0 6px",
+          letterSpacing: "0.08em",
+          margin: "0 0 8px",
         }}
       >
         {label}
       </p>
-      <p style={{ fontSize: 28, fontWeight: 700, color, margin: 0 }}>{value}</p>
+      <p
+        style={{
+          fontSize: 32,
+          fontWeight: 700,
+          color,
+          margin: 0,
+          lineHeight: 1,
+        }}
+      >
+        {value}
+      </p>
       {sub && (
-        <p style={{ fontSize: 11, color: "#AAA", margin: "4px 0 0" }}>{sub}</p>
+        <p style={{ fontSize: 12, color: "#BBB", margin: "6px 0 0" }}>{sub}</p>
       )}
     </div>
+  );
+}
+
+// ─── BADGE ───────────────────────────────────────────────────
+function Badge({ pass }: { pass: boolean }) {
+  return (
+    <span
+      style={{
+        fontSize: 10,
+        fontWeight: 700,
+        padding: "3px 8px",
+        borderRadius: 20,
+        background: pass ? GREEN_BG : RED_BG,
+        color: pass ? GREEN : RED,
+      }}
+    >
+      {pass ? "PASS" : "FAIL"}
+    </span>
   );
 }
 
@@ -185,7 +269,6 @@ export default function Admin({ session }: { session: Session }) {
     "overview" | "orgs" | "users" | "analyses"
   >("overview");
 
-  // Data
   const [stats, setStats] = useState({
     users: 0,
     orgs: 0,
@@ -196,21 +279,17 @@ export default function Admin({ session }: { session: Session }) {
   const [orgs, setOrgs] = useState<any[]>([]);
   const [analyses, setAnalyses] = useState<any[]>([]);
 
-  // Org create
   const [newOrgName, setNewOrgName] = useState("");
   const [newOrgSlug, setNewOrgSlug] = useState("");
   const [newOrgCredits, setNewOrgCredits] = useState(100);
   const [creatingOrg, setCreatingOrg] = useState(false);
 
-  // Credit edit
   const [editingUser, setEditingUser] = useState<string | null>(null);
   const [editCredits, setEditCredits] = useState(0);
 
-  // Check superadmin
   useEffect(() => {
     supabase.rpc("get_my_system_role").then(({ data, error }) => {
       if (error || !data) {
-        // Fallback to direct query
         supabase
           .from("profiles")
           .select("system_role")
@@ -227,7 +306,6 @@ export default function Admin({ session }: { session: Session }) {
     });
   }, [session]);
 
-  // Load data once unlocked
   useEffect(() => {
     if (!unlocked || !isSuperadmin) return;
     loadAll();
@@ -239,11 +317,9 @@ export default function Admin({ session }: { session: Session }) {
       supabase.rpc("admin_get_all_orgs"),
       supabase.rpc("admin_get_all_analyses"),
     ]);
-
     const allUsers = profilesRes.data || [];
     const allOrgs = orgsRes.data || [];
     const allAnalyses = analysesRes.data || [];
-
     setUsers(allUsers);
     setOrgs(allOrgs);
     setAnalyses(allAnalyses);
@@ -306,6 +382,29 @@ export default function Admin({ session }: { session: Session }) {
     setStats((s) => ({ ...s, orgs: s.orgs - 1 }));
   };
 
+  const inputStyle = {
+    width: "100%",
+    padding: "10px 12px",
+    border: "1px solid #E5E5E5",
+    borderRadius: 8,
+    fontSize: 13,
+    color: "#111",
+    background: "#fff",
+    outline: "none",
+    boxSizing: "border-box" as const,
+  };
+
+  const thStyle = {
+    padding: "11px 16px",
+    fontSize: 10,
+    fontWeight: 700,
+    color: "#AAA",
+    textTransform: "uppercase" as const,
+    textAlign: "left" as const,
+    whiteSpace: "nowrap" as const,
+    letterSpacing: "0.06em",
+  };
+
   if (checking)
     return (
       <div
@@ -326,18 +425,25 @@ export default function Admin({ session }: { session: Session }) {
       <div
         style={{
           minHeight: "100vh",
-          background: "#FAFAFA",
+          background: "#0A0A0A",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
         }}
       >
         <div style={{ textAlign: "center" }}>
-          <p style={{ fontSize: 24, marginBottom: 8 }}>🚫</p>
-          <p style={{ fontSize: 16, fontWeight: 600, color: "#111" }}>
+          <p style={{ fontSize: 32, marginBottom: 12 }}>🚫</p>
+          <p
+            style={{
+              fontSize: 18,
+              fontWeight: 700,
+              color: "#fff",
+              margin: "0 0 6px",
+            }}
+          >
             Access Denied
           </p>
-          <p style={{ fontSize: 13, color: "#888" }}>
+          <p style={{ fontSize: 13, color: "#555" }}>
             You don't have superadmin privileges.
           </p>
         </div>
@@ -357,7 +463,7 @@ export default function Admin({ session }: { session: Session }) {
     <div
       style={{
         minHeight: "100vh",
-        background: "#FAFAFA",
+        background: "#F8F8F8",
         fontFamily: "system-ui",
       }}
     >
@@ -369,15 +475,16 @@ export default function Admin({ session }: { session: Session }) {
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          height: 56,
+          height: 58,
+          borderBottom: "1px solid #1A1A1A",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <div
             style={{
-              width: 28,
-              height: 28,
-              borderRadius: 6,
+              width: 30,
+              height: 30,
+              borderRadius: 8,
               background: ACCENT,
               display: "flex",
               alignItems: "center",
@@ -388,34 +495,43 @@ export default function Admin({ session }: { session: Session }) {
               NF
             </span>
           </div>
-          <span style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>
+          <span
+            style={{
+              fontSize: 14,
+              fontWeight: 700,
+              color: "#fff",
+              letterSpacing: "0.02em",
+            }}
+          >
             Preflyght Admin
           </span>
           <span
             style={{
-              fontSize: 10,
-              fontWeight: 700,
-              padding: "2px 8px",
+              fontSize: 9,
+              fontWeight: 800,
+              padding: "3px 10px",
               borderRadius: 20,
-              background: ACCENT,
-              color: "#fff",
+              background: `${ACCENT}25`,
+              color: ACCENT,
+              border: `1px solid ${ACCENT}40`,
+              letterSpacing: "0.08em",
             }}
           >
             SUPERADMIN
           </span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 12, color: "#666" }}>
+          <span style={{ fontSize: 12, color: "#555" }}>
             {session.user.email}
           </span>
           <button
             onClick={() => (window.location.href = "/")}
             style={{
-              padding: "6px 12px",
+              padding: "7px 14px",
               borderRadius: 8,
-              border: "1px solid #333",
+              border: "1px solid #2A2A2A",
               background: "transparent",
-              color: "#888",
+              color: "#666",
               fontSize: 12,
               cursor: "pointer",
             }}
@@ -425,13 +541,13 @@ export default function Admin({ session }: { session: Session }) {
         </div>
       </div>
 
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "2rem" }}>
+      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "2rem" }}>
         {/* Tabs */}
         <div
           style={{
             display: "flex",
             gap: 4,
-            background: "#EFEFEF",
+            background: "#EBEBEB",
             borderRadius: 10,
             padding: 4,
             marginBottom: "2rem",
@@ -443,7 +559,7 @@ export default function Admin({ session }: { session: Session }) {
               key={t.id}
               onClick={() => setActiveTab(t.id)}
               style={{
-                padding: "8px 16px",
+                padding: "8px 18px",
                 borderRadius: 8,
                 border: "none",
                 fontSize: 13,
@@ -453,7 +569,7 @@ export default function Admin({ session }: { session: Session }) {
                 background: activeTab === t.id ? "#fff" : "transparent",
                 color: activeTab === t.id ? "#111" : "#888",
                 boxShadow:
-                  activeTab === t.id ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+                  activeTab === t.id ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
                 whiteSpace: "nowrap",
               }}
             >
@@ -462,7 +578,7 @@ export default function Admin({ session }: { session: Session }) {
           ))}
         </div>
 
-        {/* OVERVIEW */}
+        {/* ── OVERVIEW ── */}
         {activeTab === "overview" && (
           <div
             style={{ display: "flex", flexDirection: "column", gap: "2rem" }}
@@ -471,35 +587,37 @@ export default function Admin({ session }: { session: Session }) {
               style={{
                 display: "grid",
                 gridTemplateColumns: "1fr 1fr 1fr 1fr",
-                gap: 12,
+                gap: 14,
               }}
             >
               <StatCard
                 label="Total Users"
                 value={stats.users}
                 sub="Registered accounts"
+                accent="#111"
               />
               <StatCard
                 label="Organisations"
                 value={stats.orgs}
                 sub="Active orgs"
                 color={ACCENT}
+                accent={ACCENT}
               />
               <StatCard
                 label="Total Analyses"
                 value={stats.analyses}
                 sub="All time"
                 color="#111"
+                accent="#111"
               />
               <StatCard
                 label="Credits Used"
                 value={stats.credits_used}
                 sub="All time total"
                 color={AMBER}
+                accent={AMBER}
               />
             </div>
-
-            {/* Recent analyses */}
             <div>
               <h2
                 style={{
@@ -515,7 +633,7 @@ export default function Admin({ session }: { session: Session }) {
                 style={{
                   background: "#fff",
                   border: "1px solid #EFEFEF",
-                  borderRadius: 12,
+                  borderRadius: 14,
                   overflow: "hidden",
                 }}
               >
@@ -524,7 +642,7 @@ export default function Admin({ session }: { session: Session }) {
                     <tr
                       style={{
                         background: "#FAFAFA",
-                        borderBottom: "1px solid #EFEFEF",
+                        borderBottom: "1px solid #F0F0F0",
                       }}
                     >
                       {[
@@ -536,18 +654,7 @@ export default function Admin({ session }: { session: Session }) {
                         "Score",
                         "Credits",
                       ].map((h) => (
-                        <th
-                          key={h}
-                          style={{
-                            padding: "10px 14px",
-                            fontSize: 10,
-                            fontWeight: 700,
-                            color: "#AAA",
-                            textTransform: "uppercase",
-                            textAlign: "left",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
+                        <th key={h} style={thStyle}>
                           {h}
                         </th>
                       ))}
@@ -557,20 +664,20 @@ export default function Admin({ session }: { session: Session }) {
                     {analyses.slice(0, 10).map((a) => (
                       <tr
                         key={a.id}
-                        style={{ borderBottom: "1px solid #F5F5F5" }}
+                        style={{ borderBottom: "1px solid #F8F8F8" }}
                       >
                         <td
                           style={{
-                            padding: "12px 14px",
+                            padding: "13px 16px",
                             fontSize: 12,
-                            color: "#888",
+                            color: "#999",
                           }}
                         >
                           {new Date(a.created_at).toLocaleDateString()}
                         </td>
                         <td
                           style={{
-                            padding: "12px 14px",
+                            padding: "13px 16px",
                             fontSize: 13,
                             fontWeight: 600,
                             color: "#111",
@@ -580,66 +687,77 @@ export default function Admin({ session }: { session: Session }) {
                         </td>
                         <td
                           style={{
-                            padding: "12px 14px",
+                            padding: "13px 16px",
                             fontSize: 12,
-                            color: "#555",
+                            color: "#666",
                           }}
                         >
                           {a.platform || "—"}
                         </td>
                         <td
                           style={{
-                            padding: "12px 14px",
+                            padding: "13px 16px",
                             fontSize: 12,
-                            color: "#555",
+                            color: "#666",
                           }}
                         >
                           {a.industry || "—"}
                         </td>
                         <td
                           style={{
-                            padding: "12px 14px",
+                            padding: "13px 16px",
                             fontSize: 12,
-                            color: "#555",
+                            color: "#666",
                           }}
                         >
-                          {a.model?.split("-").slice(-2).join(" ") || "—"}
+                          {modelName(a.model)}
                         </td>
-                        <td style={{ padding: "12px 14px" }}>
-                          <span
+                        <td style={{ padding: "13px 16px" }}>
+                          <div
                             style={{
-                              fontSize: 13,
-                              fontWeight: 700,
-                              color: scoreColor(a.overall_score),
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
                             }}
                           >
-                            {a.overall_score}
-                          </span>
-                          <span
-                            style={{
-                              fontSize: 9,
-                              fontWeight: 700,
-                              padding: "2px 6px",
-                              borderRadius: 20,
-                              background: a.pass ? GREEN_BG : RED_BG,
-                              color: a.pass ? GREEN : RED,
-                              marginLeft: 6,
-                            }}
-                          >
-                            {a.pass ? "PASS" : "FAIL"}
-                          </span>
+                            <span
+                              style={{
+                                fontSize: 13,
+                                fontWeight: 700,
+                                color: scoreColor(a.overall_score),
+                              }}
+                            >
+                              {a.overall_score}
+                            </span>
+                            <Badge pass={a.pass} />
+                          </div>
                         </td>
                         <td
                           style={{
-                            padding: "12px 14px",
+                            padding: "13px 16px",
                             fontSize: 12,
-                            color: "#555",
+                            color: "#666",
                           }}
                         >
-                          {a.credits_used || "—"}
+                          {a.credits_used ?? "—"}
                         </td>
                       </tr>
                     ))}
+                    {analyses.length === 0 && (
+                      <tr>
+                        <td
+                          colSpan={7}
+                          style={{
+                            padding: "3rem",
+                            textAlign: "center",
+                            color: "#AAA",
+                            fontSize: 13,
+                          }}
+                        >
+                          No analyses yet.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -647,16 +765,15 @@ export default function Admin({ session }: { session: Session }) {
           </div>
         )}
 
-        {/* ORGANISATIONS */}
+        {/* ── ORGANISATIONS ── */}
         {activeTab === "orgs" && (
           <div
             style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}
           >
-            {/* Create org */}
             <div
               style={{
                 background: "#fff",
-                border: "1px solid #F0F0F0",
+                border: "1px solid #EFEFEF",
                 borderRadius: 14,
                 padding: "1.5rem",
               }}
@@ -666,7 +783,7 @@ export default function Admin({ session }: { session: Session }) {
                   fontSize: 15,
                   fontWeight: 600,
                   color: "#111",
-                  margin: "0 0 1rem",
+                  margin: "0 0 1.25rem",
                 }}
               >
                 Create Organisation
@@ -675,7 +792,7 @@ export default function Admin({ session }: { session: Session }) {
                 style={{
                   display: "grid",
                   gridTemplateColumns: "1fr 1fr auto auto",
-                  gap: 10,
+                  gap: 12,
                   alignItems: "end",
                 }}
               >
@@ -686,8 +803,9 @@ export default function Admin({ session }: { session: Session }) {
                       fontWeight: 700,
                       color: "#AAA",
                       display: "block",
-                      marginBottom: 5,
+                      marginBottom: 6,
                       textTransform: "uppercase",
+                      letterSpacing: "0.06em",
                     }}
                   >
                     Name
@@ -700,17 +818,8 @@ export default function Admin({ session }: { session: Session }) {
                         e.target.value.toLowerCase().replace(/\s+/g, "-"),
                       );
                     }}
-                    placeholder="No Fluff Agency"
-                    style={{
-                      width: "100%",
-                      padding: "9px 12px",
-                      border: "1px solid #EFEFEF",
-                      borderRadius: 8,
-                      fontSize: 13,
-                      color: "#111",
-                      outline: "none",
-                      boxSizing: "border-box",
-                    }}
+                    placeholder="e.g. No Fluff Agency"
+                    style={inputStyle}
                   />
                 </div>
                 <div>
@@ -720,8 +829,9 @@ export default function Admin({ session }: { session: Session }) {
                       fontWeight: 700,
                       color: "#AAA",
                       display: "block",
-                      marginBottom: 5,
+                      marginBottom: 6,
                       textTransform: "uppercase",
+                      letterSpacing: "0.06em",
                     }}
                   >
                     Slug
@@ -730,16 +840,7 @@ export default function Admin({ session }: { session: Session }) {
                     value={newOrgSlug}
                     onChange={(e) => setNewOrgSlug(e.target.value)}
                     placeholder="no-fluff-agency"
-                    style={{
-                      width: "100%",
-                      padding: "9px 12px",
-                      border: "1px solid #EFEFEF",
-                      borderRadius: 8,
-                      fontSize: 13,
-                      color: "#111",
-                      outline: "none",
-                      boxSizing: "border-box",
-                    }}
+                    style={inputStyle}
                   />
                 </div>
                 <div>
@@ -749,8 +850,9 @@ export default function Admin({ session }: { session: Session }) {
                       fontWeight: 700,
                       color: "#AAA",
                       display: "block",
-                      marginBottom: 5,
+                      marginBottom: 6,
                       textTransform: "uppercase",
+                      letterSpacing: "0.06em",
                     }}
                   >
                     Credits
@@ -759,22 +861,14 @@ export default function Admin({ session }: { session: Session }) {
                     type="number"
                     value={newOrgCredits}
                     onChange={(e) => setNewOrgCredits(Number(e.target.value))}
-                    style={{
-                      width: 90,
-                      padding: "9px 12px",
-                      border: "1px solid #EFEFEF",
-                      borderRadius: 8,
-                      fontSize: 13,
-                      color: "#111",
-                      outline: "none",
-                    }}
+                    style={{ ...inputStyle, width: 100 }}
                   />
                 </div>
                 <button
                   onClick={createOrg}
                   disabled={!newOrgName.trim() || creatingOrg}
                   style={{
-                    padding: "9px 20px",
+                    padding: "10px 22px",
                     borderRadius: 8,
                     border: "none",
                     background: newOrgName.trim() ? "#111" : "#F0F0F0",
@@ -783,6 +877,7 @@ export default function Admin({ session }: { session: Session }) {
                     fontWeight: 600,
                     cursor: newOrgName.trim() ? "pointer" : "not-allowed",
                     whiteSpace: "nowrap",
+                    height: 42,
                   }}
                 >
                   {creatingOrg ? "Creating…" : "+ Create"}
@@ -790,7 +885,6 @@ export default function Admin({ session }: { session: Session }) {
               </div>
             </div>
 
-            {/* Orgs list */}
             <div
               style={{
                 background: "#fff",
@@ -804,7 +898,7 @@ export default function Admin({ session }: { session: Session }) {
                   <tr
                     style={{
                       background: "#FAFAFA",
-                      borderBottom: "1px solid #EFEFEF",
+                      borderBottom: "1px solid #F0F0F0",
                     }}
                   >
                     {[
@@ -815,18 +909,7 @@ export default function Admin({ session }: { session: Session }) {
                       "Created",
                       "Actions",
                     ].map((h) => (
-                      <th
-                        key={h}
-                        style={{
-                          padding: "12px 16px",
-                          fontSize: 10,
-                          fontWeight: 700,
-                          color: "#AAA",
-                          textTransform: "uppercase",
-                          textAlign: "left",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
+                      <th key={h} style={thStyle}>
                         {h}
                       </th>
                     ))}
@@ -840,7 +923,7 @@ export default function Admin({ session }: { session: Session }) {
                         style={{
                           padding: "3rem",
                           textAlign: "center",
-                          color: "#888",
+                          color: "#AAA",
                           fontSize: 13,
                         }}
                       >
@@ -851,7 +934,7 @@ export default function Admin({ session }: { session: Session }) {
                     orgs.map((o) => (
                       <tr
                         key={o.id}
-                        style={{ borderBottom: "1px solid #F5F5F5" }}
+                        style={{ borderBottom: "1px solid #F8F8F8" }}
                       >
                         <td
                           style={{
@@ -867,7 +950,7 @@ export default function Admin({ session }: { session: Session }) {
                           style={{
                             padding: "14px 16px",
                             fontSize: 12,
-                            color: "#888",
+                            color: "#999",
                             fontFamily: "monospace",
                           }}
                         >
@@ -888,7 +971,7 @@ export default function Admin({ session }: { session: Session }) {
                           style={{
                             padding: "14px 16px",
                             fontSize: 13,
-                            color: "#555",
+                            color: "#666",
                           }}
                         >
                           {o.member_count || 0}
@@ -897,7 +980,7 @@ export default function Admin({ session }: { session: Session }) {
                           style={{
                             padding: "14px 16px",
                             fontSize: 12,
-                            color: "#888",
+                            color: "#999",
                           }}
                         >
                           {new Date(o.created_at).toLocaleDateString()}
@@ -907,13 +990,13 @@ export default function Admin({ session }: { session: Session }) {
                             onClick={() => deleteOrg(o.id)}
                             style={{
                               fontSize: 11,
-                              padding: "4px 10px",
+                              padding: "5px 12px",
                               borderRadius: 6,
                               border: "1px solid #FECACA",
                               background: RED_BG,
                               cursor: "pointer",
                               color: RED,
-                              fontWeight: 500,
+                              fontWeight: 600,
                             }}
                           >
                             Delete
@@ -928,7 +1011,7 @@ export default function Admin({ session }: { session: Session }) {
           </div>
         )}
 
-        {/* USERS */}
+        {/* ── USERS ── */}
         {activeTab === "users" && (
           <div
             style={{
@@ -943,7 +1026,7 @@ export default function Admin({ session }: { session: Session }) {
                 <tr
                   style={{
                     background: "#FAFAFA",
-                    borderBottom: "1px solid #EFEFEF",
+                    borderBottom: "1px solid #F0F0F0",
                   }}
                 >
                   {[
@@ -955,18 +1038,7 @@ export default function Admin({ session }: { session: Session }) {
                     "Joined",
                     "Actions",
                   ].map((h) => (
-                    <th
-                      key={h}
-                      style={{
-                        padding: "12px 16px",
-                        fontSize: 10,
-                        fontWeight: 700,
-                        color: "#AAA",
-                        textTransform: "uppercase",
-                        textAlign: "left",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
+                    <th key={h} style={thStyle}>
                       {h}
                     </th>
                   ))}
@@ -980,7 +1052,7 @@ export default function Admin({ session }: { session: Session }) {
                       style={{
                         padding: "3rem",
                         textAlign: "center",
-                        color: "#888",
+                        color: "#AAA",
                         fontSize: 13,
                       }}
                     >
@@ -991,7 +1063,7 @@ export default function Admin({ session }: { session: Session }) {
                   users.map((u) => (
                     <tr
                       key={u.id}
-                      style={{ borderBottom: "1px solid #F5F5F5" }}
+                      style={{ borderBottom: "1px solid #F8F8F8" }}
                     >
                       <td
                         style={{
@@ -1007,7 +1079,7 @@ export default function Admin({ session }: { session: Session }) {
                         style={{
                           padding: "14px 16px",
                           fontSize: 12,
-                          color: "#555",
+                          color: "#666",
                         }}
                       >
                         {u.email}
@@ -1016,7 +1088,7 @@ export default function Admin({ session }: { session: Session }) {
                         style={{
                           padding: "14px 16px",
                           fontSize: 12,
-                          color: "#555",
+                          color: "#666",
                         }}
                       >
                         {u.company || "—"}
@@ -1026,15 +1098,15 @@ export default function Admin({ session }: { session: Session }) {
                           value={u.system_role || "user"}
                           onChange={(e) => updateRole(u.id, e.target.value)}
                           style={{
-                            padding: "4px 8px",
+                            padding: "5px 10px",
                             borderRadius: 6,
-                            border: "1px solid #EFEFEF",
+                            border: "1px solid #E5E5E5",
                             fontSize: 11,
                             fontWeight: 700,
                             background:
                               u.system_role === "superadmin"
                                 ? "#F5F3FF"
-                                : "#FAFAFA",
+                                : "#F8F8F8",
                             color:
                               u.system_role === "superadmin" ? ACCENT : "#555",
                             outline: "none",
@@ -1061,11 +1133,13 @@ export default function Admin({ session }: { session: Session }) {
                                 setEditCredits(Number(e.target.value))
                               }
                               style={{
-                                width: 70,
-                                padding: "4px 8px",
+                                width: 75,
+                                padding: "5px 8px",
                                 borderRadius: 6,
-                                border: "1px solid #EFEFEF",
+                                border: "1px solid #E5E5E5",
                                 fontSize: 12,
+                                color: "#111",
+                                background: "#fff",
                                 outline: "none",
                               }}
                             />
@@ -1073,12 +1147,13 @@ export default function Admin({ session }: { session: Session }) {
                               onClick={() => updateCredits(u.id, editCredits)}
                               style={{
                                 fontSize: 11,
-                                padding: "4px 8px",
+                                padding: "5px 10px",
                                 borderRadius: 6,
                                 border: "none",
                                 background: "#111",
                                 color: "#fff",
                                 cursor: "pointer",
+                                fontWeight: 600,
                               }}
                             >
                               Save
@@ -1087,9 +1162,9 @@ export default function Admin({ session }: { session: Session }) {
                               onClick={() => setEditingUser(null)}
                               style={{
                                 fontSize: 11,
-                                padding: "4px 8px",
+                                padding: "5px 8px",
                                 borderRadius: 6,
-                                border: "1px solid #EFEFEF",
+                                border: "1px solid #E5E5E5",
                                 background: "#fff",
                                 cursor: "pointer",
                                 color: "#888",
@@ -1114,7 +1189,7 @@ export default function Admin({ session }: { session: Session }) {
                         style={{
                           padding: "14px 16px",
                           fontSize: 12,
-                          color: "#888",
+                          color: "#999",
                         }}
                       >
                         {new Date(u.created_at).toLocaleDateString()}
@@ -1127,13 +1202,13 @@ export default function Admin({ session }: { session: Session }) {
                           }}
                           style={{
                             fontSize: 11,
-                            padding: "4px 10px",
+                            padding: "5px 12px",
                             borderRadius: 6,
-                            border: "1px solid #EFEFEF",
+                            border: "1px solid #E5E5E5",
                             background: "#fff",
                             cursor: "pointer",
                             color: "#444",
-                            fontWeight: 500,
+                            fontWeight: 600,
                           }}
                         >
                           Edit Credits
@@ -1147,7 +1222,7 @@ export default function Admin({ session }: { session: Session }) {
           </div>
         )}
 
-        {/* ANALYSES */}
+        {/* ── ANALYSES ── */}
         {activeTab === "analyses" && (
           <div
             style={{
@@ -1162,7 +1237,7 @@ export default function Admin({ session }: { session: Session }) {
                 <tr
                   style={{
                     background: "#FAFAFA",
-                    borderBottom: "1px solid #EFEFEF",
+                    borderBottom: "1px solid #F0F0F0",
                   }}
                 >
                   {[
@@ -1175,18 +1250,7 @@ export default function Admin({ session }: { session: Session }) {
                     "Score",
                     "Credits",
                   ].map((h) => (
-                    <th
-                      key={h}
-                      style={{
-                        padding: "12px 16px",
-                        fontSize: 10,
-                        fontWeight: 700,
-                        color: "#AAA",
-                        textTransform: "uppercase",
-                        textAlign: "left",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
+                    <th key={h} style={thStyle}>
                       {h}
                     </th>
                   ))}
@@ -1200,7 +1264,7 @@ export default function Admin({ session }: { session: Session }) {
                       style={{
                         padding: "3rem",
                         textAlign: "center",
-                        color: "#888",
+                        color: "#AAA",
                         fontSize: 13,
                       }}
                     >
@@ -1211,13 +1275,13 @@ export default function Admin({ session }: { session: Session }) {
                   analyses.map((a) => (
                     <tr
                       key={a.id}
-                      style={{ borderBottom: "1px solid #F5F5F5" }}
+                      style={{ borderBottom: "1px solid #F8F8F8" }}
                     >
                       <td
                         style={{
-                          padding: "12px 16px",
+                          padding: "13px 16px",
                           fontSize: 12,
-                          color: "#888",
+                          color: "#999",
                           whiteSpace: "nowrap",
                         }}
                       >
@@ -1225,7 +1289,7 @@ export default function Admin({ session }: { session: Session }) {
                       </td>
                       <td
                         style={{
-                          padding: "12px 16px",
+                          padding: "13px 16px",
                           fontSize: 13,
                           fontWeight: 600,
                           color: "#111",
@@ -1235,72 +1299,68 @@ export default function Admin({ session }: { session: Session }) {
                       </td>
                       <td
                         style={{
-                          padding: "12px 16px",
+                          padding: "13px 16px",
                           fontSize: 12,
-                          color: "#555",
+                          color: "#666",
                         }}
                       >
                         {a.platform || "—"}
                       </td>
                       <td
                         style={{
-                          padding: "12px 16px",
+                          padding: "13px 16px",
                           fontSize: 12,
-                          color: "#555",
+                          color: "#666",
                         }}
                       >
                         {a.industry || "—"}
                       </td>
                       <td
                         style={{
-                          padding: "12px 16px",
+                          padding: "13px 16px",
                           fontSize: 12,
-                          color: "#555",
+                          color: "#666",
                         }}
                       >
                         {a.type || "Single"}
                       </td>
                       <td
                         style={{
-                          padding: "12px 16px",
+                          padding: "13px 16px",
                           fontSize: 12,
-                          color: "#555",
+                          color: "#666",
                         }}
                       >
-                        {a.model?.split("-").slice(-2).join(" ") || "—"}
+                        {modelName(a.model)}
                       </td>
-                      <td style={{ padding: "12px 16px" }}>
-                        <span
+                      <td style={{ padding: "13px 16px" }}>
+                        <div
                           style={{
-                            fontSize: 13,
-                            fontWeight: 700,
-                            color: scoreColor(a.overall_score),
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
                           }}
                         >
-                          {a.overall_score}
-                        </span>
-                        <span
-                          style={{
-                            fontSize: 9,
-                            fontWeight: 700,
-                            padding: "2px 6px",
-                            borderRadius: 20,
-                            background: a.pass ? GREEN_BG : RED_BG,
-                            color: a.pass ? GREEN : RED,
-                            marginLeft: 6,
-                          }}
-                        >
-                          {a.pass ? "PASS" : "FAIL"}
-                        </span>
+                          <span
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 700,
+                              color: scoreColor(a.overall_score),
+                            }}
+                          >
+                            {a.overall_score}
+                          </span>
+                          <Badge pass={a.pass} />
+                        </div>
                       </td>
                       <td
                         style={{
-                          padding: "12px 16px",
+                          padding: "13px 16px",
                           fontSize: 12,
-                          color: "#555",
+                          color: "#666",
                         }}
                       >
-                        {a.credits_used || "—"}
+                        {a.credits_used ?? "—"}
                       </td>
                     </tr>
                   ))
