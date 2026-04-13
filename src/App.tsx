@@ -2690,6 +2690,7 @@ function TeamManager({ session }: { session: any }) {
       <div
         style={{
           display: "flex",
+          flexDirection: "column",
           justifyContent: "center",
           alignItems: "flex-end",
           marginBottom: "2rem",
