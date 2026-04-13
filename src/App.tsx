@@ -2621,13 +2621,22 @@ function ABResults({
 function TeamManager({ session }: { session: any }) {
   const [teams, setTeams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [inviteLink, setInviteLink] = useState("");
 
   // --- NEW STATE FOR ORG CREATION ---
   const [showCreate, setShowCreate] = useState(false);
   const [orgName, setOrgName] = useState("");
   const [teamName, setTeamName] = useState("");
   const [creating, setCreating] = useState(false);
+
+  // --- NEW STATE FOR INVITE MODAL ---
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [activeInviteLink, setActiveInviteLink] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [sendingInvite, setSendingInvite] = useState(false);
+  const [inviteStatus, setInviteStatus] = useState<{
+    type: "success" | "error";
+    msg: string;
+  } | null>(null);
 
   useEffect(() => {
     fetchMyTeams();
@@ -2675,12 +2684,53 @@ function TeamManager({ session }: { session: any }) {
 
     if (data) {
       const link = `${window.location.origin}/?invite=${data.token}`;
-      setInviteLink(link);
-      navigator.clipboard.writeText(link);
-      alert("Multi-use invite link copied to clipboard!");
+      setActiveInviteLink(link);
+      setInviteModalOpen(true);
+      setInviteStatus(null);
+      setInviteEmail("");
     } else {
       alert("Failed to generate invite link.");
     }
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(activeInviteLink);
+    setInviteStatus({ type: "success", msg: "Link copied to clipboard!" });
+  };
+
+  const sendEmailInvite = async () => {
+    if (!inviteEmail.trim() || !inviteEmail.includes("@")) {
+      setInviteStatus({
+        type: "error",
+        msg: "Please enter a valid email address.",
+      });
+      return;
+    }
+    setSendingInvite(true);
+    setInviteStatus(null);
+
+    try {
+      // Trick: Use Supabase Magic Link to send the email, then redirect them to the invite URL!
+      const { error } = await supabase.auth.signInWithOtp({
+        email: inviteEmail.trim(),
+        options: {
+          emailRedirectTo: activeInviteLink,
+        },
+      });
+
+      if (error) throw error;
+      setInviteStatus({
+        type: "success",
+        msg: `Invite sent to ${inviteEmail}!`,
+      });
+      setInviteEmail("");
+    } catch (err: any) {
+      setInviteStatus({
+        type: "error",
+        msg: err.message || "Failed to send invite.",
+      });
+    }
+    setSendingInvite(false);
   };
 
   if (loading) return <p style={{ color: "#888" }}>Loading teams...</p>;
@@ -2690,11 +2740,9 @@ function TeamManager({ session }: { session: any }) {
       <div
         style={{
           display: "flex",
-          flexWrap: "wrap",
-          justifyContent: "center",
+          justifyContent: "space-between",
           alignItems: "flex-end",
           marginBottom: "2rem",
-          textAlign: "center",
         }}
       >
         <div>
@@ -2712,33 +2760,22 @@ function TeamManager({ session }: { session: any }) {
             Manage your teams, invite members, and allocate credits.
           </p>
         </div>
-
         {!showCreate && (
-          <div
+          <button
+            onClick={() => setShowCreate(true)}
             style={{
-              width: "100%",
-              marginTop: 12,
-              display: "flex",
-              justifyContent: "flex-end",
+              padding: "10px 16px",
+              borderRadius: 8,
+              border: "none",
+              background: "#111",
+              color: "#fff",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
             }}
           >
-            {" "}
-            <button
-              onClick={() => setShowCreate(true)}
-              style={{
-                padding: "10px 16px",
-                borderRadius: 8,
-                border: "none",
-                background: "#111",
-                color: "#fff",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              + Create Workspace
-            </button>
-          </div>
+            + Create Workspace
+          </button>
         )}
       </div>
 
@@ -2978,6 +3015,182 @@ function TeamManager({ session }: { session: any }) {
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* --- INVITE MODAL OVERLAY --- */}
+      {inviteModalOpen && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.5)",
+            zIndex: 1000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "1rem",
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 16,
+              padding: "2rem",
+              width: "100%",
+              maxWidth: 440,
+              boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
+              position: "relative",
+            }}
+          >
+            <button
+              onClick={() => setInviteModalOpen(false)}
+              style={{
+                position: "absolute",
+                top: 16,
+                right: 16,
+                background: "none",
+                border: "none",
+                fontSize: 18,
+                cursor: "pointer",
+                color: "#888",
+              }}
+            >
+              ✕
+            </button>
+
+            <h2 style={{ margin: "0 0 8px", fontSize: 20, color: "#111" }}>
+              Invite Team Member
+            </h2>
+            <p style={{ margin: "0 0 20px", fontSize: 13, color: "#666" }}>
+              Share this link or send it directly via email.
+            </p>
+
+            {/* Copy Link Section */}
+            <div style={{ marginBottom: "1.5rem" }}>
+              <label
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "#AAA",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  marginBottom: 6,
+                  display: "block",
+                }}
+              >
+                Invite Link
+              </label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  readOnly
+                  value={activeInviteLink}
+                  style={{
+                    flex: 1,
+                    padding: "10px 12px",
+                    border: "1px solid #EFEFEF",
+                    borderRadius: 8,
+                    fontSize: 13,
+                    background: "#FAFAFA",
+                    color: "#555",
+                    outline: "none",
+                  }}
+                />
+                <button
+                  onClick={copyToClipboard}
+                  style={{
+                    padding: "0 16px",
+                    borderRadius: 8,
+                    border: "none",
+                    background: "#F5F3FF",
+                    color: "#6366F1",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+
+            <div
+              style={{ height: 1, background: "#EFEFEF", margin: "1.5rem 0" }}
+            />
+
+            {/* Email Invite Section */}
+            <div>
+              <label
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "#AAA",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  marginBottom: 6,
+                  display: "block",
+                }}
+              >
+                Send via Email
+              </label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  type="email"
+                  placeholder="colleague@company.com"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  style={{
+                    flex: 1,
+                    padding: "10px 12px",
+                    border: "1px solid #EFEFEF",
+                    borderRadius: 8,
+                    fontSize: 13,
+                    outline: "none",
+                    boxSizing: "border-box",
+                  }}
+                />
+                <button
+                  onClick={sendEmailInvite}
+                  disabled={sendingInvite || !inviteEmail}
+                  style={{
+                    padding: "0 16px",
+                    borderRadius: 8,
+                    border: "none",
+                    background: "#111",
+                    color: "#fff",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor:
+                      sendingInvite || !inviteEmail ? "not-allowed" : "pointer",
+                    opacity: sendingInvite || !inviteEmail ? 0.7 : 1,
+                  }}
+                >
+                  {sendingInvite ? "Sending..." : "Send"}
+                </button>
+              </div>
+            </div>
+
+            {inviteStatus && (
+              <div
+                style={{
+                  marginTop: 16,
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  fontSize: 12,
+                  fontWeight: 500,
+                  background:
+                    inviteStatus.type === "success" ? "#F0FDF4" : "#FEF2F2",
+                  color:
+                    inviteStatus.type === "success" ? "#15803D" : "#B91C1C",
+                }}
+              >
+                {inviteStatus.msg}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
