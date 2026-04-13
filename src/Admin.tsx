@@ -208,15 +208,23 @@ export default function Admin({ session }: { session: Session }) {
 
   // Check superadmin
   useEffect(() => {
-    supabase
-      .from("profiles")
-      .select("system_role")
-      .eq("id", session.user.id)
-      .single()
-      .then(({ data }) => {
-        setIsSuperadmin(data?.system_role === "superadmin");
+    supabase.rpc("get_my_system_role").then(({ data, error }) => {
+      if (error || !data) {
+        // Fallback to direct query
+        supabase
+          .from("profiles")
+          .select("system_role")
+          .eq("id", session.user.id)
+          .single()
+          .then(({ data: profile }) => {
+            setIsSuperadmin(profile?.system_role === "superadmin");
+            setChecking(false);
+          });
+      } else {
+        setIsSuperadmin(data === "superadmin");
         setChecking(false);
-      });
+      }
+    });
   }, [session]);
 
   // Load data once unlocked
