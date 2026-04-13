@@ -4354,11 +4354,19 @@ Be specific. Reference actual elements visible. No generic advice.`;
                     fontWeight: 600,
                     color: "#111",
                     margin: 0,
+                    textAlign: "center",
                   }}
                 >
                   Analyzer Workspace
                 </h1>
-                <p style={{ fontSize: 14, color: "#888", marginTop: 4 }}>
+                <p
+                  style={{
+                    fontSize: 14,
+                    color: "#888",
+                    marginTop: 4,
+                    textAlign: "center",
+                  }}
+                >
                   Pre-flight analysis powered by behavioural science
                 </p>
               </div>
