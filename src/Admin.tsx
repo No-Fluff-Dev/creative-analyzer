@@ -671,6 +671,7 @@ export default function Admin({ session }: { session: Session }) {
                             padding: "13px 16px",
                             fontSize: 12,
                             color: "#999",
+                            textAlign: "center",
                           }}
                         >
                           {new Date(a.created_at).toLocaleDateString()}
@@ -681,6 +682,7 @@ export default function Admin({ session }: { session: Session }) {
                             fontSize: 13,
                             fontWeight: 600,
                             color: "#111",
+                            textAlign: "center",
                           }}
                         >
                           {a.client || "—"}
@@ -690,6 +692,7 @@ export default function Admin({ session }: { session: Session }) {
                             padding: "13px 16px",
                             fontSize: 12,
                             color: "#666",
+                            textAlign: "center",
                           }}
                         >
                           {a.platform || "—"}
@@ -699,6 +702,7 @@ export default function Admin({ session }: { session: Session }) {
                             padding: "13px 16px",
                             fontSize: 12,
                             color: "#666",
+                            textAlign: "center",
                           }}
                         >
                           {a.industry || "—"}
@@ -708,6 +712,7 @@ export default function Admin({ session }: { session: Session }) {
                             padding: "13px 16px",
                             fontSize: 12,
                             color: "#666",
+                            textAlign: "center",
                           }}
                         >
                           {modelName(a.model)}
@@ -724,6 +729,7 @@ export default function Admin({ session }: { session: Session }) {
                               style={{
                                 fontSize: 13,
                                 fontWeight: 700,
+                                textAlign: "center",
                                 color: scoreColor(a.overall_score),
                               }}
                             >
@@ -736,6 +742,7 @@ export default function Admin({ session }: { session: Session }) {
                           style={{
                             padding: "13px 16px",
                             fontSize: 12,
+                            textAlign: "center",
                             color: "#666",
                           }}
                         >
