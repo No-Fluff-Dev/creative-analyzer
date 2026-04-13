@@ -208,10 +208,15 @@ export default function Admin({ session }: { session: Session }) {
 
   // Check superadmin
   useEffect(() => {
-    supabase.rpc("get_my_system_role").then(({ data }) => {
-      setIsSuperadmin(data === "superadmin");
-      setChecking(false);
-    });
+    supabase
+      .from("profiles")
+      .select("system_role")
+      .eq("id", session.user.id)
+      .single()
+      .then(({ data }) => {
+        setIsSuperadmin(data?.system_role === "superadmin");
+        setChecking(false);
+      });
   }, [session]);
 
   // Load data once unlocked
@@ -222,21 +227,9 @@ export default function Admin({ session }: { session: Session }) {
 
   const loadAll = async () => {
     const [profilesRes, orgsRes, analysesRes] = await Promise.all([
-      supabase
-        .from("profiles")
-        .select("*")
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("organisations")
-        .select("*, organisation_members(count)")
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("analyses")
-        .select(
-          "id, user_id, client, platform, industry, model, credits_used, overall_score, pass, created_at",
-        )
-        .order("created_at", { ascending: false })
-        .limit(200),
+      supabase.rpc("admin_get_all_profiles"),
+      supabase.rpc("admin_get_all_orgs"),
+      supabase.rpc("admin_get_all_analyses"),
     ]);
 
     const allUsers = profilesRes.data || [];
@@ -890,7 +883,7 @@ export default function Admin({ session }: { session: Session }) {
                             color: "#555",
                           }}
                         >
-                          {o.organisation_members?.[0]?.count || 0}
+                          {o.member_count || 0}
                         </td>
                         <td
                           style={{
