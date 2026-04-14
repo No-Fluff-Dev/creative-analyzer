@@ -4831,216 +4831,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
                         {viewingHistoryItem.industry || "—"}
                       </span>
                     </div>
-                    {/* Concept field */}
-                    <div>
-                      <label
-                        style={{
-                          fontSize: 10,
-                          fontWeight: 700,
-                          color: "#AAA",
-                          display: "block",
-                          marginBottom: 5,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.06em",
-                        }}
-                      >
-                        Concept / campaign goal
-                      </label>
-                      <textarea
-                        value={concept}
-                        onChange={(e) => setConcept(e.target.value)}
-                        placeholder="e.g. Drive trial of our new protein bar — target gym-goers aged 25-35 who value clean ingredients"
-                        rows={2}
-                        style={{
-                          width: "100%",
-                          padding: "8px 12px",
-                          border: `1px solid ${concept ? "#6366F1" : "#EFEFEF"}`,
-                          borderRadius: 8,
-                          fontSize: 13,
-                          color: "#222",
-                          background: "#FAFAFA",
-                          outline: "none",
-                          resize: "vertical",
-                          fontFamily: "inherit",
-                          boxSizing: "border-box",
-                        }}
-                      />
-                      {concept && (
-                        <div style={{ marginTop: 8 }}>
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              marginBottom: 4,
-                            }}
-                          >
-                            <label
-                              style={{
-                                fontSize: 10,
-                                fontWeight: 700,
-                                color: "#AAA",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.06em",
-                              }}
-                            >
-                              Concept alignment threshold
-                            </label>
-                            <span
-                              style={{
-                                fontSize: 12,
-                                fontWeight: 600,
-                                color: "#6366F1",
-                              }}
-                            >
-                              {conceptThreshold}/100
-                            </span>
-                          </div>
-                          <input
-                            type="range"
-                            min={40}
-                            max={90}
-                            step={5}
-                            value={conceptThreshold}
-                            onChange={(e) =>
-                              setConceptThreshold(Number(e.target.value))
-                            }
-                            style={{ width: "100%", accentColor: "#6366F1" }}
-                          />
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              fontSize: 10,
-                              color: "#CCC",
-                              marginTop: 2,
-                            }}
-                          >
-                            <span>40 — loose</span>
-                            <span>90 — strict</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Reference links */}
-                    <div>
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          marginBottom: 6,
-                        }}
-                      >
-                        <label
-                          style={{
-                            fontSize: 10,
-                            fontWeight: 700,
-                            color: "#AAA",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.06em",
-                          }}
-                        >
-                          Reference creatives (optional)
-                        </label>
-                        {referenceLinks.length < 3 && (
-                          <button
-                            onClick={addReferenceLink}
-                            style={{
-                              fontSize: 11,
-                              padding: "2px 8px",
-                              borderRadius: 6,
-                              border: "1px solid #EFEFEF",
-                              background: "#fff",
-                              color: "#666",
-                              cursor: "pointer",
-                              fontWeight: 600,
-                            }}
-                          >
-                            + Add link
-                          </button>
-                        )}
-                      </div>
-                      <div
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 6,
-                        }}
-                      >
-                        {referenceLinks.map((link, idx) => (
-                          <div key={idx} style={{ display: "flex", gap: 6 }}>
-                            <input
-                              value={link}
-                              onChange={(e) =>
-                                updateReferenceLink(idx, e.target.value)
-                              }
-                              placeholder={`Reference ${idx + 1} — paste any URL`}
-                              style={{
-                                flex: 1,
-                                padding: "8px 12px",
-                                border: `1px solid ${link.trim() ? "#6366F1" : "#EFEFEF"}`,
-                                borderRadius: 8,
-                                fontSize: 13,
-                                color: "#222",
-                                background: "#FAFAFA",
-                                outline: "none",
-                              }}
-                            />
-                            {referenceLinks.length > 1 && (
-                              <button
-                                onClick={() => removeReferenceLink(idx)}
-                                style={{
-                                  width: 32,
-                                  height: 32,
-                                  borderRadius: 8,
-                                  border: "1px solid #EFEFEF",
-                                  background: "#fff",
-                                  color: "#888",
-                                  cursor: "pointer",
-                                  fontSize: 14,
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  flexShrink: 0,
-                                }}
-                              >
-                                ✕
-                              </button>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                      {referenceLinks.some((l) => l.trim()) && (
-                        <p
-                          style={{
-                            fontSize: 10,
-                            color: "#AAA",
-                            margin: "5px 0 0",
-                          }}
-                        >
-                          Links are used as stylistic/tonal reference — AI
-                          benchmarks your creative against these.
-                        </p>
-                      )}
-                    </div>
-                    <div>
-                      <span style={{ fontSize: 11, color: "#888" }}>
-                        Model:
-                      </span>{" "}
-                      <span
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 600,
-                          color: "#111",
-                        }}
-                      >
-                        {MODELS.find((m) => m.id === viewingHistoryItem.model)
-                          ?.name ||
-                          viewingHistoryItem.model ||
-                          "—"}
-                      </span>
-                    </div>
                     <div>
                       <span style={{ fontSize: 11, color: "#888" }}>Date:</span>{" "}
                       <span
@@ -5983,6 +5773,214 @@ Be specific. Reference actual elements visible. No generic advice.`;
                   <span>40 — lenient</span>
                   <span>90 — strict</span>
                 </div>
+              </div>
+              {/* Concept field */}
+              <div>
+                <label
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: "#AAA",
+                    display: "block",
+                    marginBottom: 5,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                  }}
+                >
+                  Concept / campaign goal
+                </label>
+                <textarea
+                  value={concept}
+                  onChange={(e) => setConcept(e.target.value)}
+                  placeholder="e.g. Drive trial of our new protein bar — target gym-goers aged 25-35 who value clean ingredients"
+                  rows={2}
+                  style={{
+                    width: "100%",
+                    padding: "8px 12px",
+                    border: `1px solid ${concept ? "#6366F1" : "#EFEFEF"}`,
+                    borderRadius: 8,
+                    fontSize: 13,
+                    color: "#222",
+                    background: "#FAFAFA",
+                    outline: "none",
+                    resize: "vertical",
+                    fontFamily: "inherit",
+                    boxSizing: "border-box",
+                  }}
+                />
+                {concept && (
+                  <div style={{ marginTop: 8 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        marginBottom: 4,
+                      }}
+                    >
+                      <label
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          color: "#AAA",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                        }}
+                      >
+                        Concept alignment threshold
+                      </label>
+                      <span
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: "#6366F1",
+                        }}
+                      >
+                        {conceptThreshold}/100
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={40}
+                      max={90}
+                      step={5}
+                      value={conceptThreshold}
+                      onChange={(e) =>
+                        setConceptThreshold(Number(e.target.value))
+                      }
+                      style={{ width: "100%", accentColor: "#6366F1" }}
+                    />
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        fontSize: 10,
+                        color: "#CCC",
+                        marginTop: 2,
+                      }}
+                    >
+                      <span>40 — loose</span>
+                      <span>90 — strict</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Reference links */}
+              <div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 6,
+                  }}
+                >
+                  <label
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: "#AAA",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                    }}
+                  >
+                    Reference creatives (optional)
+                  </label>
+                  {referenceLinks.length < 3 && (
+                    <button
+                      onClick={addReferenceLink}
+                      style={{
+                        fontSize: 11,
+                        padding: "2px 8px",
+                        borderRadius: 6,
+                        border: "1px solid #EFEFEF",
+                        background: "#fff",
+                        color: "#666",
+                        cursor: "pointer",
+                        fontWeight: 600,
+                      }}
+                    >
+                      + Add link
+                    </button>
+                  )}
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                  }}
+                >
+                  {referenceLinks.map((link, idx) => (
+                    <div key={idx} style={{ display: "flex", gap: 6 }}>
+                      <input
+                        value={link}
+                        onChange={(e) =>
+                          updateReferenceLink(idx, e.target.value)
+                        }
+                        placeholder={`Reference ${idx + 1} — paste any URL`}
+                        style={{
+                          flex: 1,
+                          padding: "8px 12px",
+                          border: `1px solid ${link.trim() ? "#6366F1" : "#EFEFEF"}`,
+                          borderRadius: 8,
+                          fontSize: 13,
+                          color: "#222",
+                          background: "#FAFAFA",
+                          outline: "none",
+                        }}
+                      />
+                      {referenceLinks.length > 1 && (
+                        <button
+                          onClick={() => removeReferenceLink(idx)}
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 8,
+                            border: "1px solid #EFEFEF",
+                            background: "#fff",
+                            color: "#888",
+                            cursor: "pointer",
+                            fontSize: 14,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                          }}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {referenceLinks.some((l) => l.trim()) && (
+                  <p
+                    style={{
+                      fontSize: 10,
+                      color: "#AAA",
+                      margin: "5px 0 0",
+                    }}
+                  >
+                    Links are used as stylistic/tonal reference — AI benchmarks
+                    your creative against these.
+                  </p>
+                )}
+              </div>
+              <div>
+                <span style={{ fontSize: 11, color: "#888" }}>Model:</span>{" "}
+                <span
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "#111",
+                  }}
+                >
+                  {MODELS.find((m) => m.id === viewingHistoryItem.model)
+                    ?.name ||
+                    viewingHistoryItem.model ||
+                    "—"}
+                </span>
               </div>
             </div>
 
