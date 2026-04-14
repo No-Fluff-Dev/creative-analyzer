@@ -4845,6 +4845,20 @@ Be specific. Reference actual elements visible. No generic advice.`;
                         ).toLocaleDateString()}
                       </span>
                     </div>
+                    <div>
+                      <span style={{ fontSize: 11, color: "#888" }}>Date:</span>{" "}
+                      <span
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: "#111",
+                        }}
+                      >
+                        {new Date(
+                          viewingHistoryItem.concept,
+                        ).toLocaleDateString()}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
