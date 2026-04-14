@@ -5905,11 +5905,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                   )}
                 </div>
                 <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 6,
-                  }}
+                  style={{ display: "flex", flexDirection: "column", gap: 6 }}
                 >
                   {referenceLinks.map((link, idx) => (
                     <div key={idx} style={{ display: "flex", gap: 6 }}>
@@ -5955,32 +5951,11 @@ Be specific. Reference actual elements visible. No generic advice.`;
                   ))}
                 </div>
                 {referenceLinks.some((l) => l.trim()) && (
-                  <p
-                    style={{
-                      fontSize: 10,
-                      color: "#AAA",
-                      margin: "5px 0 0",
-                    }}
-                  >
+                  <p style={{ fontSize: 10, color: "#AAA", margin: "5px 0 0" }}>
                     Links are used as stylistic/tonal reference — AI benchmarks
                     your creative against these.
                   </p>
                 )}
-              </div>
-              <div>
-                <span style={{ fontSize: 11, color: "#888" }}>Model:</span>{" "}
-                <span
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: "#111",
-                  }}
-                >
-                  {MODELS.find((m) => m.id === viewingHistoryItem.model)
-                    ?.name ||
-                    viewingHistoryItem.model ||
-                    "—"}
-                </span>
               </div>
             </div>
 
