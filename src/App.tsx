@@ -3291,9 +3291,13 @@ function TeamManager({ session }: { session: any }) {
                       style={{
                         padding: "4px 8px",
                         borderRadius: 6,
-                        border: "1px solid #EFEFEF",
+                        border: "1px solid #E5E7EB",
                         fontSize: 11,
-                        background: "#000000",
+                        fontWeight: 600,
+                        background: "#fff",
+                        color: "#444",
+                        cursor: "pointer",
+                        outline: "none",
                       }}
                     >
                       <option value="member">Member</option>
