@@ -2718,8 +2718,13 @@ function TeamManager({ session }: { session: any }) {
     setCreating(false);
   };
 
-  const openInviteModal = (teamId: string) => {
+  const [inviteTargetOrgId, setInviteTargetOrgId] = useState<string | null>(
+    null,
+  );
+
+  const openInviteModal = (teamId: string, orgId: string) => {
     setInviteTargetTeam(teamId);
+    setInviteTargetOrgId(orgId);
     setActiveInviteLink("");
     setInviteStatus(null);
     setInviteEmail("");
@@ -2740,7 +2745,9 @@ function TeamManager({ session }: { session: any }) {
       .from("team_invites")
       .insert({
         team_id: inviteTargetTeam,
+        org_id: inviteTargetOrgId, // ← added
         created_by: session.user.id,
+        is_active: true, // ← added
         expires_at: expiresAt,
       })
       .select("token")
@@ -2750,6 +2757,7 @@ function TeamManager({ session }: { session: any }) {
       const link = `${window.location.origin}/?invite=${data.token}`;
       setActiveInviteLink(link);
     } else {
+      console.error("Invite error:", error);
       setInviteStatus({
         type: "error",
         msg: "Failed to generate invite link.",
@@ -3104,7 +3112,7 @@ function TeamManager({ session }: { session: any }) {
                   }}
                 >
                   <button
-                    onClick={() => openInviteModal(t.teams.id)}
+                    onClick={() => openInviteModal(t.teams.id, t.teams.org_id)}
                     style={{
                       flex: 1,
                       background: "#111",

@@ -5,12 +5,15 @@ type AuthMode = "login" | "register" | "forgot";
 
 export default function Auth() {
   const [mode, setMode] = useState<AuthMode>("login");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(
+    new URLSearchParams(window.location.search).get("email") || "",
+  );
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const inviteToken = new URLSearchParams(window.location.search).get("invite");
 
   const reset = () => {
     setError(null);
@@ -35,13 +38,28 @@ export default function Auth() {
     }
     setLoading(true);
     reset();
+
+    // Build the redirect URL — preserve invite token so join happens after confirm
+    const redirectTo = inviteToken
+      ? `${window.location.origin}/?invite=${inviteToken}`
+      : `${window.location.origin}/`;
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName } },
+      options: {
+        data: { full_name: fullName },
+        emailRedirectTo: redirectTo,
+      },
     });
+
     if (error) setError(error.message);
-    else setSuccess("Check your email to confirm your account, then log in.");
+    else
+      setSuccess(
+        inviteToken
+          ? "Check your email to confirm your account. Once confirmed, you'll be automatically added to the team."
+          : "Check your email to confirm your account, then log in.",
+      );
     setLoading(false);
   };
 
