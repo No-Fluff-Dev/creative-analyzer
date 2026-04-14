@@ -4846,7 +4846,9 @@ Be specific. Reference actual elements visible. No generic advice.`;
                       </span>
                     </div>
                     <div>
-                      <span style={{ fontSize: 11, color: "#888" }}>Date:</span>{" "}
+                      <span style={{ fontSize: 11, color: "#888" }}>
+                        Industry:
+                      </span>{" "}
                       <span
                         style={{
                           fontSize: 13,
@@ -4854,9 +4856,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                           color: "#111",
                         }}
                       >
-                        {new Date(
-                          viewingHistoryItem.concept,
-                        ).toLocaleDateString()}
+                        {viewingHistoryItem.concept || "—"}
                       </span>
                     </div>
                   </div>
