@@ -2885,7 +2885,7 @@ function TeamManager({ session }: { session: any }) {
               cursor: "pointer",
             }}
           >
-            + Create Workspace
+            + Create Team
           </button>
         </div>
       )}
