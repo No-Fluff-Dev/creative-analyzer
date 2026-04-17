@@ -6006,8 +6006,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
 
           {/* ── BRANDS VIEW ── */}
           {currentView === "brands" && (
-            <div>
-              <div style={{ marginBottom: "1.75rem" }}>
+            <div style={{ marginBottom: "1.75rem" }}>
               <h1
                 style={{
                   fontSize: 22,
