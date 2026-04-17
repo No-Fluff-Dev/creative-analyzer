@@ -4997,7 +4997,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
           maxWidth: "100%",
         }}
       >
-        <div style={{ maxWidth: 860 }}>
+        <div>
           {/* ── ANALYSER VIEW ── */}
           {currentView === "analyzer" && (
             <div>
@@ -5008,11 +5008,19 @@ Be specific. Reference actual elements visible. No generic advice.`;
                     fontWeight: 600,
                     color: "#111",
                     margin: "0 0 4px",
+                    textAlign: "left",
                   }}
                 >
                   Creative Analyser
                 </h1>
-                <p style={{ fontSize: 13, color: "#999", margin: 0 }}>
+                <p
+                  style={{
+                    fontSize: 13,
+                    color: "#999",
+                    margin: 0,
+                    textAlign: "left",
+                  }}
+                >
                   Pre-flight analysis powered by behavioural science
                 </p>
               </div>
@@ -5783,11 +5791,19 @@ Be specific. Reference actual elements visible. No generic advice.`;
                     fontWeight: 600,
                     color: "#111",
                     margin: "0 0 4px",
+                    textAlign: "left",
                   }}
                 >
                   Analysis history
                 </h1>
-                <p style={{ fontSize: 13, color: "#999", margin: 0 }}>
+                <p
+                  style={{
+                    fontSize: 13,
+                    color: "#999",
+                    margin: 0,
+                    textAlign: "left",
+                  }}
+                >
                   {analysesHistory.length} report
                   {analysesHistory.length !== 1 ? "s" : ""} saved
                 </p>
@@ -5991,21 +6007,27 @@ Be specific. Reference actual elements visible. No generic advice.`;
           {/* ── BRANDS VIEW ── */}
           {currentView === "brands" && (
             <div>
-              <div style={{ marginBottom: "1.75rem" }}>
-                <h1
-                  style={{
-                    fontSize: 22,
-                    fontWeight: 600,
-                    color: "#111",
-                    margin: "0 0 4px",
-                  }}
-                >
-                  Brand guidelines
-                </h1>
-                <p style={{ fontSize: 13, color: "#999", margin: 0 }}>
-                  Manage your brand assets and guidelines for analysis.
-                </p>
-              </div>
+              <h1
+                style={{
+                  fontSize: 22,
+                  fontWeight: 600,
+                  color: "#111",
+                  margin: "0 0 4px",
+                  textAlign: "left",
+                }}
+              >
+                Brand guidelines
+              </h1>
+              <p
+                style={{
+                  fontSize: 13,
+                  color: "#999",
+                  margin: 0,
+                  textAlign: "left",
+                }}
+              >
+                Manage your brand assets and guidelines for analysis.
+              </p>
               <BrandManager
                 userId={session.user.id}
                 teamId={activeTeam?.id}
@@ -6036,11 +6058,19 @@ Be specific. Reference actual elements visible. No generic advice.`;
                     fontWeight: 600,
                     color: "#111",
                     margin: "0 0 4px",
+                    textAlign: "left",
                   }}
                 >
                   Profile
                 </h1>
-                <p style={{ fontSize: 13, color: "#999", margin: 0 }}>
+                <p
+                  style={{
+                    fontSize: 13,
+                    color: "#999",
+                    margin: 0,
+                    textAlign: "left",
+                  }}
+                >
                   Manage your account settings.
                 </p>
               </div>
