@@ -352,11 +352,40 @@ function FilePreviewModal({
   file: BrandFile;
   onClose: () => void;
 }) {
+  const [objectUrl, setObjectUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
   const isImage = file.type?.startsWith("image/");
   const isPdf = file.type === "application/pdf";
   const isDoc =
     file.type ===
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+  useEffect(() => {
+    // If we already have a dataUrl (images loaded inline), use it directly
+    if (file.dataUrl) {
+      setObjectUrl(file.dataUrl);
+      return;
+    }
+    // Otherwise fetch from Supabase storage (PDFs, docx stored by path)
+    if (!file.storagePath) return;
+    setLoading(true);
+    supabase.storage
+      .from("brand-assets")
+      .download(file.storagePath)
+      .then(({ data, error }) => {
+        if (data && !error) {
+          const url = URL.createObjectURL(data);
+          setObjectUrl(url);
+        }
+        setLoading(false);
+      });
+    // Revoke object URL on unmount to avoid memory leaks
+    return () => {
+      if (objectUrl && !objectUrl.startsWith("data:"))
+        URL.revokeObjectURL(objectUrl);
+    };
+  }, [file]);
 
   return (
     <div
@@ -378,8 +407,8 @@ function FilePreviewModal({
           background: "#fff",
           borderRadius: 16,
           width: "100%",
-          maxWidth: 720,
-          maxHeight: "85vh",
+          maxWidth: 780,
+          maxHeight: "88vh",
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
@@ -457,10 +486,47 @@ function FilePreviewModal({
         </div>
 
         {/* Body */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "1.25rem" }}>
-          {isImage && file.dataUrl ? (
+        <div
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            padding: isImage ? "1.25rem" : 0,
+            minHeight: 0,
+          }}
+        >
+          {loading ? (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "4rem 1rem",
+              }}
+            >
+              <svg
+                width="28"
+                height="28"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#6366F1"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                style={{
+                  animation: "spin 1s linear infinite",
+                  marginBottom: 14,
+                }}
+              >
+                <style>{`@keyframes spin{100%{transform:rotate(360deg)}}`}</style>
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+              </svg>
+              <p style={{ fontSize: 13, color: "#888", margin: 0 }}>
+                Loading preview…
+              </p>
+            </div>
+          ) : isImage && objectUrl ? (
             <img
-              src={file.dataUrl}
+              src={objectUrl}
               alt={file.name}
               style={{
                 width: "100%",
@@ -469,14 +535,14 @@ function FilePreviewModal({
                 display: "block",
               }}
             />
-          ) : isPdf && file.dataUrl ? (
+          ) : isPdf && objectUrl ? (
             <iframe
-              src={file.dataUrl}
+              src={objectUrl}
               style={{
                 width: "100%",
-                height: 520,
+                height: "600px",
                 border: "none",
-                borderRadius: 10,
+                display: "block",
               }}
               title={file.name}
             />
@@ -487,6 +553,7 @@ function FilePreviewModal({
                 border: "1px solid #EFEFEF",
                 borderRadius: 10,
                 padding: "1.25rem",
+                margin: "1.25rem",
               }}
             >
               <p
@@ -528,7 +595,8 @@ function FilePreviewModal({
                 Preview not available
               </p>
               <p style={{ fontSize: 13, color: "#AAA", margin: 0 }}>
-                This file type can't be previewed directly.
+                This file could not be loaded. It may have been moved or
+                deleted.
               </p>
             </div>
           )}
