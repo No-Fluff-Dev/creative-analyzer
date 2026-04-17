@@ -4997,7 +4997,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
           maxWidth: "100%",
         }}
       >
-        <div style={{ maxWidth: 860, margin: "0 auto" }}>
+        <div style={{ maxWidth: 860 }}>
           {/* ── ANALYSER VIEW ── */}
           {currentView === "analyzer" && (
             <div>
