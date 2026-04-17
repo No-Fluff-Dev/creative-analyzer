@@ -3178,7 +3178,7 @@ function TeamManager({ session }: { session: any }) {
                       color: "#111",
                       margin: "0 0 2px",
                       whiteSpace: "nowrap",
-                      overflow: "hidden",
+                      overflow: "visible",
                       textOverflow: "ellipsis",
                     }}
                   >
