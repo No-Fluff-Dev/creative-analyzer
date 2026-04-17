@@ -167,17 +167,13 @@ async function extractDocxText(file: File): Promise<string> {
     return "";
   }
 }
-
 async function loadBrandsFromSupabase(
   userId: string,
   teamId?: string,
 ): Promise<BrandMap> {
   let query = supabase.from("brands").select("*, brand_files(*)");
-  if (teamId) {
-    query = query.eq("team_id", teamId);
-  } else {
-    query = query.eq("user_id", userId).is("team_id", null);
-  }
+  if (teamId) query = query.eq("team_id", teamId);
+  else query = query.eq("user_id", userId).is("team_id", null);
   const { data: brands, error } = await query.order("created_at", {
     ascending: true,
   });
@@ -191,13 +187,12 @@ async function loadBrandsFromSupabase(
           const { data } = await supabase.storage
             .from("brand-assets")
             .download(f.storage_path);
-          if (data) {
+          if (data)
             dataUrl = await new Promise((res) => {
               const reader = new FileReader();
               reader.onload = () => res(reader.result as string);
               reader.readAsDataURL(data);
             });
-          }
         }
         return {
           id: f.id,
@@ -219,6 +214,7 @@ async function loadBrandsFromSupabase(
   return brandMap;
 }
 
+// ─── RADIAL SCORE ────────────────────────────────────────────
 function RadialScore({
   score,
   size = 72,
@@ -269,6 +265,7 @@ function RadialScore({
   );
 }
 
+// ─── HEATMAP CANVAS ──────────────────────────────────────────
 function HeatmapCanvas({ dataUrl, zones }: { dataUrl: string; zones: Zone[] }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
@@ -348,6 +345,7 @@ function HeatmapCanvas({ dataUrl, zones }: { dataUrl: string; zones: Zone[] }) {
   );
 }
 
+// ─── BRAND MANAGER ───────────────────────────────────────────
 function BrandManager({
   onSelect,
   selectedBrand,
@@ -373,14 +371,12 @@ function BrandManager({
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-
   useEffect(() => {
     loadBrandsFromSupabase(userId, teamId).then((b) => {
       setBrands(b);
       onUpdated(b);
     });
   }, [userId, teamId]);
-
   const handleFileUpload = async (f: File) => {
     setUploading(true);
     try {
@@ -403,7 +399,6 @@ function BrandManager({
     } catch {}
     setUploading(false);
   };
-
   const commit = async () => {
     if (!name.trim() || saving) return;
     setSaving(true);
@@ -456,9 +451,7 @@ function BrandManager({
             .select()
             .single();
           savedFiles.push({ ...f, id: fileRecord.id, storagePath });
-        } else {
-          savedFiles.push(f);
-        }
+        } else savedFiles.push(f);
       }
       const updated = await loadBrandsFromSupabase(userId, teamId);
       setBrands(updated);
@@ -474,7 +467,6 @@ function BrandManager({
     }
     setSaving(false);
   };
-
   const del = async (n: string) => {
     const brand = brands[n];
     if (!brand?.id) return;
@@ -489,14 +481,12 @@ function BrandManager({
     onUpdated(updated);
     if (selectedBrand === n) onSelect("", "", []);
   };
-
   const edit = (n: string) => {
     setEditing(n);
     setName(n);
     setNotes(brands[n].notes);
     setFiles(brands[n].files || []);
   };
-
   const removeFile = async (idx: number) => {
     const f = files[idx];
     if (f.id) {
@@ -506,10 +496,8 @@ function BrandManager({
     }
     setFiles((prev) => prev.filter((_, i) => i !== idx));
   };
-
   const fileIcon = (type: string) =>
     type.startsWith("image/") ? "🖼️" : type === "application/pdf" ? "📄" : "📝";
-
   const content = (
     <div
       style={{
@@ -863,7 +851,6 @@ function BrandManager({
       </div>
     </div>
   );
-
   if (!isModal) return content;
   return (
     <div
@@ -883,6 +870,7 @@ function BrandManager({
   );
 }
 
+// ─── UPLOAD ZONE ─────────────────────────────────────────────
 function UploadZone({
   onFile,
   label,
@@ -983,6 +971,7 @@ function UploadZone({
   );
 }
 
+// ─── CREATIVE PREVIEW ────────────────────────────────────────
 function CreativePreview({
   creative,
   onRemove,
@@ -1083,6 +1072,7 @@ function CreativePreview({
   );
 }
 
+// ─── MODEL SELECTOR ──────────────────────────────────────────
 function ModelSelector({
   value,
   onChange,
@@ -1101,10 +1091,10 @@ function ModelSelector({
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
-  const creditColor = (credits: number) => {
-    if (credits <= 1) return { bg: "#F0FDF4", text: "#15803D" };
-    if (credits <= 3) return { bg: "#FFFBEB", text: "#B45309" };
-    if (credits <= 4) return { bg: "#EEF2FF", text: "#4338CA" };
+  const creditColor = (c: number) => {
+    if (c <= 1) return { bg: "#F0FDF4", text: "#15803D" };
+    if (c <= 3) return { bg: "#FFFBEB", text: "#B45309" };
+    if (c <= 4) return { bg: "#EEF2FF", text: "#4338CA" };
     return { bg: "#FEF2F2", text: "#B91C1C" };
   };
   return (
@@ -1319,7 +1309,7 @@ function AnalysisLoader({ label }: { label: string }) {
         strokeLinejoin="round"
         style={{ animation: "spin 1s linear infinite", marginBottom: 16 }}
       >
-        <style>{`@keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
+        <style>{`@keyframes spin{100%{transform:rotate(360deg)}}`}</style>
         <path d="M21 12a9 9 0 1 1-6.219-8.56" />
       </svg>
       <p
@@ -1348,6 +1338,7 @@ function AnalysisLoader({ label }: { label: string }) {
   );
 }
 
+// ─── SINGLE RESULT ───────────────────────────────────────────
 function SingleResult({
   creative,
   result,
@@ -2046,6 +2037,7 @@ function SingleResult({
   );
 }
 
+// ─── AB RESULTS ──────────────────────────────────────────────
 function ABResults({
   analysedCreatives,
   winner,
@@ -2527,7 +2519,7 @@ function ABResults({
                                 {diff}
                               </span>
                             );
-                          })}
+                          })}{" "}
                           <span
                             style={{
                               fontSize: 11,
@@ -2572,7 +2564,7 @@ function ABResults({
                       </p>
                     </div>
                   );
-                })}
+                })}{" "}
               </div>
             );
           })()}
@@ -2598,17 +2590,31 @@ function ABResults({
   );
 }
 
+// ─── TEAM MANAGER (full page, Chatling-style) ─────────────────
 function TeamManager({ session }: { session: any }) {
   const [teams, setTeams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
+  const [teamSection, setTeamSection] = useState<
+    "members" | "credits" | "invite"
+  >("members");
+
+  // Create form
   const [showCreate, setShowCreate] = useState(false);
   const [orgName, setOrgName] = useState("");
   const [teamName, setTeamName] = useState("");
   const [creating, setCreating] = useState(false);
-  const [inviteTargetTeam, setInviteTargetTeam] = useState<string | null>(null);
-  const [inviteTargetOrgId, setInviteTargetOrgId] = useState<string | null>(
-    null,
-  );
+
+  // Members
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const [memberSearch, setMemberSearch] = useState("");
+  const [loadingMembers, setLoadingMembers] = useState(false);
+
+  // Credits
+  const [allocAmount, setAllocAmount] = useState("");
+  const [allocating, setAllocating] = useState(false);
+
+  // Invite
   const [inviteExpiration, setInviteExpiration] = useState<
     "never" | "24h" | "7d"
   >("never");
@@ -2619,10 +2625,6 @@ function TeamManager({ session }: { session: any }) {
     type: "success" | "error";
     msg: string;
   } | null>(null);
-  const [manageTeam, setManageTeam] = useState<any | null>(null);
-  const [teamMembers, setTeamMembers] = useState<any[]>([]);
-  const [allocAmount, setAllocAmount] = useState("");
-  const [allocating, setAllocating] = useState(false);
 
   useEffect(() => {
     fetchMyTeams();
@@ -2641,10 +2643,40 @@ function TeamManager({ session }: { session: any }) {
         .from("team_members")
         .select("role, joined_at, teams(*)")
         .eq("user_id", session.user.id);
-      if (fallback.error) alert("Could not load your teams.");
-      else if (fallback.data) setTeams(fallback.data);
-    } else if (data) setTeams(data);
+      if (!fallback.error && fallback.data) {
+        setTeams(fallback.data);
+        if (!activeTeamId && fallback.data.length > 0)
+          setActiveTeamId((fallback.data[0].teams as any).id);
+      }
+    } else if (data) {
+      setTeams(data);
+      if (!activeTeamId && data.length > 0)
+        setActiveTeamId((data[0].teams as any).id);
+    }
     setLoading(false);
+  };
+
+  const activeTeamData = teams.find(
+    (t) => (t.teams as any).id === activeTeamId,
+  );
+
+  useEffect(() => {
+    if (!activeTeamId) return;
+    loadMembers(activeTeamId);
+    setActiveInviteLink("");
+    setInviteStatus(null);
+    setInviteEmail("");
+    setAllocAmount("");
+  }, [activeTeamId]);
+
+  const loadMembers = async (teamId: string) => {
+    setLoadingMembers(true);
+    const { data } = await supabase
+      .from("team_members")
+      .select(`id, role, user_id, profiles!left(full_name, email)`)
+      .eq("team_id", teamId);
+    if (data) setTeamMembers(data);
+    setLoadingMembers(false);
   };
 
   const handleCreate = async () => {
@@ -2660,22 +2692,52 @@ function TeamManager({ session }: { session: any }) {
       setOrgName("");
       setTeamName("");
       setShowCreate(false);
-      fetchMyTeams();
+      await fetchMyTeams();
     }
     setCreating(false);
   };
 
-  const openInviteModal = (teamId: string, orgId: string) => {
-    setInviteTargetTeam(teamId);
-    setInviteTargetOrgId(orgId);
-    setActiveInviteLink("");
-    setInviteStatus(null);
-    setInviteEmail("");
-    setInviteExpiration("never");
+  const updateMemberRole = async (memberId: string, newRole: string) => {
+    await supabase
+      .from("team_members")
+      .update({ role: newRole })
+      .eq("id", memberId);
+    setTeamMembers((prev) =>
+      prev.map((m) => (m.id === memberId ? { ...m, role: newRole } : m)),
+    );
+  };
+
+  const removeMember = async (memberId: string, userId: string) => {
+    if (userId === session.user.id) {
+      alert("You cannot remove yourself from the team.");
+      return;
+    }
+    if (!window.confirm("Remove this member from the team?")) return;
+    await supabase.from("team_members").delete().eq("id", memberId);
+    setTeamMembers((prev) => prev.filter((m) => m.id !== memberId));
+  };
+
+  const handleAllocateCredits = async () => {
+    const amt = parseInt(allocAmount);
+    if (!amt || amt <= 0 || !activeTeamData) return;
+    setAllocating(true);
+    const { data, error } = await supabase.rpc("allocate_credits_to_team", {
+      p_org_id: activeTeamData.teams.org_id,
+      p_team_id: activeTeamData.teams.id,
+      p_amount: amt,
+    });
+    if (error || !data?.success)
+      alert(error?.message || data?.error || "Allocation failed");
+    else {
+      alert(`Successfully allocated ${amt} credits!`);
+      setAllocAmount("");
+      fetchMyTeams();
+    }
+    setAllocating(false);
   };
 
   const generateInvite = async () => {
-    if (!inviteTargetTeam) return;
+    if (!activeTeamData) return;
     let expiresAt: string | null = null;
     if (inviteExpiration === "24h")
       expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
@@ -2684,8 +2746,8 @@ function TeamManager({ session }: { session: any }) {
     const { data, error } = await supabase
       .from("team_invites")
       .insert({
-        team_id: inviteTargetTeam,
-        org_id: inviteTargetOrgId,
+        team_id: activeTeamData.teams.id,
+        org_id: activeTeamData.teams.org_id,
         created_by: session.user.id,
         is_active: true,
         expires_at: expiresAt,
@@ -2703,17 +2765,14 @@ function TeamManager({ session }: { session: any }) {
     }
   };
 
-  const copyToClipboard = () => {
+  const copyLink = () => {
     navigator.clipboard.writeText(activeInviteLink);
-    setInviteStatus({ type: "success", msg: "Link copied to clipboard!" });
+    setInviteStatus({ type: "success", msg: "Link copied!" });
   };
 
   const sendEmailInvite = async () => {
     if (!inviteEmail.trim() || !inviteEmail.includes("@")) {
-      setInviteStatus({
-        type: "error",
-        msg: "Please enter a valid email address.",
-      });
+      setInviteStatus({ type: "error", msg: "Enter a valid email." });
       return;
     }
     setSendingInvite(true);
@@ -2738,89 +2797,99 @@ function TeamManager({ session }: { session: any }) {
     setSendingInvite(false);
   };
 
-  const openManageModal = async (teamData: any) => {
-    setManageTeam(teamData);
-    const { data } = await supabase
-      .from("team_members")
-      .select(`id, role, user_id, profiles!left(full_name, email)`)
-      .eq("team_id", teamData.teams.id);
-    if (data) setTeamMembers(data);
-  };
-
-  const updateMemberRole = async (memberId: string, newRole: string) => {
-    await supabase
-      .from("team_members")
-      .update({ role: newRole })
-      .eq("id", memberId);
-    setTeamMembers((prev) =>
-      prev.map((m) => (m.id === memberId ? { ...m, role: newRole } : m)),
+  const isAdmin = activeTeamData?.role === "admin";
+  const filteredMembers = teamMembers.filter((m) => {
+    if (!memberSearch.trim()) return true;
+    const q = memberSearch.toLowerCase();
+    return (
+      (m.profiles?.full_name || "").toLowerCase().includes(q) ||
+      (m.profiles?.email || "").toLowerCase().includes(q)
     );
-  };
+  });
 
-  const handleAllocateCredits = async () => {
-    const amt = parseInt(allocAmount);
-    if (!amt || amt <= 0 || !manageTeam) return;
-    setAllocating(true);
-    const { data, error } = await supabase.rpc("allocate_credits_to_team", {
-      p_org_id: manageTeam.teams.org_id,
-      p_team_id: manageTeam.teams.id,
-      p_amount: amt,
-    });
-    if (error || !data?.success)
-      alert(error?.message || data?.error || "Allocation failed");
-    else {
-      alert(`Successfully allocated ${amt} credits to team!`);
-      setAllocAmount("");
-      fetchMyTeams();
-      setManageTeam(null);
-    }
-    setAllocating(false);
-  };
+  const navBtn = (
+    section: typeof teamSection,
+    label: string,
+    icon: React.ReactNode,
+  ) => (
+    <button
+      onClick={() => setTeamSection(section)}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        width: "100%",
+        padding: "9px 12px",
+        borderRadius: 8,
+        border: "none",
+        background: teamSection === section ? "#F5F3FF" : "transparent",
+        color: teamSection === section ? "#6366F1" : "#555",
+        fontSize: 13,
+        fontWeight: teamSection === section ? 600 : 500,
+        cursor: "pointer",
+        textAlign: "left",
+      }}
+    >
+      {icon} {label}
+    </button>
+  );
 
-  if (loading) return <p style={{ color: "#888" }}>Loading teams...</p>;
+  if (loading)
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          height: 300,
+        }}
+      >
+        <p style={{ color: "#888" }}>Loading teams...</p>
+      </div>
+    );
 
   return (
-    <div style={{ maxWidth: 800, margin: "0 auto" }}>
-      <div style={{ textAlign: "center", marginBottom: "2rem" }}>
-        <h1
-          style={{
-            fontSize: 24,
-            fontWeight: 600,
-            color: "#111",
-            margin: "0 0 6px",
-          }}
-        >
-          Teams & Credits
-        </h1>
-        <p style={{ fontSize: 14, color: "#888", margin: 0 }}>
-          Manage your teams, invite members, and allocate credits.
-        </p>
-      </div>
-      {!showCreate && (
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "flex-end",
-            marginBottom: "1rem",
-          }}
-        >
-          <button
-            onClick={() => setShowCreate(true)}
+    <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          marginBottom: "2rem",
+        }}
+      >
+        <div>
+          <h1
             style={{
-              padding: "10px 16px",
-              borderRadius: 8,
-              border: "none",
-              background: "#111",
-              color: "#fff",
-              fontSize: 13,
+              fontSize: 24,
               fontWeight: 600,
-              cursor: "pointer",
+              color: "#111",
+              margin: "0 0 4px",
             }}
           >
-            + Create Team
-          </button>
+            Teams & Credits
+          </h1>
+          <p style={{ fontSize: 14, color: "#888", margin: 0 }}>
+            Manage your teams, members, and credit allocation.
+          </p>
         </div>
-      )}
+        <button
+          onClick={() => setShowCreate(!showCreate)}
+          style={{
+            padding: "10px 16px",
+            borderRadius: 8,
+            border: "none",
+            background: "#111",
+            color: "#fff",
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
+        >
+          + New Team
+        </button>
+      </div>
+
       {showCreate && (
         <div
           style={{
@@ -2828,13 +2897,20 @@ function TeamManager({ session }: { session: any }) {
             border: "1px solid #EFEFEF",
             borderRadius: 14,
             padding: "1.5rem",
-            marginBottom: "2rem",
+            marginBottom: "1.5rem",
           }}
         >
-          <h3 style={{ margin: "0 0 16px", fontSize: 16 }}>
-            Create New Organization & Team
+          <h3
+            style={{
+              margin: "0 0 16px",
+              fontSize: 15,
+              fontWeight: 600,
+              color: "#111",
+            }}
+          >
+            Create Organization & Team
           </h3>
-          <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
+          <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
             <div style={{ flex: 1 }}>
               <label
                 style={{
@@ -2847,7 +2923,7 @@ function TeamManager({ session }: { session: any }) {
                   letterSpacing: "0.06em",
                 }}
               >
-                Organization Name
+                Organization
               </label>
               <input
                 value={orgName}
@@ -2876,7 +2952,7 @@ function TeamManager({ session }: { session: any }) {
                   letterSpacing: "0.06em",
                 }}
               >
-                First Team Name
+                Team Name
               </label>
               <input
                 value={teamName}
@@ -2899,8 +2975,7 @@ function TeamManager({ session }: { session: any }) {
               onClick={handleCreate}
               disabled={creating || !orgName.trim() || !teamName.trim()}
               style={{
-                flex: 1,
-                padding: "10px",
+                padding: "10px 20px",
                 borderRadius: 8,
                 border: "none",
                 background: "#6366F1",
@@ -2915,13 +2990,12 @@ function TeamManager({ session }: { session: any }) {
                   creating || !orgName.trim() || !teamName.trim() ? 0.7 : 1,
               }}
             >
-              {creating ? "Creating..." : "Create Workspace"}
+              {creating ? "Creating..." : "Create"}
             </button>
             <button
               onClick={() => setShowCreate(false)}
               style={{
-                flex: 1,
-                padding: "10px",
+                padding: "10px 20px",
                 borderRadius: 8,
                 border: "1px solid #EFEFEF",
                 background: "#fff",
@@ -2936,23 +3010,60 @@ function TeamManager({ session }: { session: any }) {
           </div>
         </div>
       )}
+
       {teams.length === 0 && !showCreate ? (
         <div
           style={{
-            padding: "3rem",
+            padding: "4rem",
             background: "#fff",
             borderRadius: 14,
             textAlign: "center",
             border: "1px solid #EFEFEF",
           }}
         >
-          <p style={{ color: "#888", fontSize: 14, marginBottom: 16 }}>
-            You are not part of any teams yet.
+          <div
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: 12,
+              background: "#F5F3FF",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              margin: "0 auto 16px",
+            }}
+          >
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#6366F1"
+              strokeWidth="2"
+            >
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+          </div>
+          <p
+            style={{
+              fontWeight: 600,
+              fontSize: 16,
+              color: "#111",
+              margin: "0 0 6px",
+            }}
+          >
+            No teams yet
+          </p>
+          <p style={{ color: "#888", fontSize: 14, marginBottom: 20 }}>
+            Create your first team to collaborate with others.
           </p>
           <button
             onClick={() => setShowCreate(true)}
             style={{
-              padding: "10px 16px",
+              padding: "10px 20px",
               borderRadius: 8,
               border: "none",
               background: "#6366F1",
@@ -2962,50 +3073,125 @@ function TeamManager({ session }: { session: any }) {
               cursor: "pointer",
             }}
           >
-            Create Your First Workspace
+            Create First Team
           </button>
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {teams.map((t, i) => (
-            <div
-              key={i}
+        <div
+          style={{
+            display: "flex",
+            gap: 0,
+            background: "#fff",
+            border: "1px solid #EFEFEF",
+            borderRadius: 14,
+            overflow: "hidden",
+            minHeight: 520,
+          }}
+        >
+          {/* ── LEFT SIDEBAR — Team list ── */}
+          <div
+            style={{
+              width: 220,
+              borderRight: "1px solid #EFEFEF",
+              padding: "1rem 0.75rem",
+              display: "flex",
+              flexDirection: "column",
+              gap: 2,
+              flexShrink: 0,
+            }}
+          >
+            <p
               style={{
-                background: "#fff",
-                border: "1px solid #EFEFEF",
-                borderRadius: 14,
-                padding: "1.5rem",
+                fontSize: 10,
+                fontWeight: 700,
+                color: "#AAA",
+                textTransform: "uppercase",
+                letterSpacing: "0.07em",
+                padding: "0 8px",
+                marginBottom: 8,
               }}
             >
+              Your Teams
+            </p>
+            {teams.map((t, i) => {
+              const team = t.teams as any;
+              const isActive = team.id === activeTeamId;
+              return (
+                <button
+                  key={i}
+                  onClick={() => setActiveTeamId(team.id)}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "flex-start",
+                    width: "100%",
+                    padding: "10px 12px",
+                    borderRadius: 8,
+                    border: "none",
+                    background: isActive ? "#F5F3FF" : "transparent",
+                    cursor: "pointer",
+                    textAlign: "left",
+                    gap: 2,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 13,
+                      fontWeight: isActive ? 600 : 500,
+                      color: isActive ? "#6366F1" : "#222",
+                    }}
+                  >
+                    {team.name}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 10,
+                      color: isActive ? "#6366F1" : "#AAA",
+                    }}
+                  >
+                    {team.organisations?.name}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* ── RIGHT CONTENT ── */}
+          {activeTeamData ? (
+            <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+              {/* Team header */}
               <div
                 style={{
+                  padding: "1.25rem 1.5rem",
+                  borderBottom: "1px solid #EFEFEF",
                   display: "flex",
+                  alignItems: "center",
                   justifyContent: "space-between",
-                  alignItems: "flex-start",
-                  marginBottom: 16,
                 }}
               >
                 <div>
-                  <h3 style={{ margin: 0, fontSize: 16, color: "#111" }}>
-                    {t.teams.name}
-                  </h3>
-                  <p style={{ fontSize: 12, color: "#888", margin: "2px 0 0" }}>
-                    Org: {t.teams.organisations?.name}
-                  </p>
-                  <span
+                  <h2
                     style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: t.role === "admin" ? "#6366F1" : "#888",
-                      background: t.role === "admin" ? "#F5F3FF" : "#F4F4F5",
-                      padding: "2px 8px",
-                      borderRadius: 20,
-                      display: "inline-block",
-                      marginTop: 8,
+                      fontSize: 17,
+                      fontWeight: 600,
+                      color: "#111",
+                      margin: "0 0 2px",
                     }}
                   >
-                    {t.role.toUpperCase()}
-                  </span>
+                    {(activeTeamData.teams as any).name}
+                  </h2>
+                  <p style={{ fontSize: 12, color: "#888", margin: 0 }}>
+                    {(activeTeamData.teams as any).organisations?.name} ·{" "}
+                    <span
+                      style={{
+                        color:
+                          activeTeamData.role === "admin" ? "#6366F1" : "#888",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {activeTeamData.role.toUpperCase()}
+                    </span>
+                  </p>
                 </div>
                 <div style={{ textAlign: "right" }}>
                   <p
@@ -3014,455 +3200,749 @@ function TeamManager({ session }: { session: any }) {
                       fontWeight: 700,
                       color: "#AAA",
                       textTransform: "uppercase",
-                      margin: "0 0 4px",
+                      margin: "0 0 2px",
                     }}
                   >
                     Team Credits
                   </p>
                   <p
                     style={{
-                      fontSize: 20,
+                      fontSize: 22,
                       fontWeight: 700,
-                      margin: 0,
                       color: "#111",
+                      margin: 0,
                     }}
                   >
-                    {t.teams.credits_pool}
+                    {(activeTeamData.teams as any).credits_pool}
                   </p>
                 </div>
               </div>
-              {t.role === "admin" && (
-                <div
-                  style={{
-                    borderTop: "1px solid #F5F5F5",
-                    paddingTop: 16,
-                    marginTop: 16,
-                    display: "flex",
-                    gap: 8,
-                  }}
-                >
-                  <button
-                    onClick={() => openInviteModal(t.teams.id, t.teams.org_id)}
-                    style={{
-                      flex: 1,
-                      background: "#111",
-                      color: "#fff",
-                      border: "none",
-                      padding: "8px 14px",
-                      borderRadius: 8,
-                      fontSize: 12,
-                      fontWeight: 600,
-                      cursor: "pointer",
-                    }}
-                  >
-                    Invite Member
-                  </button>
-                  <button
-                    onClick={() => openManageModal(t)}
-                    style={{
-                      flex: 1,
-                      background: "#fff",
-                      color: "#444",
-                      border: "1px solid #EFEFEF",
-                      padding: "8px 14px",
-                      borderRadius: 8,
-                      fontSize: 12,
-                      fontWeight: 600,
-                      cursor: "pointer",
-                    }}
-                  >
-                    Manage Team & Credits
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
 
-      {manageTeam && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: "rgba(0,0,0,0.5)",
-            zIndex: 1000,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "1rem",
-          }}
-        >
-          <div
-            style={{
-              background: "#fff",
-              borderRadius: 16,
-              padding: "2rem",
-              width: "100%",
-              maxWidth: 480,
-              boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
-              position: "relative",
-              maxHeight: "85vh",
-              overflowY: "auto",
-            }}
-          >
-            <button
-              onClick={() => setManageTeam(null)}
-              style={{
-                position: "absolute",
-                top: 16,
-                right: 16,
-                background: "none",
-                border: "none",
-                fontSize: 18,
-                cursor: "pointer",
-                color: "#888",
-              }}
-            >
-              ✕
-            </button>
-            <h2 style={{ margin: "0 0 16px", fontSize: 20, color: "#111" }}>
-              Manage Workspace
-            </h2>
-            <div
-              style={{
-                background: "#FAFAFA",
-                borderRadius: 12,
-                padding: "1.25rem",
-                border: "1px solid #EFEFEF",
-                marginBottom: "1.5rem",
-              }}
-            >
-              <h4 style={{ margin: "0 0 12px", fontSize: 13, color: "#444" }}>
-                Allocate Credits to Team
-              </h4>
-              <p style={{ fontSize: 12, color: "#888", marginBottom: 12 }}>
-                Your Organization has{" "}
-                <strong>{manageTeam.teams.organisations?.credits_pool}</strong>{" "}
-                total credits available.
-              </p>
-              <div style={{ display: "flex", gap: 8 }}>
-                <input
-                  type="number"
-                  placeholder="Amount"
-                  value={allocAmount}
-                  onChange={(e) => setAllocAmount(e.target.value)}
-                  style={{
-                    flex: 1,
-                    padding: "10px",
-                    borderRadius: 8,
-                    border: "1px solid #EFEFEF",
-                    fontSize: 13,
-                    outline: "none",
-                  }}
-                />
-                <button
-                  onClick={handleAllocateCredits}
-                  disabled={allocating}
-                  style={{
-                    padding: "0 16px",
-                    borderRadius: 8,
-                    border: "none",
-                    background: "#6366F1",
-                    color: "#fff",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  {allocating ? "Moving..." : "Transfer"}
-                </button>
-              </div>
-            </div>
-            <h4 style={{ margin: "0 0 12px", fontSize: 13, color: "#444" }}>
-              Team Members
-            </h4>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {teamMembers.map((member) => (
+              <div style={{ display: "flex", flex: 1 }}>
+                {/* Section nav */}
                 <div
-                  key={member.id}
                   style={{
+                    width: 180,
+                    borderRight: "1px solid #EFEFEF",
+                    padding: "1rem 0.75rem",
                     display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "10px",
-                    border: "1px solid #EFEFEF",
-                    borderRadius: 8,
+                    flexDirection: "column",
+                    gap: 2,
+                    flexShrink: 0,
                   }}
                 >
-                  <div>
-                    <p
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 600,
-                        color: "#111",
-                        margin: 0,
-                      }}
+                  {navBtn(
+                    "members",
+                    "Members",
+                    <svg
+                      width="15"
+                      height="15"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
                     >
-                      {member.profiles?.full_name || "Guest"}
-                    </p>
-                    <p style={{ fontSize: 11, color: "#888", margin: 0 }}>
-                      {member.profiles?.email || "User"}
-                    </p>
-                  </div>
-                  {member.user_id !== session.user.id && (
-                    <select
-                      value={member.role}
-                      onChange={(e) =>
-                        updateMemberRole(member.id, e.target.value)
-                      }
-                      style={{
-                        padding: "4px 8px",
-                        borderRadius: 6,
-                        border: "1px solid #E5E7EB",
-                        fontSize: 11,
-                        fontWeight: 600,
-                        background: "#fff",
-                        color: "#444",
-                        cursor: "pointer",
-                        outline: "none",
-                      }}
-                    >
-                      <option value="member">Member</option>
-                      <option value="admin">Admin</option>
-                    </select>
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                      <circle cx="9" cy="7" r="4" />
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    </svg>,
+                  )}
+                  {isAdmin &&
+                    navBtn(
+                      "credits",
+                      "Credits",
+                      <svg
+                        width="15"
+                        height="15"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M12 6v6l4 2" />
+                      </svg>,
+                    )}
+                  {isAdmin &&
+                    navBtn(
+                      "invite",
+                      "Invite",
+                      <svg
+                        width="15"
+                        height="15"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                        <circle cx="8.5" cy="7" r="4" />
+                        <line x1="20" y1="8" x2="20" y2="14" />
+                        <line x1="23" y1="11" x2="17" y2="11" />
+                      </svg>,
+                    )}
+                </div>
+
+                {/* Section content */}
+                <div style={{ flex: 1, padding: "1.5rem", overflowY: "auto" }}>
+                  {/* MEMBERS */}
+                  {teamSection === "members" && (
+                    <div>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          marginBottom: 16,
+                        }}
+                      >
+                        <h3
+                          style={{
+                            fontSize: 15,
+                            fontWeight: 600,
+                            color: "#111",
+                            margin: 0,
+                          }}
+                        >
+                          Team Members ({teamMembers.length})
+                        </h3>
+                        {/* Search */}
+                        <div style={{ position: "relative" }}>
+                          <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="#AAA"
+                            strokeWidth="2"
+                            style={{
+                              position: "absolute",
+                              left: 10,
+                              top: "50%",
+                              transform: "translateY(-50%)",
+                            }}
+                          >
+                            <circle cx="11" cy="11" r="8" />
+                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                          </svg>
+                          <input
+                            value={memberSearch}
+                            onChange={(e) => setMemberSearch(e.target.value)}
+                            placeholder="Search members…"
+                            style={{
+                              padding: "8px 12px 8px 32px",
+                              border: "1px solid #EFEFEF",
+                              borderRadius: 8,
+                              fontSize: 12,
+                              outline: "none",
+                              width: 200,
+                              background: "#FAFAFA",
+                            }}
+                          />
+                        </div>
+                      </div>
+                      {loadingMembers ? (
+                        <p style={{ color: "#888", fontSize: 13 }}>
+                          Loading...
+                        </p>
+                      ) : (
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 8,
+                          }}
+                        >
+                          {filteredMembers.length === 0 ? (
+                            <p
+                              style={{
+                                color: "#AAA",
+                                fontSize: 13,
+                                textAlign: "center",
+                                padding: "2rem 0",
+                              }}
+                            >
+                              No members found.
+                            </p>
+                          ) : (
+                            filteredMembers.map((member) => (
+                              <div
+                                key={member.id}
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                  padding: "12px 16px",
+                                  border: "1px solid #EFEFEF",
+                                  borderRadius: 10,
+                                  background: "#FAFAFA",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 12,
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      width: 36,
+                                      height: 36,
+                                      borderRadius: "50%",
+                                      background: "#6366F120",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      flexShrink: 0,
+                                    }}
+                                  >
+                                    <span
+                                      style={{
+                                        fontSize: 14,
+                                        fontWeight: 700,
+                                        color: "#6366F1",
+                                      }}
+                                    >
+                                      {(member.profiles?.full_name ||
+                                        member.profiles?.email ||
+                                        "?")[0].toUpperCase()}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <p
+                                      style={{
+                                        fontSize: 13,
+                                        fontWeight: 600,
+                                        color: "#111",
+                                        margin: 0,
+                                      }}
+                                    >
+                                      {member.profiles?.full_name || "Guest"}
+                                    </p>
+                                    <p
+                                      style={{
+                                        fontSize: 11,
+                                        color: "#888",
+                                        margin: 0,
+                                      }}
+                                    >
+                                      {member.profiles?.email || "—"}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 10,
+                                  }}
+                                >
+                                  {member.user_id === session.user.id ? (
+                                    <span
+                                      style={{
+                                        fontSize: 11,
+                                        fontWeight: 700,
+                                        padding: "3px 10px",
+                                        borderRadius: 20,
+                                        background: "#F5F3FF",
+                                        color: "#6366F1",
+                                      }}
+                                    >
+                                      YOU · {member.role.toUpperCase()}
+                                    </span>
+                                  ) : isAdmin ? (
+                                    <>
+                                      <select
+                                        value={member.role}
+                                        onChange={(e) =>
+                                          updateMemberRole(
+                                            member.id,
+                                            e.target.value,
+                                          )
+                                        }
+                                        style={{
+                                          padding: "5px 10px",
+                                          borderRadius: 6,
+                                          border: "1px solid #E5E7EB",
+                                          fontSize: 11,
+                                          fontWeight: 600,
+                                          background: "#fff",
+                                          color: "#444",
+                                          cursor: "pointer",
+                                          outline: "none",
+                                        }}
+                                      >
+                                        <option value="member">Member</option>
+                                        <option value="admin">Admin</option>
+                                      </select>
+                                      <button
+                                        onClick={() =>
+                                          removeMember(
+                                            member.id,
+                                            member.user_id,
+                                          )
+                                        }
+                                        style={{
+                                          padding: "5px 10px",
+                                          borderRadius: 6,
+                                          border: "1px solid #FECACA",
+                                          background: "#FEF2F2",
+                                          color: "#B91C1C",
+                                          fontSize: 11,
+                                          fontWeight: 600,
+                                          cursor: "pointer",
+                                        }}
+                                      >
+                                        Remove
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <span
+                                      style={{
+                                        fontSize: 11,
+                                        fontWeight: 700,
+                                        padding: "3px 10px",
+                                        borderRadius: 20,
+                                        background: "#F4F4F5",
+                                        color: "#888",
+                                      }}
+                                    >
+                                      {member.role.toUpperCase()}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* CREDITS */}
+                  {teamSection === "credits" && isAdmin && (
+                    <div>
+                      <h3
+                        style={{
+                          fontSize: 15,
+                          fontWeight: 600,
+                          color: "#111",
+                          margin: "0 0 6px",
+                        }}
+                      >
+                        Credit Allocation
+                      </h3>
+                      <p
+                        style={{
+                          fontSize: 13,
+                          color: "#888",
+                          marginBottom: 24,
+                        }}
+                      >
+                        Transfer credits from your org pool to this team.
+                      </p>
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "1fr 1fr",
+                          gap: 16,
+                          marginBottom: 24,
+                        }}
+                      >
+                        <div
+                          style={{
+                            background: "#F5F3FF",
+                            borderRadius: 12,
+                            padding: "1.25rem",
+                          }}
+                        >
+                          <p
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              color: "#6366F1",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.06em",
+                              margin: "0 0 8px",
+                            }}
+                          >
+                            Org Pool
+                          </p>
+                          <p
+                            style={{
+                              fontSize: 28,
+                              fontWeight: 700,
+                              color: "#6366F1",
+                              margin: 0,
+                            }}
+                          >
+                            {
+                              (activeTeamData.teams as any).organisations
+                                ?.credits_pool
+                            }
+                          </p>
+                          <p
+                            style={{
+                              fontSize: 12,
+                              color: "#6366F180",
+                              margin: "4px 0 0",
+                            }}
+                          >
+                            Available to allocate
+                          </p>
+                        </div>
+                        <div
+                          style={{
+                            background: "#F0FDF4",
+                            borderRadius: 12,
+                            padding: "1.25rem",
+                          }}
+                        >
+                          <p
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              color: "#15803D",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.06em",
+                              margin: "0 0 8px",
+                            }}
+                          >
+                            Team Balance
+                          </p>
+                          <p
+                            style={{
+                              fontSize: 28,
+                              fontWeight: 700,
+                              color: "#15803D",
+                              margin: 0,
+                            }}
+                          >
+                            {(activeTeamData.teams as any).credits_pool}
+                          </p>
+                          <p
+                            style={{
+                              fontSize: 12,
+                              color: "#15803D80",
+                              margin: "4px 0 0",
+                            }}
+                          >
+                            Current team credits
+                          </p>
+                        </div>
+                      </div>
+                      <div
+                        style={{
+                          background: "#FAFAFA",
+                          borderRadius: 12,
+                          padding: "1.25rem",
+                          border: "1px solid #EFEFEF",
+                        }}
+                      >
+                        <label
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: "#555",
+                            display: "block",
+                            marginBottom: 10,
+                          }}
+                        >
+                          Transfer amount
+                        </label>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <input
+                            type="number"
+                            placeholder="e.g. 50"
+                            value={allocAmount}
+                            onChange={(e) => setAllocAmount(e.target.value)}
+                            style={{
+                              flex: 1,
+                              padding: "10px 12px",
+                              border: "1px solid #EFEFEF",
+                              borderRadius: 8,
+                              fontSize: 13,
+                              outline: "none",
+                            }}
+                          />
+                          <button
+                            onClick={handleAllocateCredits}
+                            disabled={allocating}
+                            style={{
+                              padding: "0 20px",
+                              borderRadius: 8,
+                              border: "none",
+                              background: "#6366F1",
+                              color: "#fff",
+                              fontWeight: 600,
+                              fontSize: 13,
+                              cursor: allocating ? "not-allowed" : "pointer",
+                              opacity: allocating ? 0.7 : 1,
+                            }}
+                          >
+                            {allocating ? "Moving..." : "Transfer"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* INVITE */}
+                  {teamSection === "invite" && isAdmin && (
+                    <div>
+                      <h3
+                        style={{
+                          fontSize: 15,
+                          fontWeight: 600,
+                          color: "#111",
+                          margin: "0 0 6px",
+                        }}
+                      >
+                        Invite Members
+                      </h3>
+                      <p
+                        style={{
+                          fontSize: 13,
+                          color: "#888",
+                          marginBottom: 24,
+                        }}
+                      >
+                        Generate a link or send an email invitation to join this
+                        team.
+                      </p>
+                      <div
+                        style={{
+                          background: "#FAFAFA",
+                          borderRadius: 12,
+                          padding: "1.25rem",
+                          border: "1px solid #EFEFEF",
+                          marginBottom: 16,
+                        }}
+                      >
+                        <label
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: "#555",
+                            display: "block",
+                            marginBottom: 10,
+                          }}
+                        >
+                          Link expiration
+                        </label>
+                        <div
+                          style={{ display: "flex", gap: 8, marginBottom: 12 }}
+                        >
+                          {(["never", "24h", "7d"] as const).map((opt) => (
+                            <button
+                              key={opt}
+                              onClick={() => setInviteExpiration(opt)}
+                              style={{
+                                padding: "7px 14px",
+                                borderRadius: 8,
+                                border: `1px solid ${inviteExpiration === opt ? "#6366F1" : "#EFEFEF"}`,
+                                background:
+                                  inviteExpiration === opt ? "#F5F3FF" : "#fff",
+                                color:
+                                  inviteExpiration === opt ? "#6366F1" : "#555",
+                                fontSize: 12,
+                                fontWeight: 600,
+                                cursor: "pointer",
+                              }}
+                            >
+                              {opt === "never"
+                                ? "Never"
+                                : opt === "24h"
+                                  ? "24 hours"
+                                  : "7 days"}
+                            </button>
+                          ))}
+                        </div>
+                        <button
+                          onClick={generateInvite}
+                          style={{
+                            width: "100%",
+                            padding: "10px",
+                            borderRadius: 8,
+                            border: "none",
+                            background: "#111",
+                            color: "#fff",
+                            fontSize: 13,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                          }}
+                        >
+                          Generate Invite Link
+                        </button>
+                      </div>
+                      {activeInviteLink && (
+                        <div
+                          style={{
+                            background: "#fff",
+                            borderRadius: 12,
+                            padding: "1.25rem",
+                            border: "1px solid #EFEFEF",
+                            marginBottom: 16,
+                          }}
+                        >
+                          <label
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              color: "#AAA",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.05em",
+                              display: "block",
+                              marginBottom: 8,
+                            }}
+                          >
+                            Invite Link
+                          </label>
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: 8,
+                              marginBottom: 16,
+                            }}
+                          >
+                            <input
+                              readOnly
+                              value={activeInviteLink}
+                              style={{
+                                flex: 1,
+                                padding: "10px 12px",
+                                border: "1px solid #EFEFEF",
+                                borderRadius: 8,
+                                fontSize: 12,
+                                background: "#FAFAFA",
+                                color: "#555",
+                                outline: "none",
+                              }}
+                            />
+                            <button
+                              onClick={copyLink}
+                              style={{
+                                padding: "0 16px",
+                                borderRadius: 8,
+                                border: "none",
+                                background: "#F5F3FF",
+                                color: "#6366F1",
+                                fontSize: 13,
+                                fontWeight: 600,
+                                cursor: "pointer",
+                              }}
+                            >
+                              Copy
+                            </button>
+                          </div>
+                          <div
+                            style={{
+                              height: 1,
+                              background: "#F0F0F0",
+                              marginBottom: 16,
+                            }}
+                          />
+                          <label
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              color: "#AAA",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.05em",
+                              display: "block",
+                              marginBottom: 8,
+                            }}
+                          >
+                            Send via email
+                          </label>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <input
+                              type="email"
+                              placeholder="colleague@company.com"
+                              value={inviteEmail}
+                              onChange={(e) => setInviteEmail(e.target.value)}
+                              style={{
+                                flex: 1,
+                                padding: "10px 12px",
+                                border: "1px solid #EFEFEF",
+                                borderRadius: 8,
+                                fontSize: 13,
+                                outline: "none",
+                              }}
+                            />
+                            <button
+                              onClick={sendEmailInvite}
+                              disabled={sendingInvite || !inviteEmail}
+                              style={{
+                                padding: "0 16px",
+                                borderRadius: 8,
+                                border: "none",
+                                background: "#111",
+                                color: "#fff",
+                                fontSize: 13,
+                                fontWeight: 600,
+                                cursor:
+                                  sendingInvite || !inviteEmail
+                                    ? "not-allowed"
+                                    : "pointer",
+                                opacity:
+                                  sendingInvite || !inviteEmail ? 0.7 : 1,
+                              }}
+                            >
+                              {sendingInvite ? "Sending..." : "Send"}
+                            </button>
+                          </div>
+                          {inviteStatus && (
+                            <div
+                              style={{
+                                marginTop: 12,
+                                padding: "10px 12px",
+                                borderRadius: 8,
+                                fontSize: 12,
+                                fontWeight: 500,
+                                background:
+                                  inviteStatus.type === "success"
+                                    ? "#F0FDF4"
+                                    : "#FEF2F2",
+                                color:
+                                  inviteStatus.type === "success"
+                                    ? "#15803D"
+                                    : "#B91C1C",
+                              }}
+                            >
+                              {inviteStatus.msg}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
-              ))}
+              </div>
             </div>
-          </div>
-        </div>
-      )}
-
-      {inviteTargetTeam && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: "rgba(0,0,0,0.5)",
-            zIndex: 1000,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "1rem",
-          }}
-        >
-          <div
-            style={{
-              background: "#fff",
-              borderRadius: 16,
-              padding: "2rem",
-              width: "100%",
-              maxWidth: 440,
-              boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
-              position: "relative",
-            }}
-          >
-            <button
-              onClick={() => setInviteTargetTeam(null)}
+          ) : (
+            <div
               style={{
-                position: "absolute",
-                top: 16,
-                right: 16,
-                background: "none",
-                border: "none",
-                fontSize: 18,
-                cursor: "pointer",
-                color: "#888",
+                flex: 1,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
             >
-              ✕
-            </button>
-            <h2 style={{ margin: "0 0 8px", fontSize: 20, color: "#111" }}>
-              Invite Team Member
-            </h2>
-            <p style={{ margin: "0 0 20px", fontSize: 13, color: "#666" }}>
-              Generate a secure link to join this team.
-            </p>
-            {!activeInviteLink ? (
-              <div
-                style={{ display: "flex", flexDirection: "column", gap: 12 }}
-              >
-                <label
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: "#AAA",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                  }}
-                >
-                  Link Expiration
-                </label>
-                <select
-                  value={inviteExpiration}
-                  onChange={(e: any) => setInviteExpiration(e.target.value)}
-                  style={{
-                    padding: "10px",
-                    borderRadius: 8,
-                    border: "1px solid #EFEFEF",
-                    fontSize: 13,
-                  }}
-                >
-                  <option value="never">Never expires</option>
-                  <option value="24h">Expires in 24 hours</option>
-                  <option value="7d">Expires in 7 days</option>
-                </select>
-                <button
-                  onClick={generateInvite}
-                  style={{
-                    padding: "10px",
-                    borderRadius: 8,
-                    border: "none",
-                    background: "#111",
-                    color: "#fff",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    marginTop: 8,
-                  }}
-                >
-                  Generate Invite Link
-                </button>
-              </div>
-            ) : (
-              <>
-                <div style={{ marginBottom: "1.5rem" }}>
-                  <label
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: "#AAA",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      marginBottom: 6,
-                      display: "block",
-                    }}
-                  >
-                    Invite Link
-                  </label>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <input
-                      readOnly
-                      value={activeInviteLink}
-                      style={{
-                        flex: 1,
-                        padding: "10px 12px",
-                        border: "1px solid #EFEFEF",
-                        borderRadius: 8,
-                        fontSize: 13,
-                        background: "#FAFAFA",
-                        color: "#555",
-                        outline: "none",
-                      }}
-                    />
-                    <button
-                      onClick={copyToClipboard}
-                      style={{
-                        padding: "0 16px",
-                        borderRadius: 8,
-                        border: "none",
-                        background: "#F5F3FF",
-                        color: "#6366F1",
-                        fontSize: 13,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                      }}
-                    >
-                      Copy
-                    </button>
-                  </div>
-                </div>
-                <div
-                  style={{
-                    height: 1,
-                    background: "#EFEFEF",
-                    margin: "1.5rem 0",
-                  }}
-                />
-                <div>
-                  <label
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: "#AAA",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      marginBottom: 6,
-                      display: "block",
-                    }}
-                  >
-                    Send via Email
-                  </label>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <input
-                      type="email"
-                      placeholder="colleague@company.com"
-                      value={inviteEmail}
-                      onChange={(e) => setInviteEmail(e.target.value)}
-                      style={{
-                        flex: 1,
-                        padding: "10px 12px",
-                        border: "1px solid #EFEFEF",
-                        borderRadius: 8,
-                        fontSize: 13,
-                        outline: "none",
-                        boxSizing: "border-box",
-                      }}
-                    />
-                    <button
-                      onClick={sendEmailInvite}
-                      disabled={sendingInvite || !inviteEmail}
-                      style={{
-                        padding: "0 16px",
-                        borderRadius: 8,
-                        border: "none",
-                        background: "#111",
-                        color: "#fff",
-                        fontSize: 13,
-                        fontWeight: 600,
-                        cursor:
-                          sendingInvite || !inviteEmail
-                            ? "not-allowed"
-                            : "pointer",
-                        opacity: sendingInvite || !inviteEmail ? 0.7 : 1,
-                      }}
-                    >
-                      {sendingInvite ? "Sending..." : "Send"}
-                    </button>
-                  </div>
-                </div>
-                {inviteStatus && (
-                  <div
-                    style={{
-                      marginTop: 16,
-                      padding: "10px 12px",
-                      borderRadius: 8,
-                      fontSize: 12,
-                      fontWeight: 500,
-                      background:
-                        inviteStatus.type === "success" ? "#F0FDF4" : "#FEF2F2",
-                      color:
-                        inviteStatus.type === "success" ? "#15803D" : "#B91C1C",
-                    }}
-                  >
-                    {inviteStatus.msg}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
+              <p style={{ color: "#AAA", fontSize: 13 }}>
+                Select a team from the left
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
 
+// ─── APP ─────────────────────────────────────────────────────
 export default function App({
   session,
 }: {
@@ -3733,12 +4213,11 @@ Be specific. Reference actual elements visible. No generic advice.`;
         type: "text",
         text: "Analyse this creative. Return raw JSON only, starting with {",
       });
-    } else {
+    } else
       contentParts.push({
         type: "text",
         text: `Video file: "${creative.name}". Provide the JSON analysis. Raw JSON only, starting with {`,
       });
-    }
     const messages = [
       {
         role: "user",
@@ -3928,558 +4407,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
         )
       : null;
 
-  const Sidebar = () => (
-    <aside
-      style={{
-        width: isSidebarOpen ? 260 : 76,
-        transition: "width 0.3s ease",
-        background: "#fff",
-        borderRight: "1px solid #EFEFEF",
-        display: "flex",
-        flexDirection: "column",
-        height: "100vh",
-        position: "fixed",
-        left: 0,
-        top: 0,
-        overflow: "hidden",
-        zIndex: 100,
-      }}
-    >
-      <div style={{ borderBottom: "1px solid #EFEFEF" }}>
-        <div
-          style={{
-            padding: isSidebarOpen
-              ? "1.25rem 1rem 0.75rem"
-              : "1.25rem 0 0.75rem",
-            display: "flex",
-            justifyContent: "center",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              justifyContent: "center",
-              width: "100%",
-            }}
-          >
-            <div
-              style={{
-                width: 24,
-                height: 24,
-                borderRadius: 6,
-                background: "#111",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-              }}
-            >
-              <span style={{ color: "#fff", fontSize: 12, fontWeight: 800 }}>
-                NF
-              </span>
-            </div>
-            {isSidebarOpen && (
-              <span
-                style={{
-                  fontSize: 14,
-                  fontWeight: 700,
-                  letterSpacing: "0.05em",
-                }}
-              >
-                PREFLYGHT
-              </span>
-            )}
-          </div>
-        </div>
-        {isSidebarOpen && (
-          <div style={{ padding: "0 1rem 1rem", position: "relative" }}>
-            <button
-              onClick={() => setTeamSwitcherOpen((o) => !o)}
-              style={{
-                width: "100%",
-                padding: "8px 10px",
-                borderRadius: 8,
-                border: "1px solid #EFEFEF",
-                background: "#FAFAFA",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                cursor: "pointer",
-                gap: 8,
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "flex-start",
-                  overflow: "hidden",
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: 10,
-                    color: "#AAA",
-                    fontWeight: 600,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                  }}
-                >
-                  {activeTeam?.org_name || "Personal"}
-                </span>
-                <span
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: "#111",
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    maxWidth: 160,
-                  }}
-                >
-                  {activeTeam?.name || "No team"}
-                </span>
-              </div>
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#AAA"
-                strokeWidth="2.5"
-                style={{
-                  transform: teamSwitcherOpen
-                    ? "rotate(180deg)"
-                    : "rotate(0deg)",
-                  transition: "transform 0.2s",
-                  flexShrink: 0,
-                }}
-              >
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </button>
-            {teamSwitcherOpen && (
-              <div
-                style={{
-                  position: "absolute",
-                  top: "calc(100% - 4px)",
-                  left: "1rem",
-                  right: "1rem",
-                  background: "#fff",
-                  border: "1px solid #EFEFEF",
-                  borderRadius: 10,
-                  boxShadow: "0 8px 24px rgba(0,0,0,0.1)",
-                  zIndex: 200,
-                  overflow: "hidden",
-                }}
-              >
-                <div
-                  style={{
-                    padding: 6,
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 2,
-                  }}
-                >
-                  {userTeams.length === 0 ? (
-                    <p
-                      style={{
-                        fontSize: 12,
-                        color: "#AAA",
-                        padding: "8px 10px",
-                        margin: 0,
-                      }}
-                    >
-                      No teams yet
-                    </p>
-                  ) : (
-                    userTeams.map((t: any, i: number) => {
-                      const team = t.teams as any;
-                      const isActive = activeTeam?.id === team.id;
-                      return (
-                        <button
-                          key={i}
-                          onClick={() => {
-                            setActiveTeam({
-                              id: team.id,
-                              name: team.name,
-                              org_id: team.org_id,
-                              org_name: team.organisations?.name || "—",
-                            });
-                            setTeamSwitcherOpen(false);
-                          }}
-                          style={{
-                            width: "100%",
-                            padding: "8px 10px",
-                            borderRadius: 7,
-                            border: "none",
-                            background: isActive ? "#F5F3FF" : "transparent",
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "flex-start",
-                            cursor: "pointer",
-                            textAlign: "left",
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: 10,
-                              color: isActive ? "#6366F1" : "#AAA",
-                              fontWeight: 600,
-                              textTransform: "uppercase",
-                              letterSpacing: "0.05em",
-                            }}
-                          >
-                            {team.organisations?.name || "—"}
-                          </span>
-                          <span
-                            style={{
-                              fontSize: 13,
-                              fontWeight: 600,
-                              color: isActive ? "#6366F1" : "#222",
-                            }}
-                          >
-                            {team.name}
-                          </span>
-                        </button>
-                      );
-                    })
-                  )}
-                  <div
-                    style={{
-                      height: 1,
-                      background: "#F0F0F0",
-                      margin: "4px 0",
-                    }}
-                  />
-                  <button
-                    onClick={() => {
-                      setCurrentView("teams");
-                      setTeamSwitcherOpen(false);
-                    }}
-                    style={{
-                      width: "100%",
-                      padding: "8px 10px",
-                      borderRadius: 7,
-                      border: "none",
-                      background: "transparent",
-                      fontSize: 12,
-                      color: "#6366F1",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      textAlign: "left",
-                    }}
-                  >
-                    + Manage teams
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-      <nav
-        style={{
-          padding: "1rem 0.5rem",
-          flex: 1,
-          display: "flex",
-          flexDirection: "column",
-          gap: 6,
-          overflow: "hidden",
-        }}
-      >
-        {(
-          [
-            [
-              "analyzer",
-              "Analyzer Workspace",
-              "M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z",
-            ],
-            [
-              "brands",
-              "Brand Assets",
-              "M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z M7 7h.01",
-            ],
-            [
-              "teams",
-              "Teams & Credits",
-              "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M23 21v-2a4 4 0 0 0-3-3.87 M16 3.13a4 4 0 0 1 0 7.75",
-            ],
-            [
-              "dashboard",
-              "Dashboard History",
-              "rect x=3 y=3 width=18 height=18 rx=2 ry=2 M3 9h18 M9 21V9",
-            ],
-            ["profile", "Profile & Settings", "circle cx=12 cy=12 r=3"],
-          ] as [string, string, string][]
-        ).map(([view, label]) => (
-          <button
-            key={view}
-            onClick={() => {
-              setCurrentView(view as any);
-              setViewingHistoryItem(null);
-            }}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              padding: "10px",
-              borderRadius: 8,
-              border: "none",
-              background: currentView === view ? "#F5F3FF" : "transparent",
-              color: currentView === view ? "#6366F1" : "#555",
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: "pointer",
-              textAlign: "left",
-              transition: "all 0.15s",
-              justifyContent: isSidebarOpen ? "flex-start" : "center",
-              whiteSpace: "nowrap",
-            }}
-            title={!isSidebarOpen ? label : undefined}
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{ flexShrink: 0 }}
-            >
-              {view === "analyzer" && (
-                <>
-                  <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-                  <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-                </>
-              )}
-              {view === "brands" && (
-                <>
-                  <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
-                  <line x1="7" y1="7" x2="7.01" y2="7" />
-                </>
-              )}
-              {view === "teams" && (
-                <>
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                  <circle cx="9" cy="7" r="4" />
-                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                </>
-              )}
-              {view === "dashboard" && (
-                <>
-                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                  <line x1="3" y1="9" x2="21" y2="9" />
-                  <line x1="9" y1="21" x2="9" y2="9" />
-                </>
-              )}
-              {view === "profile" && (
-                <>
-                  <circle cx="12" cy="12" r="3" />
-                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                </>
-              )}
-            </svg>
-            {isSidebarOpen && <span>{label}</span>}
-          </button>
-        ))}
-        <div style={{ flex: 1 }} />
-        <button
-          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: "10px",
-            borderRadius: 8,
-            border: "none",
-            background: "transparent",
-            color: "#888",
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: "pointer",
-            textAlign: "left",
-            transition: "all 0.15s",
-            justifyContent: isSidebarOpen ? "flex-start" : "center",
-            whiteSpace: "nowrap",
-            marginTop: "auto",
-          }}
-          title={isSidebarOpen ? "Collapse Sidebar" : "Expand Sidebar"}
-        >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            style={{ flexShrink: 0 }}
-          >
-            {isSidebarOpen ? (
-              <polyline points="15 18 9 12 15 6" />
-            ) : (
-              <polyline points="9 18 15 12 9 6" />
-            )}
-          </svg>
-          {isSidebarOpen && <span>Collapse Sidebar</span>}
-        </button>
-      </nav>
-      <div
-        style={{
-          padding: isSidebarOpen ? "1.5rem" : "1.5rem 0.5rem",
-          borderTop: "1px solid #EFEFEF",
-          background: "#FAFAFA",
-          overflow: "hidden",
-        }}
-      >
-        {isSidebarOpen ? (
-          <>
-            <div style={{ marginBottom: 12 }}>
-              <p
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  color: "#AAA",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                  margin: "0 0 6px",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                Remaining Credits
-              </p>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "baseline",
-                  gap: 6,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                <span style={{ fontSize: 24, fontWeight: 700, color: "#111" }}>
-                  {profile?.credits_remaining || 0}
-                </span>
-                <span style={{ fontSize: 12, color: "#888" }}>/ tokens</span>
-              </div>
-            </div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                marginTop: 16,
-              }}
-            >
-              <div style={{ display: "flex", flexDirection: "column" }}>
-                <span
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: "#222",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    maxWidth: "150px",
-                  }}
-                >
-                  {profile?.full_name || session.user.email?.split("@")[0]}
-                </span>
-                <span
-                  style={{
-                    fontSize: 11,
-                    color: "#888",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    maxWidth: "150px",
-                  }}
-                >
-                  {profile?.company || "User"}
-                </span>
-              </div>
-              <button
-                onClick={() => supabase.auth.signOut()}
-                style={{
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  color: "#AAA",
-                }}
-              >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                  <polyline points="16 17 21 12 16 7" />
-                  <line x1="21" y1="12" x2="9" y2="12" />
-                </svg>
-              </button>
-            </div>
-          </>
-        ) : (
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: 16,
-            }}
-          >
-            <div
-              style={{
-                background: "#EFEFEF",
-                padding: "4px 8px",
-                borderRadius: 12,
-                fontSize: 11,
-                fontWeight: 700,
-                color: "#111",
-              }}
-              title="Remaining Credits"
-            >
-              {profile?.credits_remaining || 0}
-            </div>
-            <button
-              onClick={() => supabase.auth.signOut()}
-              style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                color: "#AAA",
-              }}
-              title="Sign out"
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <polyline points="16 17 21 12 16 7" />
-                <line x1="21" y1="12" x2="9" y2="12" />
-              </svg>
-            </button>
-          </div>
-        )}
-      </div>
-    </aside>
-  );
-
   const generateHeatmapCanvas = async (
     creative: CreativeFile | null,
     zones: Zone[],
@@ -4563,18 +4490,457 @@ Be specific. Reference actual elements visible. No generic advice.`;
     return canvas.toDataURL("image/png");
   };
 
+  const Sidebar = () => (
+    <aside
+      style={{
+        width: isSidebarOpen ? 260 : 76,
+        transition: "width 0.3s ease",
+        background: "#fff",
+        borderRight: "1px solid #EFEFEF",
+        display: "flex",
+        flexDirection: "column",
+        height: "100vh",
+        position: "fixed",
+        left: 0,
+        top: 0,
+        overflow: "hidden",
+        zIndex: 100,
+      }}
+    >
+      <div style={{ borderBottom: "1px solid #EFEFEF" }}>
+        <div
+          style={{
+            padding: isSidebarOpen
+              ? "1.25rem 1rem 0.75rem"
+              : "1.25rem 0 0.75rem",
+            display: "flex",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              justifyContent: isSidebarOpen ? "flex-start" : "center",
+              width: "100%",
+              paddingLeft: isSidebarOpen ? 4 : 0,
+            }}
+          >
+            <div
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: 6,
+                background: "#111",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              <span style={{ fontSize: 12, color: "#fff", fontWeight: 800 }}>
+                P
+              </span>
+            </div>
+            {isSidebarOpen && (
+              <span style={{ fontSize: 15, fontWeight: 700, color: "#111" }}>
+                Preflyght
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Team switcher */}
+        {isSidebarOpen && userTeams.length > 0 && (
+          <div style={{ padding: "0 0.75rem 0.75rem" }}>
+            <div
+              onClick={() => setTeamSwitcherOpen((o) => !o)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "8px 10px",
+                borderRadius: 8,
+                border: "1px solid #F0F0F0",
+                background: "#FAFAFA",
+                cursor: "pointer",
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <p
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: "#AAA",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                    margin: "0 0 1px",
+                  }}
+                >
+                  {activeTeam?.org_name || "Personal"}
+                </p>
+                <p
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "#111",
+                    margin: 0,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {activeTeam?.name || "My workspace"}
+                </p>
+              </div>
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#AAA"
+                strokeWidth="2.5"
+                style={{
+                  flexShrink: 0,
+                  marginLeft: 8,
+                  transform: teamSwitcherOpen
+                    ? "rotate(180deg)"
+                    : "rotate(0deg)",
+                  transition: "transform 0.2s",
+                }}
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </div>
+            {teamSwitcherOpen && (
+              <div
+                style={{
+                  marginTop: 4,
+                  background: "#fff",
+                  border: "1px solid #EFEFEF",
+                  borderRadius: 8,
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.07)",
+                  overflow: "hidden",
+                }}
+              >
+                <div style={{ padding: "4px" }}>
+                  {userTeams.map((t, i) => {
+                    const team = t.teams as any;
+                    const isCurrent = team.id === activeTeam?.id;
+                    return (
+                      <div
+                        key={i}
+                        onClick={() => {
+                          setActiveTeam({
+                            id: team.id,
+                            name: team.name,
+                            org_id: team.org_id,
+                            org_name: team.organisations?.name || "—",
+                          });
+                          setTeamSwitcherOpen(false);
+                        }}
+                        style={{
+                          padding: "8px 10px",
+                          borderRadius: 6,
+                          cursor: "pointer",
+                          background: isCurrent ? "#F5F3FF" : "transparent",
+                        }}
+                      >
+                        <p
+                          style={{
+                            fontSize: 12,
+                            fontWeight: isCurrent ? 600 : 500,
+                            color: isCurrent ? "#6366F1" : "#222",
+                            margin: 0,
+                          }}
+                        >
+                          {team.name}
+                        </p>
+                        <p
+                          style={{
+                            fontSize: 10,
+                            color: isCurrent ? "#6366F1" : "#AAA",
+                            margin: 0,
+                          }}
+                        >
+                          {team.organisations?.name}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Nav */}
+      <nav
+        style={{
+          flex: 1,
+          padding: "0.75rem 0.5rem",
+          display: "flex",
+          flexDirection: "column",
+          gap: 2,
+          overflowY: "auto",
+        }}
+      >
+        {(
+          [
+            [
+              "analyzer",
+              "Analyser",
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+              </svg>,
+            ],
+            [
+              "dashboard",
+              "History",
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <rect x="3" y="3" width="7" height="7" />
+                <rect x="14" y="3" width="7" height="7" />
+                <rect x="14" y="14" width="7" height="7" />
+                <rect x="3" y="14" width="7" height="7" />
+              </svg>,
+            ],
+            [
+              "brands",
+              "Brands",
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+              </svg>,
+            ],
+            [
+              "teams",
+              "Teams",
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>,
+            ],
+            [
+              "profile",
+              "Profile",
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>,
+            ],
+          ] as [string, string, React.ReactNode][]
+        ).map(([view, label, icon]) => {
+          const active = currentView === view;
+          return (
+            <button
+              key={view}
+              onClick={() => setCurrentView(view as typeof currentView)}
+              title={!isSidebarOpen ? label : undefined}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                width: "100%",
+                padding: isSidebarOpen ? "9px 12px" : "9px 0",
+                justifyContent: isSidebarOpen ? "flex-start" : "center",
+                borderRadius: 8,
+                border: "none",
+                background: active ? "#F5F3FF" : "transparent",
+                color: active ? "#6366F1" : "#555",
+                fontSize: 13,
+                fontWeight: active ? 600 : 500,
+                cursor: "pointer",
+                textAlign: "left",
+              }}
+            >
+              {icon}
+              {isSidebarOpen && label}
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* Bottom — credits + toggle */}
+      <div
+        style={{
+          padding: "0.75rem 0.5rem",
+          borderTop: "1px solid #EFEFEF",
+          display: "flex",
+          flexDirection: "column",
+          gap: 8,
+        }}
+      >
+        {isSidebarOpen && profile && (
+          <div
+            style={{
+              padding: "8px 10px",
+              borderRadius: 8,
+              background: "#FAFAFA",
+              border: "1px solid #F0F0F0",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 4,
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "#AAA",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                }}
+              >
+                Credits
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#111" }}>
+                {profile.credits_balance ?? 0}
+              </span>
+            </div>
+            <div style={{ height: 4, background: "#F0F0F0", borderRadius: 2 }}>
+              <div
+                style={{
+                  height: 4,
+                  borderRadius: 2,
+                  width: `${Math.min(100, ((profile.credits_balance || 0) / 100) * 100)}%`,
+                  background: "#6366F1",
+                  transition: "width 0.5s ease",
+                }}
+              />
+            </div>
+          </div>
+        )}
+        <button
+          onClick={() => setIsSidebarOpen((o) => !o)}
+          title={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: isSidebarOpen ? "flex-start" : "center",
+            gap: 8,
+            padding: isSidebarOpen ? "8px 10px" : "8px 0",
+            borderRadius: 8,
+            border: "none",
+            background: "transparent",
+            color: "#AAA",
+            cursor: "pointer",
+            fontSize: 12,
+            fontWeight: 500,
+            width: "100%",
+          }}
+        >
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            style={{
+              transform: isSidebarOpen ? "rotate(0deg)" : "rotate(180deg)",
+              transition: "transform 0.3s",
+            }}
+          >
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+          {isSidebarOpen && "Collapse"}
+        </button>
+        {isSidebarOpen && (
+          <button
+            onClick={() => supabase.auth.signOut()}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "8px 10px",
+              borderRadius: 8,
+              border: "none",
+              background: "transparent",
+              color: "#CCC",
+              cursor: "pointer",
+              fontSize: 12,
+              fontWeight: 500,
+              width: "100%",
+            }}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+            Sign out
+          </button>
+        )}
+      </div>
+    </aside>
+  );
+
+  // ─── MAIN LAYOUT ───────────────────────────────────────────
   return (
     <div
       style={{
         display: "flex",
-        minHeight: "100vh",
-        background: "#FAFAFA",
         fontFamily: "var(--font-sans,system-ui)",
-        overflowX: "hidden",
+        background: "#FAFAFA",
+        minHeight: "100vh",
       }}
     >
-      {showBrandMgr && currentView !== "brands" && (
+      <Sidebar />
+      {showBrandMgr && (
         <BrandManager
+          userId={session.user.id}
+          teamId={activeTeam?.id}
           selectedBrand={selectedBrand}
           onSelect={(n, notes, files) => {
             setSelectedBrand(n);
@@ -4584,1507 +4950,1149 @@ Be specific. Reference actual elements visible. No generic advice.`;
           }}
           onClose={() => setShowBrandMgr(false)}
           onUpdated={(b) => setBrands(b)}
-          userId={session.user.id}
-          teamId={activeTeam?.id}
-          isModal={true}
         />
       )}
-      <Sidebar />
+
       <main
         style={{
           marginLeft: isSidebarOpen ? 260 : 76,
-          transition: "margin-left 0.3s ease",
           flex: 1,
-          padding: "3rem",
-          height: "100vh",
-          overflowY: "auto",
-          boxSizing: "border-box",
+          padding: "2rem 1.5rem",
+          transition: "margin-left 0.3s ease",
+          maxWidth: "100%",
         }}
       >
-        {currentView === "teams" && <TeamManager session={session} />}
-
-        {currentView === "brands" && (
-          <div style={{ width: "100%", maxWidth: 1000, margin: "0 auto" }}>
-            <h1
-              style={{
-                fontSize: 24,
-                fontWeight: 600,
-                color: "#111",
-                margin: "0 0 6px",
-              }}
-            >
-              Brand Assets
-            </h1>
-            <p style={{ fontSize: 14, color: "#888", marginBottom: "2rem" }}>
-              Manage your team's brand guidelines, rules, and visual assets.
-            </p>
-            <BrandManager
-              selectedBrand={selectedBrand}
-              onSelect={(n, notes, files) => {
-                setSelectedBrand(n);
-                setBrandNotes(notes || "");
-                setBrandFiles(files || []);
-                if (n) setClient(n);
-              }}
-              onClose={() => {}}
-              onUpdated={(b) => setBrands(b)}
-              userId={session.user.id}
-              teamId={activeTeam?.id}
-              isModal={false}
-            />
-          </div>
-        )}
-
-        {currentView === "profile" && (
-          <div style={{ width: "100%", maxWidth: 600, margin: "0 auto" }}>
-            <h1
-              style={{
-                fontSize: 24,
-                fontWeight: 600,
-                color: "#111",
-                margin: "0 0 6px",
-              }}
-            >
-              Profile & Settings
-            </h1>
-            <p style={{ fontSize: 14, color: "#888", marginBottom: "2rem" }}>
-              Manage your account details and view your subscription.
-            </p>
-            <div
-              style={{
-                background: "#fff",
-                border: "1px solid #F0F0F0",
-                borderRadius: 14,
-                padding: "1.5rem",
-              }}
-            >
-              {[
-                ["Email Address", session.user.email || "", true],
-                ["Full Name", editName, false],
-                ["Company", editCompany, false],
-              ].map(([label, value, disabled]) => (
-                <div key={label as string} style={{ marginBottom: "1.25rem" }}>
-                  <label
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: "#AAA",
-                      display: "block",
-                      marginBottom: 6,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                    }}
-                  >
-                    {label}
-                  </label>
-                  <input
-                    value={value as string}
-                    disabled={disabled as boolean}
-                    onChange={(e) => {
-                      if (label === "Full Name") setEditName(e.target.value);
-                      else if (label === "Company")
-                        setEditCompany(e.target.value);
-                    }}
-                    style={{
-                      width: "100%",
-                      padding: "10px 12px",
-                      border: "1px solid #EFEFEF",
-                      borderRadius: 8,
-                      fontSize: 13,
-                      color: disabled ? "#888" : "#222",
-                      background: disabled ? "#FAFAFA" : "#fff",
-                      outline: "none",
-                      boxSizing: "border-box",
-                    }}
-                  />
-                </div>
-              ))}
-              <div style={{ marginBottom: "1.5rem" }}>
-                <label
+        <div style={{ maxWidth: 860, margin: "0 auto" }}>
+          {/* ── ANALYSER VIEW ── */}
+          {currentView === "analyzer" && (
+            <div>
+              <div style={{ marginBottom: "1.75rem" }}>
+                <h1
                   style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: "#AAA",
-                    display: "block",
-                    marginBottom: 6,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                  }}
-                >
-                  Credits Remaining
-                </label>
-                <div
-                  style={{
-                    display: "inline-block",
-                    background: "#F5F3FF",
-                    padding: "6px 12px",
-                    borderRadius: 8,
-                    fontSize: 14,
-                    fontWeight: 700,
-                    color: "#6366F1",
-                  }}
-                >
-                  {profile?.credits_remaining || 0} tokens
-                </div>
-              </div>
-              <button
-                onClick={handleSaveProfile}
-                disabled={savingProfile}
-                style={{
-                  width: "100%",
-                  padding: "12px",
-                  borderRadius: 10,
-                  border: "none",
-                  background: savingProfile ? "#F0F0F0" : "#111",
-                  color: savingProfile ? "#AAA" : "#fff",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  cursor: savingProfile ? "not-allowed" : "pointer",
-                }}
-              >
-                {savingProfile ? "Saving..." : "Save Profile"}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {currentView === "dashboard" && (
-          <div style={{ width: "100%", margin: "0 auto" }}>
-            {viewingHistoryItem ? (
-              <div style={{ maxWidth: 900, margin: "0 auto" }}>
-                <button
-                  onClick={() => setViewingHistoryItem(null)}
-                  style={{
-                    padding: "8px 14px",
-                    borderRadius: 8,
-                    border: "1px solid #EFEFEF",
-                    background: "#fff",
-                    fontSize: 12,
+                    fontSize: 22,
                     fontWeight: 600,
-                    color: "#555",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    marginBottom: "1.5rem",
+                    color: "#111",
+                    margin: "0 0 4px",
                   }}
                 >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <line x1="19" y1="12" x2="5" y2="12" />
-                    <polyline points="12 19 5 12 12 5" />
-                  </svg>
-                  Back to History
-                </button>
+                  Creative Analyser
+                </h1>
+                <p style={{ fontSize: 13, color: "#999", margin: 0 }}>
+                  Pre-flight analysis powered by behavioural science
+                </p>
+              </div>
+
+              {/* Config panel */}
+              {!(
+                singleResult ||
+                (mode === "ab" && analysedCreatives.length > 0)
+              ) && (
                 <div
                   style={{
                     background: "#fff",
-                    border: "1px solid #F0F0F0",
+                    border: "1px solid #EFEFEF",
                     borderRadius: 14,
                     padding: "1.25rem",
-                    marginBottom: "1rem",
+                    marginBottom: "1.25rem",
                   }}
                 >
                   <p
                     style={{
                       fontSize: 10,
                       fontWeight: 700,
-                      color: "#AAA",
+                      color: "#BBB",
+                      letterSpacing: "0.08em",
                       textTransform: "uppercase",
-                      letterSpacing: "0.06em",
-                      marginBottom: 5,
+                      marginBottom: 14,
                     }}
                   >
-                    Archived Report Context
+                    Configuration
                   </p>
                   <div
-                    style={{ display: "flex", gap: "2rem", flexWrap: "wrap" }}
-                  >
-                    {[
-                      ["Client", viewingHistoryItem.client],
-                      ["Platform", viewingHistoryItem.platform],
-                      ["Industry", viewingHistoryItem.industry || "—"],
-                      ["Concept", viewingHistoryItem.concept || "—"],
-                      [
-                        "Model",
-                        MODELS.find((m) => m.id === viewingHistoryItem.model)
-                          ?.name ||
-                          viewingHistoryItem.model ||
-                          "—",
-                      ],
-                      [
-                        "Date",
-                        new Date(
-                          viewingHistoryItem.created_at,
-                        ).toLocaleDateString(),
-                      ],
-                    ].map(([label, value]) => (
-                      <div key={label}>
-                        <span style={{ fontSize: 11, color: "#888" }}>
-                          {label}:
-                        </span>{" "}
-                        <span
-                          style={{
-                            fontSize: 13,
-                            fontWeight: 600,
-                            color: "#111",
-                          }}
-                        >
-                          {value}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                {isLoadingHistory ? (
-                  <div
                     style={{
-                      padding: "3rem",
-                      textAlign: "center",
-                      background: "#fff",
-                      borderRadius: 14,
-                      border: "1px solid #EFEFEF",
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: 12,
+                      marginBottom: 12,
                     }}
                   >
-                    <p style={{ color: "#888", fontSize: 13 }}>
-                      Loading archived creative...
-                    </p>
-                  </div>
-                ) : viewingHistoryItem.result ? (
-                  <SingleResult
-                    creative={historyCreative}
-                    result={viewingHistoryItem.result}
-                    threshold={65}
-                    model={
-                      MODELS.find((m) => m.id === viewingHistoryItem.model)
-                        ?.name || viewingHistoryItem.model
-                    }
-                    client={viewingHistoryItem.client}
-                    platform={viewingHistoryItem.platform}
-                    industry={viewingHistoryItem.industry}
-                    onReset={() => setViewingHistoryItem(null)}
-                    onExport={async () => {
-                      const heatmapDataUrl = await generateHeatmapCanvas(
-                        historyCreative,
-                        viewingHistoryItem.result?.attention_zones || [],
-                      );
-                      await generatePDF({
-                        creative: historyCreative,
-                        result: viewingHistoryItem.result,
-                        heatmapDataUrl,
-                        client: viewingHistoryItem.client,
-                        platform: viewingHistoryItem.platform,
-                        industry: viewingHistoryItem.industry || "",
-                        threshold: 65,
-                        model:
-                          MODELS.find((m) => m.id === viewingHistoryItem.model)
-                            ?.name || viewingHistoryItem.model,
-                        date: new Date(
-                          viewingHistoryItem.created_at,
-                        ).toLocaleDateString("en-GB"),
-                      });
-                    }}
-                  />
-                ) : (
-                  <div
-                    style={{
-                      padding: "2rem",
-                      textAlign: "center",
-                      background: "#FEF2F2",
-                      color: "#B91C1C",
-                      borderRadius: 14,
-                    }}
-                  >
-                    <p style={{ fontWeight: 600, margin: 0 }}>
-                      Legacy Report Data Missing
-                    </p>
-                    <p style={{ fontSize: 13, margin: "4px 0 0" }}>
-                      This analysis was run before full JSON results were saved
-                      to the database.
-                    </p>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <>
-                <h1
-                  style={{
-                    fontSize: 24,
-                    fontWeight: 600,
-                    color: "#111",
-                    margin: "0 0 6px",
-                  }}
-                >
-                  Analysis History
-                </h1>
-                <p
-                  style={{ fontSize: 14, color: "#888", marginBottom: "2rem" }}
-                >
-                  {activeTeam
-                    ? `Showing all analyses for ${activeTeam.name}`
-                    : "Showing your personal analyses"}
-                </p>
-                <div
-                  style={{
-                    background: "#fff",
-                    border: "1px solid #EFEFEF",
-                    borderRadius: 14,
-                    overflowX: "auto",
-                    width: "100%",
-                  }}
-                >
-                  <table
-                    style={{
-                      width: "100%",
-                      borderCollapse: "collapse",
-                      textAlign: "left",
-                    }}
-                  >
-                    <thead>
-                      <tr
-                        style={{
-                          background: "#FAFAFA",
-                          borderBottom: "1px solid #EFEFEF",
-                        }}
-                      >
-                        {[
-                          "Date",
-                          "Client / Campaign",
-                          "Platform",
-                          "Industry",
-                          "Type",
-                          "Model",
-                          "Score",
-                          "Actions",
-                        ].map((h) => (
-                          <th
-                            key={h}
-                            style={{
-                              padding: "12px 16px",
-                              fontSize: 11,
-                              fontWeight: 700,
-                              color: "#AAA",
-                              textTransform: "uppercase",
-                              whiteSpace: "nowrap",
-                              textAlign: h === "Actions" ? "right" : "left",
-                            }}
-                          >
-                            {h}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {analysesHistory.length === 0 ? (
-                        <tr>
-                          <td
-                            colSpan={8}
-                            style={{
-                              padding: "3rem 1rem",
-                              textAlign: "center",
-                              color: "#888",
-                              fontSize: 13,
-                            }}
-                          >
-                            No analyses yet. Head to the workspace to get
-                            started!
-                          </td>
-                        </tr>
-                      ) : (
-                        analysesHistory.map((item) => (
-                          <tr
-                            key={item.id}
-                            style={{ borderBottom: "1px solid #F5F5F5" }}
-                          >
-                            <td
-                              style={{
-                                padding: "14px 16px",
-                                fontSize: 13,
-                                color: "#555",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {new Date(item.created_at).toLocaleDateString()}
-                            </td>
-                            <td
-                              style={{
-                                padding: "14px 16px",
-                                fontSize: 13,
-                                fontWeight: 600,
-                                color: "#111",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {item.client}
-                            </td>
-                            <td
-                              style={{
-                                padding: "14px 16px",
-                                fontSize: 13,
-                                color: "#555",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {item.platform}
-                            </td>
-                            <td
-                              style={{
-                                padding: "14px 16px",
-                                fontSize: 13,
-                                color: "#555",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {item.industry || "—"}
-                            </td>
-                            <td
-                              style={{
-                                padding: "14px 16px",
-                                fontSize: 13,
-                                color: "#555",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {item.type || "Single"}
-                            </td>
-                            <td
-                              style={{
-                                padding: "14px 16px",
-                                fontSize: 13,
-                                color: "#555",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {MODELS.find((m) => m.id === item.model)?.name ||
-                                item.model ||
-                                "—"}
-                            </td>
-                            <td
-                              style={{
-                                padding: "14px 16px",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 6,
-                                }}
-                              >
-                                <span
-                                  style={{
-                                    fontSize: 13,
-                                    fontWeight: 700,
-                                    color: scoreColor(item.overall_score),
-                                  }}
-                                >
-                                  {item.overall_score}
-                                </span>
-                                <span
-                                  style={{
-                                    fontSize: 9,
-                                    fontWeight: 700,
-                                    padding: "2px 6px",
-                                    borderRadius: 20,
-                                    background: item.pass
-                                      ? "#F0FDF4"
-                                      : "#FEF2F2",
-                                    color: item.pass ? "#15803D" : "#B91C1C",
-                                  }}
-                                >
-                                  {item.pass ? "PASS" : "FAIL"}
-                                </span>
-                              </div>
-                            </td>
-                            <td
-                              style={{
-                                padding: "14px 16px",
-                                textAlign: "right",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "flex-end",
-                                  gap: 8,
-                                }}
-                              >
-                                <button
-                                  onClick={() => handleViewHistory(item)}
-                                  style={{
-                                    fontSize: 11,
-                                    padding: "4px 10px",
-                                    borderRadius: 6,
-                                    border: "1px solid #EFEFEF",
-                                    background: "#fff",
-                                    cursor: "pointer",
-                                    color: "#444",
-                                    fontWeight: 500,
-                                  }}
-                                >
-                                  View Report
-                                </button>
-                                <button
-                                  onClick={() => deleteAnalysis(item.id)}
-                                  style={{
-                                    fontSize: 11,
-                                    padding: "4px 10px",
-                                    borderRadius: 6,
-                                    border: "1px solid #FECACA",
-                                    background: "#FEF2F2",
-                                    cursor: "pointer",
-                                    color: "#B91C1C",
-                                    fontWeight: 500,
-                                  }}
-                                >
-                                  Delete
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
-        {currentView === "analyzer" && (
-          <div style={{ maxWidth: 800, margin: "0 auto" }}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "flex-start",
-                marginBottom: "1.75rem",
-                textAlign: "center",
-              }}
-            >
-              <div>
-                <h1
-                  style={{
-                    fontSize: 24,
-                    fontWeight: 600,
-                    color: "#111",
-                    margin: 0,
-                    textAlign: "center",
-                  }}
-                >
-                  Analyzer Workspace
-                </h1>
-                <p
-                  style={{
-                    fontSize: 14,
-                    color: "#888",
-                    marginTop: 4,
-                    textAlign: "center",
-                  }}
-                >
-                  {activeTeam
-                    ? `${activeTeam.org_name} · ${activeTeam.name}`
-                    : "Pre-flight analysis powered by behavioural science"}
-                </p>
-              </div>
-            </div>
-            <div
-              style={{
-                display: "flex",
-                gap: 6,
-                marginBottom: "1.25rem",
-                background: "#EFEFEF",
-                borderRadius: 10,
-                padding: 4,
-              }}
-            >
-              {[
-                ["single", "Single creative"],
-                ["ab", "A/B comparison"],
-              ].map(([m, l]) => (
-                <button
-                  key={m}
-                  onClick={() => {
-                    setMode(m);
-                    setError(null);
-                  }}
-                  style={{
-                    flex: 1,
-                    padding: "8px 0",
-                    borderRadius: 8,
-                    border: "none",
-                    fontSize: 13,
-                    fontWeight: 500,
-                    background: mode === m ? "#fff" : "transparent",
-                    color: mode === m ? "#111" : "#888",
-                    boxShadow:
-                      mode === m ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
-                    cursor: "pointer",
-                    transition: "all 0.15s",
-                  }}
-                >
-                  {l}
-                </button>
-              ))}
-            </div>
-            <div
-              style={{
-                background: "#fff",
-                border: "1px solid #F0F0F0",
-                borderRadius: 14,
-                padding: "1.25rem",
-                marginBottom: "1.25rem",
-                display: "flex",
-                flexDirection: "column",
-                gap: 12,
-              }}
-            >
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr 1fr",
-                  gap: 10,
-                }}
-              >
-                <div>
-                  <label
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 700,
-                      color: "#AAA",
-                      display: "block",
-                      marginBottom: 5,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.06em",
-                    }}
-                  >
-                    Client / campaign
-                  </label>
-                  <input
-                    value={client}
-                    onChange={(e) => setClient(e.target.value)}
-                    placeholder="e.g. Sirf Coffee — Diwali"
-                    style={{
-                      width: "100%",
-                      padding: "8px 12px",
-                      border: "1px solid #EFEFEF",
-                      borderRadius: 8,
-                      fontSize: 13,
-                      color: "#222",
-                      background: "#FAFAFA",
-                      outline: "none",
-                      boxSizing: "border-box",
-                    }}
-                  />
-                </div>
-                <div>
-                  <label
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 700,
-                      color: "#AAA",
-                      display: "block",
-                      marginBottom: 5,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.06em",
-                    }}
-                  >
-                    Platform
-                  </label>
-                  <select
-                    value={platform}
-                    onChange={(e) => setPlatform(e.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: "8px 12px",
-                      border: "1px solid #EFEFEF",
-                      borderRadius: 8,
-                      fontSize: 13,
-                      color: platform ? "#222" : "#AAA",
-                      background: "#FAFAFA",
-                      outline: "none",
-                    }}
-                  >
-                    <option value="">Select platform</option>
-                    {PLATFORMS.map((p) => (
-                      <option key={p} value={p}>
-                        {p}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 700,
-                      color: "#AAA",
-                      display: "block",
-                      marginBottom: 5,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.06em",
-                    }}
-                  >
-                    Industry
-                  </label>
-                  <select
-                    value={industry}
-                    onChange={(e) => setIndustry(e.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: "8px 12px",
-                      border: `1px solid ${industry ? "#6366F1" : "#EFEFEF"}`,
-                      borderRadius: 8,
-                      fontSize: 13,
-                      color: industry ? "#6366F1" : "#AAA",
-                      background: "#FAFAFA",
-                      outline: "none",
-                    }}
-                  >
-                    <option value="">Select industry…</option>
-                    {INDUSTRIES.map((i) => (
-                      <option key={i} value={i}>
-                        {i}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label
-                  style={{
-                    fontSize: 10,
-                    fontWeight: 700,
-                    color: "#AAA",
-                    display: "block",
-                    marginBottom: 5,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.06em",
-                  }}
-                >
-                  Model
-                </label>
-                <ModelSelector
-                  value={selectedModel}
-                  onChange={setSelectedModel}
-                />
-              </div>
-              <div>
-                <label
-                  style={{
-                    fontSize: 10,
-                    fontWeight: 700,
-                    color: "#AAA",
-                    display: "block",
-                    marginBottom: 5,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.06em",
-                  }}
-                >
-                  Brand guidelines
-                </label>
-                {brandList.length > 0 ? (
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <select
-                      value={selectedBrand}
-                      onChange={(e) => {
-                        const n = e.target.value;
-                        setSelectedBrand(n);
-                        setBrandNotes(brands[n]?.notes || "");
-                        setBrandFiles(brands[n]?.files || []);
-                        if (n) setClient(n);
-                      }}
-                      style={{
-                        flex: 1,
-                        padding: "8px 12px",
-                        border: `1px solid ${selectedBrand ? "#6366F1" : "#EFEFEF"}`,
-                        borderRadius: 8,
-                        fontSize: 13,
-                        color: selectedBrand ? "#6366F1" : "#AAA",
-                        background: "#FAFAFA",
-                        outline: "none",
-                      }}
-                    >
-                      <option value="">Select saved brand…</option>
-                      {brandList.map((b) => (
-                        <option key={b} value={b}>
-                          {b}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      onClick={() => setCurrentView("brands")}
-                      style={{
-                        padding: "8px 12px",
-                        borderRadius: 8,
-                        border: "1px solid #EFEFEF",
-                        background: "#fff",
-                        fontSize: 12,
-                        color: "#666",
-                        cursor: "pointer",
-                      }}
-                    >
-                      Manage
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setCurrentView("brands")}
-                    style={{
-                      width: "100%",
-                      padding: "9px",
-                      borderRadius: 8,
-                      border: "1px dashed #DDD",
-                      background: "#FAFAFA",
-                      fontSize: 13,
-                      color: "#888",
-                      cursor: "pointer",
-                    }}
-                  >
-                    + Save a brand guideline
-                  </button>
-                )}
-                {selectedBrand && (brandNotes || brandFiles.length > 0) && (
-                  <div
-                    style={{
-                      marginTop: 6,
-                      background: "#F5F3FF",
-                      padding: "8px 10px",
-                      borderRadius: 6,
-                    }}
-                  >
-                    {brandNotes && (
-                      <p
-                        style={{
-                          fontSize: 11,
-                          color: "#6366F1",
-                          margin: 0,
-                          lineHeight: 1.4,
-                        }}
-                      >
-                        Using: <strong>{selectedBrand}</strong> —{" "}
-                        {brandNotes.length > 80
-                          ? brandNotes.slice(0, 80) + "…"
-                          : brandNotes}
-                      </p>
-                    )}
-                    {brandFiles.length > 0 && (
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: 4,
-                          flexWrap: "wrap",
-                          marginTop: brandNotes ? 5 : 0,
-                        }}
-                      >
-                        {brandFiles.map((f, i) => (
-                          <span
-                            key={i}
-                            style={{
-                              fontSize: 10,
-                              padding: "2px 6px",
-                              borderRadius: 4,
-                              background: "#E0DBFF",
-                              color: "#6366F1",
-                            }}
-                          >
-                            {f.type.startsWith("image/")
-                              ? "🖼️"
-                              : f.type === "application/pdf"
-                                ? "📄"
-                                : "📝"}{" "}
-                            {f.name.length > 18
-                              ? f.name.slice(0, 18) + "…"
-                              : f.name}
-                            {f.extractedText && (
-                              <span style={{ color: "#10B981" }}> ✓</span>
-                            )}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-              {!selectedBrand && (
-                <div>
-                  <label
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 700,
-                      color: "#AAA",
-                      display: "block",
-                      marginBottom: 5,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.06em",
-                    }}
-                  >
-                    Or enter brand notes manually
-                  </label>
-                  <textarea
-                    value={brandNotes}
-                    onChange={(e) => setBrandNotes(e.target.value)}
-                    placeholder="e.g. Primary red #E63030, bold sans-serif, no lifestyle imagery…"
-                    rows={2}
-                    style={{
-                      width: "100%",
-                      padding: "8px 12px",
-                      border: "1px solid #EFEFEF",
-                      borderRadius: 8,
-                      fontSize: 13,
-                      color: "#222",
-                      background: "#FAFAFA",
-                      outline: "none",
-                      resize: "vertical",
-                      fontFamily: "inherit",
-                      boxSizing: "border-box",
-                    }}
-                  />
-                </div>
-              )}
-              <div>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    marginBottom: 6,
-                  }}
-                >
-                  <label
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 700,
-                      color: "#AAA",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.06em",
-                    }}
-                  >
-                    Pass threshold
-                  </label>
-                  <span
-                    style={{ fontSize: 12, fontWeight: 600, color: "#222" }}
-                  >
-                    {threshold}/100
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min={40}
-                  max={90}
-                  step={5}
-                  value={threshold}
-                  onChange={(e) => setThreshold(Number(e.target.value))}
-                  style={{ width: "100%", accentColor: "#111" }}
-                />
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    fontSize: 10,
-                    color: "#CCC",
-                    marginTop: 2,
-                  }}
-                >
-                  <span>40 — lenient</span>
-                  <span>90 — strict</span>
-                </div>
-              </div>
-              <div>
-                <label
-                  style={{
-                    fontSize: 10,
-                    fontWeight: 700,
-                    color: "#AAA",
-                    display: "block",
-                    marginBottom: 5,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.06em",
-                  }}
-                >
-                  Concept / campaign goal
-                </label>
-                <textarea
-                  value={concept}
-                  onChange={(e) => setConcept(e.target.value)}
-                  placeholder="e.g. Drive trial of our new protein bar — target gym-goers aged 25-35 who value clean ingredients"
-                  rows={2}
-                  style={{
-                    width: "100%",
-                    padding: "8px 12px",
-                    border: `1px solid ${concept ? "#6366F1" : "#EFEFEF"}`,
-                    borderRadius: 8,
-                    fontSize: 13,
-                    color: "#222",
-                    background: "#FAFAFA",
-                    outline: "none",
-                    resize: "vertical",
-                    fontFamily: "inherit",
-                    boxSizing: "border-box",
-                  }}
-                />
-                {concept && (
-                  <div style={{ marginTop: 8 }}>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        marginBottom: 4,
-                      }}
-                    >
+                    <div>
                       <label
                         style={{
-                          fontSize: 10,
-                          fontWeight: 700,
-                          color: "#AAA",
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: "#888",
+                          display: "block",
+                          marginBottom: 6,
                           textTransform: "uppercase",
                           letterSpacing: "0.06em",
                         }}
                       >
-                        Concept alignment threshold
+                        Brand / client
                       </label>
-                      <span
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <select
+                          value={selectedBrand}
+                          onChange={(e) => {
+                            const n = e.target.value;
+                            setSelectedBrand(n);
+                            if (n && brands[n]) {
+                              setBrandNotes(brands[n].notes);
+                              setBrandFiles(brands[n].files || []);
+                              setClient(n);
+                            } else {
+                              setBrandNotes("");
+                              setBrandFiles([]);
+                            }
+                          }}
+                          style={{
+                            flex: 1,
+                            padding: "9px 10px",
+                            border: "1px solid #EFEFEF",
+                            borderRadius: 8,
+                            fontSize: 13,
+                            background: "#FAFAFA",
+                            color: "#333",
+                            outline: "none",
+                          }}
+                        >
+                          <option value="">No brand selected</option>
+                          {brandList.map((n) => (
+                            <option key={n} value={n}>
+                              {n}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() => setShowBrandMgr(true)}
+                          style={{
+                            padding: "0 10px",
+                            border: "1px solid #EFEFEF",
+                            borderRadius: 8,
+                            background: "#fff",
+                            cursor: "pointer",
+                            color: "#888",
+                            fontSize: 13,
+                          }}
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <label
                         style={{
-                          fontSize: 12,
+                          fontSize: 11,
                           fontWeight: 600,
-                          color: "#6366F1",
+                          color: "#888",
+                          display: "block",
+                          marginBottom: 6,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
                         }}
                       >
-                        {conceptThreshold}/100
-                      </span>
+                        Platform
+                      </label>
+                      <select
+                        value={platform}
+                        onChange={(e) => setPlatform(e.target.value)}
+                        style={{
+                          width: "100%",
+                          padding: "9px 10px",
+                          border: "1px solid #EFEFEF",
+                          borderRadius: 8,
+                          fontSize: 13,
+                          background: "#FAFAFA",
+                          color: "#333",
+                          outline: "none",
+                        }}
+                      >
+                        <option value="">Select platform…</option>
+                        {PLATFORMS.map((p) => (
+                          <option key={p} value={p}>
+                            {p}
+                          </option>
+                        ))}
+                      </select>
                     </div>
+                    <div>
+                      <label
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: "#888",
+                          display: "block",
+                          marginBottom: 6,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                        }}
+                      >
+                        Industry
+                      </label>
+                      <select
+                        value={industry}
+                        onChange={(e) => setIndustry(e.target.value)}
+                        style={{
+                          width: "100%",
+                          padding: "9px 10px",
+                          border: "1px solid #EFEFEF",
+                          borderRadius: 8,
+                          fontSize: 13,
+                          background: "#FAFAFA",
+                          color: "#333",
+                          outline: "none",
+                        }}
+                      >
+                        <option value="">No industry benchmarks</option>
+                        {INDUSTRIES.map((i) => (
+                          <option key={i} value={i}>
+                            {i}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: "#888",
+                          display: "block",
+                          marginBottom: 6,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                        }}
+                      >
+                        Pass threshold: {threshold}
+                      </label>
+                      <input
+                        type="range"
+                        min={40}
+                        max={90}
+                        value={threshold}
+                        onChange={(e) => setThreshold(parseInt(e.target.value))}
+                        style={{
+                          width: "100%",
+                          marginTop: 4,
+                          accentColor: "#6366F1",
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div style={{ marginBottom: 12 }}>
+                    <label
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: "#888",
+                        display: "block",
+                        marginBottom: 6,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                      }}
+                    >
+                      Concept / campaign goal{" "}
+                      <span
+                        style={{
+                          fontSize: 10,
+                          color: "#CCC",
+                          fontWeight: 400,
+                          textTransform: "none",
+                        }}
+                      >
+                        optional
+                      </span>
+                    </label>
                     <input
-                      type="range"
-                      min={40}
-                      max={90}
-                      step={5}
-                      value={conceptThreshold}
-                      onChange={(e) =>
-                        setConceptThreshold(Number(e.target.value))
-                      }
-                      style={{ width: "100%", accentColor: "#6366F1" }}
+                      value={concept}
+                      onChange={(e) => setConcept(e.target.value)}
+                      placeholder="e.g. Drive trial of new SPF moisturiser among women 25–40"
+                      style={{
+                        width: "100%",
+                        padding: "9px 12px",
+                        border: "1px solid #EFEFEF",
+                        borderRadius: 8,
+                        fontSize: 13,
+                        outline: "none",
+                        background: "#FAFAFA",
+                        color: "#333",
+                        boxSizing: "border-box",
+                      }}
                     />
+                  </div>
+                  {concept && (
+                    <div
+                      style={{
+                        marginBottom: 12,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                      }}
+                    >
+                      <label
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: "#888",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                          flexShrink: 0,
+                        }}
+                      >
+                        Concept threshold: {conceptThreshold}
+                      </label>
+                      <input
+                        type="range"
+                        min={40}
+                        max={90}
+                        value={conceptThreshold}
+                        onChange={(e) =>
+                          setConceptThreshold(parseInt(e.target.value))
+                        }
+                        style={{ flex: 1, accentColor: "#6366F1" }}
+                      />
+                    </div>
+                  )}
+                  <div style={{ marginBottom: 12 }}>
                     <div
                       style={{
                         display: "flex",
                         justifyContent: "space-between",
-                        fontSize: 10,
-                        color: "#CCC",
-                        marginTop: 2,
+                        alignItems: "center",
+                        marginBottom: 6,
                       }}
                     >
-                      <span>40 — loose</span>
-                      <span>90 — strict</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: 6,
-                  }}
-                >
-                  <label
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 700,
-                      color: "#AAA",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.06em",
-                    }}
-                  >
-                    Reference creatives (optional)
-                  </label>
-                  {referenceLinks.length < 3 && (
-                    <button
-                      onClick={addReferenceLink}
-                      style={{
-                        fontSize: 11,
-                        padding: "2px 8px",
-                        borderRadius: 6,
-                        border: "1px solid #EFEFEF",
-                        background: "#fff",
-                        color: "#666",
-                        cursor: "pointer",
-                        fontWeight: 600,
-                      }}
-                    >
-                      + Add link
-                    </button>
-                  )}
-                </div>
-                <div
-                  style={{ display: "flex", flexDirection: "column", gap: 6 }}
-                >
-                  {referenceLinks.map((link, idx) => (
-                    <div key={idx} style={{ display: "flex", gap: 6 }}>
-                      <input
-                        value={link}
-                        onChange={(e) =>
-                          updateReferenceLink(idx, e.target.value)
-                        }
-                        placeholder={`Reference ${idx + 1} — paste any URL`}
+                      <label
                         style={{
-                          flex: 1,
-                          padding: "8px 12px",
-                          border: `1px solid ${link.trim() ? "#6366F1" : "#EFEFEF"}`,
-                          borderRadius: 8,
-                          fontSize: 13,
-                          color: "#222",
-                          background: "#FAFAFA",
-                          outline: "none",
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: "#888",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
                         }}
-                      />
-                      {referenceLinks.length > 1 && (
-                        <button
-                          onClick={() => removeReferenceLink(idx)}
+                      >
+                        Reference creatives{" "}
+                        <span
                           style={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: 8,
-                            border: "1px solid #EFEFEF",
-                            background: "#fff",
-                            color: "#888",
-                            cursor: "pointer",
-                            fontSize: 14,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            flexShrink: 0,
+                            fontSize: 10,
+                            color: "#CCC",
+                            fontWeight: 400,
+                            textTransform: "none",
                           }}
                         >
-                          ✕
+                          optional · up to 3 URLs
+                        </span>
+                      </label>
+                      {referenceLinks.length < 3 && (
+                        <button
+                          onClick={addReferenceLink}
+                          style={{
+                            fontSize: 11,
+                            padding: "2px 8px",
+                            borderRadius: 6,
+                            border: "1px solid #E0DBFF",
+                            background: "#F5F3FF",
+                            color: "#6366F1",
+                            cursor: "pointer",
+                            fontWeight: 600,
+                          }}
+                        >
+                          + Add
                         </button>
                       )}
                     </div>
+                    {referenceLinks.map((l, i) => (
+                      <div
+                        key={i}
+                        style={{ display: "flex", gap: 6, marginBottom: 6 }}
+                      >
+                        <input
+                          value={l}
+                          onChange={(e) =>
+                            updateReferenceLink(i, e.target.value)
+                          }
+                          placeholder="https://example.com/ad-image.jpg"
+                          style={{
+                            flex: 1,
+                            padding: "8px 12px",
+                            border: "1px solid #EFEFEF",
+                            borderRadius: 8,
+                            fontSize: 12,
+                            outline: "none",
+                            background: "#FAFAFA",
+                            color: "#333",
+                          }}
+                        />
+                        {referenceLinks.length > 1 && (
+                          <button
+                            onClick={() => removeReferenceLink(i)}
+                            style={{
+                              padding: "0 10px",
+                              border: "1px solid #EFEFEF",
+                              borderRadius: 8,
+                              background: "#fff",
+                              color: "#AAA",
+                              cursor: "pointer",
+                              fontSize: 13,
+                            }}
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <ModelSelector
+                    value={selectedModel}
+                    onChange={setSelectedModel}
+                  />
+                </div>
+              )}
+
+              {/* Mode toggle */}
+              {!(
+                singleResult ||
+                (mode === "ab" && analysedCreatives.length > 0)
+              ) && (
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 6,
+                    marginBottom: "1.25rem",
+                    background: "#EFEFEF",
+                    borderRadius: 10,
+                    padding: 4,
+                  }}
+                >
+                  {[
+                    ["single", "Single creative"],
+                    ["ab", "A/B comparison"],
+                  ].map(([m, l]) => (
+                    <button
+                      key={m}
+                      onClick={() => {
+                        setMode(m);
+                        setError(null);
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: "8px 0",
+                        borderRadius: 8,
+                        border: "none",
+                        fontSize: 13,
+                        fontWeight: 500,
+                        background: mode === m ? "#fff" : "transparent",
+                        color: mode === m ? "#111" : "#888",
+                        boxShadow:
+                          mode === m ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {l}
+                    </button>
                   ))}
                 </div>
-                {referenceLinks.some((l) => l.trim()) && (
-                  <p style={{ fontSize: 10, color: "#AAA", margin: "5px 0 0" }}>
-                    Links are used as stylistic/tonal reference — AI benchmarks
-                    your creative against these.
-                  </p>
-                )}
-              </div>
-            </div>
+              )}
 
-            {mode === "single" && (
-              <>
-                {!single && (
-                  <UploadZone
-                    onFile={(f) => {
-                      setSingle(f);
-                      setSingleResult(null);
-                      setError(null);
-                    }}
-                  />
-                )}
-                {single && !singleResult && !singleAnalysing && (
-                  <>
+              {/* Single mode */}
+              {mode === "single" && !singleResult && !singleAnalysing && (
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 12 }}
+                >
+                  {single ? (
                     <CreativePreview
                       creative={single}
-                      onRemove={() => {
-                        setSingle(null);
-                        setSingleResult(null);
-                      }}
+                      onRemove={() => setSingle(null)}
                     />
+                  ) : (
+                    <UploadZone onFile={(f) => setSingle(f)} />
+                  )}
+                  {single && (
                     <button
                       onClick={runSingle}
                       style={{
                         width: "100%",
-                        padding: 13,
-                        borderRadius: 12,
+                        padding: "13px",
+                        borderRadius: 10,
                         border: "none",
                         background: "#111",
                         color: "#fff",
                         fontSize: 14,
                         fontWeight: 600,
                         cursor: "pointer",
-                        marginTop: 10,
                       }}
                     >
                       Analyse creative
                     </button>
-                  </>
-                )}
-                {singleAnalysing && (
-                  <AnalysisLoader label="Analysing Creative..." />
-                )}
-                {singleResult && (
-                  <SingleResult
-                    creative={single}
-                    result={singleResult}
-                    threshold={threshold}
-                    model={
-                      MODELS.find((m) => m.id === selectedModel)?.name ||
-                      selectedModel
-                    }
-                    client={client}
-                    platform={platform}
-                    industry={industry}
-                    onReset={() => {
-                      setSingle(null);
-                      setSingleResult(null);
-                    }}
-                    onExport={async () => {
-                      const heatmapDataUrl = await generateHeatmapCanvas(
-                        single,
-                        singleResult?.attention_zones || [],
-                      );
-                      await generatePDF({
-                        creative: single,
-                        result: singleResult,
-                        heatmapDataUrl,
-                        client,
-                        platform,
-                        industry,
-                        threshold,
-                        model:
-                          MODELS.find((m) => m.id === selectedModel)?.name ||
-                          selectedModel,
-                        date: new Date().toLocaleDateString("en-GB"),
-                      });
-                    }}
-                  />
-                )}
-              </>
-            )}
-
-            {mode === "ab" && (
-              <>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns:
-                      creatives.length <= 2 ? "1fr 1fr" : "1fr 1fr 1fr",
-                    gap: 10,
-                    marginBottom: "1rem",
-                  }}
-                >
-                  {creatives.map((c, i) =>
-                    c ? (
-                      <div key={i}>
-                        <CreativePreview
-                          creative={c as CreativeFile}
-                          onRemove={() =>
-                            setCreatives((prev) => {
-                              const n = [...prev];
-                              n[i] = null;
-                              return n;
-                            })
-                          }
-                          label={LABELS[i]}
-                          labelColor={LABEL_COLORS[i]}
-                          compact
-                        />
-                        {(c as AnalysedCreative).result && (
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 8,
-                              padding: "8px 10px",
-                              background: "#fff",
-                              border: "1px solid #EFEFEF",
-                              borderTop: "none",
-                              borderRadius: "0 0 14px 14px",
-                            }}
-                          >
-                            <RadialScore
-                              score={
-                                (c as AnalysedCreative).result.overall_score
-                              }
-                              size={38}
-                              color={LABEL_COLORS[i]}
-                            />
-                            <div style={{ flex: 1 }}>
-                              <p
-                                style={{
-                                  fontSize: 12,
-                                  fontWeight: 700,
-                                  color: LABEL_COLORS[i],
-                                  margin: 0,
-                                }}
-                              >
-                                {(c as AnalysedCreative).result.overall_score}
-                                /100
-                              </p>
-                              <p
-                                style={{
-                                  fontSize: 10,
-                                  color: "#888",
-                                  margin: 0,
-                                }}
-                              >
-                                {verdictText(
-                                  (c as AnalysedCreative).result.overall_score,
-                                )}
-                              </p>
-                            </div>
-                            <span
-                              style={{
-                                fontSize: 9,
-                                fontWeight: 700,
-                                padding: "2px 7px",
-                                borderRadius: 20,
-                                background: (c as AnalysedCreative).result.pass
-                                  ? "#F0FDF4"
-                                  : "#FEF2F2",
-                                color: (c as AnalysedCreative).result.pass
-                                  ? "#15803D"
-                                  : "#B91C1C",
-                              }}
-                            >
-                              {(c as AnalysedCreative).result.pass
-                                ? "PASS"
-                                : "FAIL"}
-                            </span>
-                          </div>
-                        )}
-                        {abAnalysing === i && (
-                          <div
-                            style={{
-                              padding: "16px",
-                              textAlign: "center",
-                              background: "#fff",
-                              borderRadius: "0 0 14px 14px",
-                              border: "1px solid #EFEFEF",
-                              borderTop: "none",
-                              display: "flex",
-                              flexDirection: "column",
-                              alignItems: "center",
-                              gap: 10,
-                            }}
-                          >
-                            <svg
-                              width="20"
-                              height="20"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke={LABEL_COLORS[i]}
-                              strokeWidth="2.5"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              style={{ animation: "spin 1s linear infinite" }}
-                            >
-                              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                            </svg>
-                            <span
-                              style={{
-                                fontSize: 12,
-                                fontWeight: 600,
-                                color: "#333",
-                              }}
-                            >
-                              Analysing {LABELS[i]}…
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <UploadZone
-                        key={i}
-                        onFile={(f) =>
-                          setCreatives((prev) => {
-                            const n = [...prev];
-                            n[i] = f;
-                            return n;
-                          })
-                        }
-                        label={LABELS[i]}
-                        labelColor={LABEL_COLORS[i]}
-                      />
-                    ),
                   )}
                 </div>
-                <div style={{ display: "flex", gap: 8, marginBottom: "1rem" }}>
+              )}
+              {mode === "single" && singleAnalysing && (
+                <AnalysisLoader label="Analysing your creative…" />
+              )}
+              {mode === "single" && singleResult && !singleAnalysing && (
+                <SingleResult
+                  creative={single}
+                  result={singleResult}
+                  threshold={threshold}
+                  model={selectedModel}
+                  client={client}
+                  platform={platform}
+                  industry={industry}
+                  onReset={() => {
+                    setSingleResult(null);
+                    setSingle(null);
+                  }}
+                  onExport={() => {
+                    if (single && singleResult)
+                      exportReport([
+                        { ...single, result: singleResult, index: 0 },
+                      ]);
+                  }}
+                />
+              )}
+
+              {/* A/B mode */}
+              {mode === "ab" && analysedCreatives.length === 0 && (
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 12 }}
+                >
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns:
+                        creatives.length <= 2 ? "1fr 1fr" : "1fr 1fr 1fr",
+                      gap: 12,
+                    }}
+                  >
+                    {creatives.map((c, i) => (
+                      <div key={i}>
+                        {c ? (
+                          <CreativePreview
+                            creative={c}
+                            label={LABELS[i]}
+                            labelColor={LABEL_COLORS[i]}
+                            onRemove={() =>
+                              setCreatives((prev) => {
+                                const n = [...prev];
+                                n[i] = null;
+                                return n;
+                              })
+                            }
+                            compact
+                          />
+                        ) : (
+                          <UploadZone
+                            onFile={(f) =>
+                              setCreatives((prev) => {
+                                const n = [...prev];
+                                n[i] = f;
+                                return n;
+                              })
+                            }
+                            label={LABELS[i]}
+                            labelColor={LABEL_COLORS[i]}
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
                   {creatives.length < 4 && (
                     <button
                       onClick={() => setCreatives((prev) => [...prev, null])}
                       style={{
-                        flex: 1,
+                        width: "100%",
                         padding: "10px",
                         borderRadius: 10,
-                        border: "1px dashed #DDD",
-                        background: "#fff",
-                        fontSize: 13,
+                        border: "1.5px dashed #E0E0E0",
+                        background: "#FAFAFA",
                         color: "#888",
+                        fontSize: 13,
                         cursor: "pointer",
+                        fontWeight: 500,
                       }}
                     >
-                      + Add {LABELS[creatives.length]}
+                      + Add Creative {LABELS[creatives.length]}
                     </button>
                   )}
+                  {creatives.filter(Boolean).length >= 2 &&
+                    abAnalysing === null && (
+                      <button
+                        onClick={runAB}
+                        style={{
+                          width: "100%",
+                          padding: "13px",
+                          borderRadius: 10,
+                          border: "none",
+                          background: "#111",
+                          color: "#fff",
+                          fontSize: 14,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Run A/B analysis ({creatives.filter(Boolean).length}{" "}
+                        creatives)
+                      </button>
+                    )}
+                  {abAnalysing !== null && (
+                    <AnalysisLoader
+                      label={`Analysing creative ${LABELS[abAnalysing]}…`}
+                    />
+                  )}
+                </div>
+              )}
+              {mode === "ab" && analysedCreatives.length > 0 && (
+                <div>
                   <button
-                    onClick={runAB}
-                    disabled={
-                      creatives.filter(Boolean).length < 2 ||
-                      abAnalysing !== null
-                    }
+                    onClick={() => {
+                      setCreatives([null, null]);
+                    }}
                     style={{
-                      flex: 2,
-                      padding: "10px",
-                      borderRadius: 10,
-                      border: "none",
-                      background:
-                        creatives.filter(Boolean).length < 2 ||
-                        abAnalysing !== null
-                          ? "#F5F5F5"
-                          : "#111",
-                      color:
-                        creatives.filter(Boolean).length < 2 ||
-                        abAnalysing !== null
-                          ? "#AAA"
-                          : "#fff",
-                      fontSize: 13,
-                      fontWeight: 600,
+                      marginBottom: 12,
+                      padding: "8px 14px",
+                      borderRadius: 8,
+                      border: "1px solid #EFEFEF",
+                      background: "#fff",
+                      fontSize: 12,
+                      fontWeight: 500,
+                      color: "#555",
                       cursor: "pointer",
                     }}
                   >
-                    {abAnalysing !== null
-                      ? `Analysing ${LABELS[abAnalysing]}…`
-                      : `Analyse all (${creatives.filter(Boolean).length})`}
+                    ← New comparison
                   </button>
-                </div>
-                {analysedCreatives.length >= 2 && (
                   <ABResults
                     analysedCreatives={analysedCreatives}
                     winner={winner}
                     threshold={threshold}
                     onExport={() => exportReport(analysedCreatives)}
                   />
-                )}
-              </>
-            )}
-            {error && (
-              <div
-                style={{
-                  marginTop: 10,
-                  padding: "12px 16px",
-                  background: "#FEF2F2",
-                  borderRadius: 10,
-                  fontSize: 13,
-                  color: "#B91C1C",
-                }}
-              >
-                {error}
+                </div>
+              )}
+
+              {error && (
+                <div
+                  style={{
+                    marginTop: 12,
+                    padding: "12px 14px",
+                    borderRadius: 10,
+                    background: "#FEF2F2",
+                    border: "1px solid #FECACA",
+                    fontSize: 13,
+                    color: "#B91C1C",
+                  }}
+                >
+                  ⚠ {error}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── HISTORY / DASHBOARD VIEW ── */}
+          {currentView === "dashboard" && (
+            <div>
+              <div style={{ marginBottom: "1.75rem" }}>
+                <h1
+                  style={{
+                    fontSize: 22,
+                    fontWeight: 600,
+                    color: "#111",
+                    margin: "0 0 4px",
+                  }}
+                >
+                  Analysis history
+                </h1>
+                <p style={{ fontSize: 13, color: "#999", margin: 0 }}>
+                  {analysesHistory.length} report
+                  {analysesHistory.length !== 1 ? "s" : ""} saved
+                </p>
               </div>
-            )}
-          </div>
-        )}
+              {viewingHistoryItem ? (
+                <div>
+                  <button
+                    onClick={() => {
+                      setViewingHistoryItem(null);
+                      setHistoryCreative(null);
+                    }}
+                    style={{
+                      marginBottom: 12,
+                      padding: "8px 14px",
+                      borderRadius: 8,
+                      border: "1px solid #EFEFEF",
+                      background: "#fff",
+                      fontSize: 12,
+                      fontWeight: 500,
+                      color: "#555",
+                      cursor: "pointer",
+                    }}
+                  >
+                    ← Back to history
+                  </button>
+                  {isLoadingHistory && (
+                    <AnalysisLoader label="Loading archived creative…" />
+                  )}
+                  <SingleResult
+                    creative={historyCreative}
+                    result={viewingHistoryItem.result}
+                    threshold={
+                      viewingHistoryItem.result?.pass !== undefined
+                        ? threshold
+                        : 65
+                    }
+                    client={viewingHistoryItem.client}
+                    platform={viewingHistoryItem.platform}
+                    industry={viewingHistoryItem.industry}
+                    onReset={() => {
+                      setViewingHistoryItem(null);
+                      setHistoryCreative(null);
+                    }}
+                    onExport={() => {
+                      if (historyCreative)
+                        exportReport([
+                          {
+                            ...historyCreative,
+                            result: viewingHistoryItem.result,
+                            index: 0,
+                          },
+                        ]);
+                    }}
+                  />
+                </div>
+              ) : analysesHistory.length === 0 ? (
+                <div
+                  style={{
+                    padding: "4rem",
+                    background: "#fff",
+                    border: "1px solid #EFEFEF",
+                    borderRadius: 14,
+                    textAlign: "center",
+                  }}
+                >
+                  <p style={{ fontSize: 24, margin: "0 0 8px" }}>📭</p>
+                  <p
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: "#222",
+                      margin: "0 0 4px",
+                    }}
+                  >
+                    No analyses yet
+                  </p>
+                  <p style={{ fontSize: 13, color: "#AAA", margin: 0 }}>
+                    Run your first creative analysis to see it here.
+                  </p>
+                </div>
+              ) : (
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 8 }}
+                >
+                  {analysesHistory.map((item) => {
+                    const s = item.overall_score || 0;
+                    const { bg, text } = scoreBg(s);
+                    return (
+                      <div
+                        key={item.id}
+                        onClick={() => handleViewHistory(item)}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 14,
+                          padding: "14px 16px",
+                          background: "#fff",
+                          border: "1px solid #EFEFEF",
+                          borderRadius: 12,
+                          cursor: "pointer",
+                        }}
+                        onMouseEnter={(e) =>
+                          ((
+                            e.currentTarget as HTMLDivElement
+                          ).style.borderColor = "#6366F1")
+                        }
+                        onMouseLeave={(e) =>
+                          ((
+                            e.currentTarget as HTMLDivElement
+                          ).style.borderColor = "#EFEFEF")
+                        }
+                      >
+                        <RadialScore
+                          score={s}
+                          size={48}
+                          color={scoreColor(s)}
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 600,
+                              color: "#111",
+                              margin: "0 0 2px",
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {item.client || "Unnamed"}
+                          </p>
+                          <p style={{ fontSize: 11, color: "#888", margin: 0 }}>
+                            {item.platform || "—"} · {item.type || "Single"} ·{" "}
+                            {new Date(item.created_at).toLocaleDateString(
+                              "en-GB",
+                            )}
+                          </p>
+                        </div>
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: 8,
+                            alignItems: "center",
+                            flexShrink: 0,
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              padding: "2px 8px",
+                              borderRadius: 20,
+                              background: bg,
+                              color: text,
+                            }}
+                          >
+                            {s}/100
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              padding: "2px 8px",
+                              borderRadius: 20,
+                              background: item.pass ? "#F0FDF4" : "#FEF2F2",
+                              color: item.pass ? "#15803D" : "#B91C1C",
+                            }}
+                          >
+                            {item.pass ? "PASS" : "FAIL"}
+                          </span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteAnalysis(item.id);
+                            }}
+                            style={{
+                              padding: "4px 8px",
+                              borderRadius: 6,
+                              border: "1px solid #FECACA",
+                              background: "#FEF2F2",
+                              color: "#B91C1C",
+                              fontSize: 11,
+                              cursor: "pointer",
+                              fontWeight: 600,
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── BRANDS VIEW ── */}
+          {currentView === "brands" && (
+            <div>
+              <div style={{ marginBottom: "1.75rem" }}>
+                <h1
+                  style={{
+                    fontSize: 22,
+                    fontWeight: 600,
+                    color: "#111",
+                    margin: "0 0 4px",
+                  }}
+                >
+                  Brand guidelines
+                </h1>
+                <p style={{ fontSize: 13, color: "#999", margin: 0 }}>
+                  Manage your brand assets and guidelines for analysis.
+                </p>
+              </div>
+              <BrandManager
+                userId={session.user.id}
+                teamId={activeTeam?.id}
+                isModal={false}
+                selectedBrand={selectedBrand}
+                onSelect={(n, notes, files) => {
+                  setSelectedBrand(n);
+                  setBrandNotes(notes || "");
+                  setBrandFiles(files || []);
+                  if (n) setClient(n);
+                }}
+                onClose={() => {}}
+                onUpdated={(b) => setBrands(b)}
+              />
+            </div>
+          )}
+
+          {/* ── TEAMS VIEW ── */}
+          {currentView === "teams" && <TeamManager session={session} />}
+
+          {/* ── PROFILE VIEW ── */}
+          {currentView === "profile" && (
+            <div>
+              <div style={{ marginBottom: "1.75rem" }}>
+                <h1
+                  style={{
+                    fontSize: 22,
+                    fontWeight: 600,
+                    color: "#111",
+                    margin: "0 0 4px",
+                  }}
+                >
+                  Profile
+                </h1>
+                <p style={{ fontSize: 13, color: "#999", margin: 0 }}>
+                  Manage your account settings.
+                </p>
+              </div>
+              <div
+                style={{ display: "flex", flexDirection: "column", gap: 12 }}
+              >
+                <div
+                  style={{
+                    background: "#fff",
+                    border: "1px solid #EFEFEF",
+                    borderRadius: 14,
+                    padding: "1.5rem",
+                  }}
+                >
+                  <p
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: "#BBB",
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase",
+                      marginBottom: 14,
+                    }}
+                  >
+                    Account
+                  </p>
+                  <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
+                    <div style={{ flex: 1 }}>
+                      <label
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: "#888",
+                          display: "block",
+                          marginBottom: 6,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                        }}
+                      >
+                        Full name
+                      </label>
+                      <input
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        placeholder="Your name"
+                        style={{
+                          width: "100%",
+                          padding: "10px 12px",
+                          border: "1px solid #EFEFEF",
+                          borderRadius: 8,
+                          fontSize: 13,
+                          outline: "none",
+                          boxSizing: "border-box",
+                          color: "#111",
+                        }}
+                      />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: "#888",
+                          display: "block",
+                          marginBottom: 6,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                        }}
+                      >
+                        Company
+                      </label>
+                      <input
+                        value={editCompany}
+                        onChange={(e) => setEditCompany(e.target.value)}
+                        placeholder="Your company"
+                        style={{
+                          width: "100%",
+                          padding: "10px 12px",
+                          border: "1px solid #EFEFEF",
+                          borderRadius: 8,
+                          fontSize: 13,
+                          outline: "none",
+                          boxSizing: "border-box",
+                          color: "#111",
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <p style={{ fontSize: 12, color: "#AAA", marginBottom: 16 }}>
+                    Email: {session.user.email}
+                  </p>
+                  <button
+                    onClick={handleSaveProfile}
+                    disabled={savingProfile}
+                    style={{
+                      padding: "10px 20px",
+                      borderRadius: 8,
+                      border: "none",
+                      background: savingProfile ? "#F0F0F0" : "#111",
+                      color: savingProfile ? "#AAA" : "#fff",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: savingProfile ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    {savingProfile ? "Saving…" : "Save profile"}
+                  </button>
+                </div>
+                <div
+                  style={{
+                    background: "#fff",
+                    border: "1px solid #EFEFEF",
+                    borderRadius: 14,
+                    padding: "1.5rem",
+                  }}
+                >
+                  <p
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: "#BBB",
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase",
+                      marginBottom: 14,
+                    }}
+                  >
+                    Credits
+                  </p>
+                  <div style={{ display: "flex", gap: 16 }}>
+                    <div
+                      style={{
+                        background: "#F5F3FF",
+                        borderRadius: 12,
+                        padding: "1rem 1.25rem",
+                        flex: 1,
+                      }}
+                    >
+                      <p
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: "#6366F1",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                          margin: "0 0 6px",
+                        }}
+                      >
+                        Balance
+                      </p>
+                      <p
+                        style={{
+                          fontSize: 28,
+                          fontWeight: 700,
+                          color: "#6366F1",
+                          margin: 0,
+                        }}
+                      >
+                        {profile?.credits_balance ?? 0}
+                      </p>
+                    </div>
+                    <div
+                      style={{
+                        background: "#FAFAFA",
+                        borderRadius: 12,
+                        padding: "1rem 1.25rem",
+                        flex: 1,
+                      }}
+                    >
+                      <p
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: "#888",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                          margin: "0 0 6px",
+                        }}
+                      >
+                        Total used
+                      </p>
+                      <p
+                        style={{
+                          fontSize: 28,
+                          fontWeight: 700,
+                          color: "#111",
+                          margin: 0,
+                        }}
+                      >
+                        {profile?.credits_used ?? 0}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div
+                  style={{
+                    background: "#FEF2F2",
+                    border: "1px solid #FECACA",
+                    borderRadius: 14,
+                    padding: "1.25rem",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <div>
+                    <p
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: "#B91C1C",
+                        margin: "0 0 2px",
+                      }}
+                    >
+                      Sign out
+                    </p>
+                    <p style={{ fontSize: 12, color: "#EF4444", margin: 0 }}>
+                      You will be redirected to the login screen.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => supabase.auth.signOut()}
+                    style={{
+                      padding: "9px 16px",
+                      borderRadius: 8,
+                      border: "none",
+                      background: "#EF4444",
+                      color: "#fff",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Sign out
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );
