@@ -4280,23 +4280,21 @@ Be specific. Reference actual elements visible. No generic advice.`;
     }
     const creditsUsed =
       MODELS.find((m) => m.id === selectedModel)?.credits || 1;
-    await supabase
-      .from("analyses")
-      .insert({
-        user_id: session.user.id,
-        team_id: activeTeam?.id || null,
-        org_id: activeTeam?.org_id || null,
-        client: client || "Unnamed Analysis",
-        platform: platform || "Unknown",
-        industry: industry || "Unknown",
-        concept: concept || null,
-        type: analysisType,
-        model: selectedModel,
-        credits_used: creditsUsed,
-        overall_score: score,
-        pass,
-        result: updatedResult,
-      });
+    await supabase.from("analyses").insert({
+      user_id: session.user.id,
+      team_id: activeTeam?.id || null,
+      org_id: activeTeam?.org_id || null,
+      client: client || "Unnamed Analysis",
+      platform: platform || "Unknown",
+      industry: industry || "Unknown",
+      concept: concept || null,
+      type: analysisType,
+      model: selectedModel,
+      credits_used: creditsUsed,
+      overall_score: score,
+      pass,
+      result: updatedResult,
+    });
     fetchUserData();
   };
 
@@ -4591,7 +4589,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                     textOverflow: "ellipsis",
                   }}
                 >
-                  {activeTeam?.name || "My workspace"}
+                  {activeTeam?.name || "My team"}
                 </p>
               </div>
               <svg
