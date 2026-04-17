@@ -505,7 +505,7 @@ function BrandManager({
         borderRadius: 18,
         padding: "1.5rem",
         width: "100%",
-        maxWidth: isModal ? 480 : "100%",
+        maxWidth: isModal ? 480 : 900,
         maxHeight: isModal ? "85vh" : "auto",
         overflowY: "auto",
         boxShadow: isModal ? "0 20px 60px rgba(0,0,0,0.2)" : "none",
@@ -549,7 +549,9 @@ function BrandManager({
           style={{
             marginBottom: "1.25rem",
             display: "grid",
-            gridTemplateColumns: isModal ? "1fr" : "1fr 1fr",
+            gridTemplateColumns: isModal
+              ? "1fr"
+              : "repeat(auto-fill, minmax(280px, 1fr))",
             gap: 10,
           }}
         >
@@ -4997,7 +4999,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
           maxWidth: "100%",
         }}
       >
-        <div>
+        <div style={{ maxWidth: 900 }}>
           {/* ── ANALYSER VIEW ── */}
           {currentView === "analyzer" && (
             <div>
