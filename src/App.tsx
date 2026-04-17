@@ -794,7 +794,7 @@ function BrandManager({
         borderRadius: 18,
         padding: "1.5rem",
         width: "100%",
-        maxWidth: isModal ? 480 : 900,
+        maxWidth: isModal ? 1000 : 2000,
         maxHeight: isModal ? "85vh" : "auto",
         overflowY: "auto",
         boxShadow: isModal ? "0 20px 60px rgba(0,0,0,0.2)" : "none",
