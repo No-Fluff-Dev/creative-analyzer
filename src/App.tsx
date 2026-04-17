@@ -4358,47 +4358,53 @@ Be specific. Reference actual elements visible. No generic advice.`;
     setAbAnalysing(null);
   };
 
-  const exportReport = (items: AnalysedCreative[]) => {
+  const exportReport = async (
+    items: AnalysedCreative[],
+    creative: CreativeFile | null = null,
+  ) => {
     try {
-      const lines = [
-        "NO FLUFF CREATIVE ANALYSER — REPORT",
-        "=====================================",
-        `Date: ${new Date().toLocaleDateString("en-GB")}`,
-        client ? `Client: ${client}` : "",
-        platform ? `Platform: ${platform}` : "",
-        "",
-        ...items.map((r) =>
-          [
-            `${items.length > 1 ? `--- CREATIVE ${LABELS[r.index]} ---` : "--- ANALYSIS ---"}`,
-            `Score: ${r.result?.overall_score || 0}/100 — ${r.result?.pass ? "PASS" : "FAIL"} (threshold ${threshold})`,
-            `Verdict: ${r.result?.overall_verdict || "N/A"}`,
-            "",
-            "Dimensions:",
-            ...DIMS.map(
-              (d) =>
-                `  ${d.name}: ${r.result?.dimensions?.[d.key]?.score || 0}/100\n    → ${r.result?.dimensions?.[d.key]?.recommendation || "N/A"}`,
-            ),
-            "",
-            "Top fixes:",
-            ...(r.result?.top_fixes || []).map((f, j) => `  ${j + 1}. ${f}`),
-            "",
-          ].join("\n"),
-        ),
-      ]
-        .filter(Boolean)
-        .join("\n");
-      const blob = new Blob([lines], { type: "text/plain;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `NF_Creative_Report_${(client || "unnamed").replace(/[^a-z0-9]/gi, "_")}_${new Date().toISOString().slice(0, 10)}.txt`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      // Single creative export
+      if (items.length === 1) {
+        const item = items[0];
+        const heatmap = await generateHeatmapCanvas(
+          creative || item,
+          item.result.attention_zones || [],
+        );
+        await generatePDF({
+          creative: creative || item,
+          result: item.result,
+          heatmapDataUrl: heatmap,
+          client: client || "Unnamed",
+          platform: platform || "—",
+          industry: industry || "—",
+          threshold,
+          model: selectedModel,
+          date: new Date().toLocaleDateString("en-GB"),
+        });
+      } else {
+        // A/B: export each creative as a separate PDF page set
+        // For multi-creative, export winner first then others sequentially
+        for (const item of items) {
+          const heatmap = await generateHeatmapCanvas(
+            item,
+            item.result.attention_zones || [],
+          );
+          await generatePDF({
+            creative: item,
+            result: item.result,
+            heatmapDataUrl: heatmap,
+            client: `${client || "Unnamed"} — Creative ${LABELS[item.index]}`,
+            platform: platform || "—",
+            industry: industry || "—",
+            threshold,
+            model: selectedModel,
+            date: new Date().toLocaleDateString("en-GB"),
+          });
+        }
+      }
     } catch (err) {
       console.error("Export failed:", err);
-      alert("Export failed.");
+      alert("Export failed. Check the console for details.");
     }
   };
 
@@ -5603,9 +5609,10 @@ Be specific. Reference actual elements visible. No generic advice.`;
                   }}
                   onExport={() => {
                     if (single && singleResult)
-                      exportReport([
-                        { ...single, result: singleResult, index: 0 },
-                      ]);
+                      exportReport(
+                        [{ ...single, result: singleResult, index: 0 }],
+                        single,
+                      );
                   }}
                 />
               )}
@@ -5807,13 +5814,16 @@ Be specific. Reference actual elements visible. No generic advice.`;
                     }}
                     onExport={() => {
                       if (historyCreative)
-                        exportReport([
-                          {
-                            ...historyCreative,
-                            result: viewingHistoryItem.result,
-                            index: 0,
-                          },
-                        ]);
+                        exportReport(
+                          [
+                            {
+                              ...historyCreative,
+                              result: viewingHistoryItem.result,
+                              index: 0,
+                            },
+                          ],
+                          historyCreative,
+                        );
                     }}
                   />
                 </div>
