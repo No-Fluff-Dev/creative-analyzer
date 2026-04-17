@@ -345,6 +345,226 @@ function HeatmapCanvas({ dataUrl, zones }: { dataUrl: string; zones: Zone[] }) {
   );
 }
 
+function FilePreviewModal({
+  file,
+  onClose,
+}: {
+  file: BrandFile;
+  onClose: () => void;
+}) {
+  const isImage = file.type?.startsWith("image/");
+  const isPdf = file.type === "application/pdf";
+  const isDoc =
+    file.type ===
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.6)",
+        zIndex: 200,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "1.5rem",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "#fff",
+          borderRadius: 16,
+          width: "100%",
+          maxWidth: 720,
+          maxHeight: "85vh",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+          boxShadow: "0 24px 64px rgba(0,0,0,0.3)",
+        }}
+      >
+        {/* Header */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "14px 18px",
+            borderBottom: "1px solid #F0F0F0",
+            flexShrink: 0,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              minWidth: 0,
+            }}
+          >
+            <span style={{ fontSize: 18 }}>
+              {isImage ? "🖼️" : isPdf ? "📄" : "📝"}
+            </span>
+            <p
+              style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: "#111",
+                margin: 0,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {file.name}
+            </p>
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                padding: "2px 7px",
+                borderRadius: 20,
+                background: "#F5F3FF",
+                color: "#6366F1",
+                flexShrink: 0,
+              }}
+            >
+              {isImage ? "Image" : isPdf ? "PDF" : "Document"}
+            </span>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: "50%",
+              border: "1px solid #EFEFEF",
+              background: "#fff",
+              cursor: "pointer",
+              fontSize: 14,
+              color: "#555",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Body */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "1.25rem" }}>
+          {isImage && file.dataUrl ? (
+            <img
+              src={file.dataUrl}
+              alt={file.name}
+              style={{
+                width: "100%",
+                height: "auto",
+                borderRadius: 10,
+                display: "block",
+              }}
+            />
+          ) : isPdf && file.dataUrl ? (
+            <iframe
+              src={file.dataUrl}
+              style={{
+                width: "100%",
+                height: 520,
+                border: "none",
+                borderRadius: 10,
+              }}
+              title={file.name}
+            />
+          ) : file.extractedText ? (
+            <div
+              style={{
+                background: "#FAFAFA",
+                border: "1px solid #EFEFEF",
+                borderRadius: 10,
+                padding: "1.25rem",
+              }}
+            >
+              <p
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: "#BBB",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.07em",
+                  margin: "0 0 12px",
+                }}
+              >
+                Extracted text content
+              </p>
+              <pre
+                style={{
+                  fontSize: 12,
+                  color: "#444",
+                  lineHeight: 1.7,
+                  margin: 0,
+                  whiteSpace: "pre-wrap",
+                  fontFamily: "inherit",
+                }}
+              >
+                {file.extractedText}
+              </pre>
+            </div>
+          ) : (
+            <div style={{ textAlign: "center", padding: "3rem 1rem" }}>
+              <p style={{ fontSize: 32, margin: "0 0 12px" }}>📎</p>
+              <p
+                style={{
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: "#222",
+                  margin: "0 0 6px",
+                }}
+              >
+                Preview not available
+              </p>
+              <p style={{ fontSize: 13, color: "#AAA", margin: 0 }}>
+                This file type can't be previewed directly.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div
+          style={{
+            padding: "12px 18px",
+            borderTop: "1px solid #F0F0F0",
+            flexShrink: 0,
+            display: "flex",
+            justifyContent: "flex-end",
+          }}
+        >
+          <button
+            onClick={onClose}
+            style={{
+              padding: "8px 18px",
+              borderRadius: 8,
+              border: "1px solid #EFEFEF",
+              background: "#fff",
+              fontSize: 13,
+              fontWeight: 500,
+              color: "#555",
+              cursor: "pointer",
+            }}
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── BRAND MANAGER ───────────────────────────────────────────
 function BrandManager({
   onSelect,
@@ -371,6 +591,7 @@ function BrandManager({
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [previewFile, setPreviewFile] = useState<BrandFile | null>(null);
   useEffect(() => {
     loadBrandsFromSupabase(userId, teamId).then((b) => {
       setBrands(b);
@@ -512,6 +733,12 @@ function BrandManager({
         border: isModal ? "none" : "1px solid #EFEFEF",
       }}
     >
+      {previewFile && (
+        <FilePreviewModal
+          file={previewFile}
+          onClose={() => setPreviewFile(null)}
+        />
+      )}
       <div
         style={{
           display: "flex",
@@ -648,6 +875,10 @@ function BrandManager({
                   {(d.files || []).map((f, i) => (
                     <span
                       key={i}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPreviewFile(f);
+                      }}
                       style={{
                         fontSize: 10,
                         padding: "2px 6px",
@@ -655,10 +886,25 @@ function BrandManager({
                         background: "#F5F3FF",
                         color: "#6366F1",
                         border: "1px solid #E0DBFF",
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 3,
                       }}
                     >
                       {fileIcon(f.type)}{" "}
                       {f.name.length > 20 ? f.name.slice(0, 20) + "…" : f.name}
+                      <svg
+                        width="9"
+                        height="9"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                      >
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
                     </span>
                   ))}
                 </div>
@@ -781,9 +1027,28 @@ function BrandManager({
                   border: "1px solid #E0DBFF",
                 }}
               >
-                <span>
+                <span
+                  onClick={() => setPreviewFile(f)}
+                  style={{
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                  }}
+                >
                   {fileIcon(f.type)}{" "}
                   {f.name.length > 22 ? f.name.slice(0, 22) + "…" : f.name}
+                  <svg
+                    width="9"
+                    height="9"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                  >
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
                 </span>
                 {f.extractedText && (
                   <span style={{ color: "#10B981", fontSize: 9 }}>
@@ -4026,6 +4291,8 @@ export default function App({
   const [conceptThreshold, setConceptThreshold] = useState(70);
   const [referenceLinks, setReferenceLinks] = useState<string[]>([""]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [analyserPreviewFile, setAnalyserPreviewFile] =
+    useState<BrandFile | null>(null);
 
   const fetchUserData = async () => {
     const { data: prof } = await supabase
@@ -4974,6 +5241,12 @@ Be specific. Reference actual elements visible. No generic advice.`;
       }}
     >
       <Sidebar />
+      {analyserPreviewFile && (
+        <FilePreviewModal
+          file={analyserPreviewFile}
+          onClose={() => setAnalyserPreviewFile(null)}
+        />
+      )}
       {showBrandMgr && (
         <BrandManager
           userId={session.user.id}
@@ -5225,6 +5498,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                                   (f, i) => (
                                     <span
                                       key={i}
+                                      onClick={() => setAnalyserPreviewFile(f)}
                                       style={{
                                         fontSize: 10,
                                         padding: "2px 7px",
@@ -5232,6 +5506,10 @@ Be specific. Reference actual elements visible. No generic advice.`;
                                         background: "#fff",
                                         color: "#6366F1",
                                         border: "1px solid #E0DBFF",
+                                        cursor: "pointer",
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: 3,
                                       }}
                                     >
                                       {f.type.startsWith("image/")
@@ -5242,6 +5520,17 @@ Be specific. Reference actual elements visible. No generic advice.`;
                                       {f.name.length > 18
                                         ? f.name.slice(0, 18) + "…"
                                         : f.name}
+                                      <svg
+                                        width="9"
+                                        height="9"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2.5"
+                                      >
+                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                        <circle cx="12" cy="12" r="3" />
+                                      </svg>
                                     </span>
                                   ),
                                 )}
