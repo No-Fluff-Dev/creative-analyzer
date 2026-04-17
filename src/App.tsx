@@ -3167,15 +3167,19 @@ function TeamManager({ session }: { session: any }) {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
+                  gap: 12,
                 }}
               >
-                <div>
+                <div style={{ minWidth: 0, flex: 1 }}>
                   <h2
                     style={{
                       fontSize: 17,
                       fontWeight: 600,
                       color: "#111",
                       margin: "0 0 2px",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
                     }}
                   >
                     {(activeTeamData.teams as any).name}
@@ -3193,13 +3197,22 @@ function TeamManager({ session }: { session: any }) {
                     </span>
                   </p>
                 </div>
-                <div style={{ textAlign: "right" }}>
+                <div
+                  style={{
+                    textAlign: "right",
+                    flexShrink: 0,
+                    background: "#F5F3FF",
+                    borderRadius: 10,
+                    padding: "8px 14px",
+                  }}
+                >
                   <p
                     style={{
                       fontSize: 10,
                       fontWeight: 700,
-                      color: "#AAA",
+                      color: "#6366F1",
                       textTransform: "uppercase",
+                      letterSpacing: "0.06em",
                       margin: "0 0 2px",
                     }}
                   >
@@ -3209,11 +3222,11 @@ function TeamManager({ session }: { session: any }) {
                     style={{
                       fontSize: 22,
                       fontWeight: 700,
-                      color: "#111",
+                      color: "#6366F1",
                       margin: 0,
                     }}
                   >
-                    {(activeTeamData.teams as any).credits_pool}
+                    {(activeTeamData.teams as any).credits_pool ?? 0}
                   </p>
                 </div>
               </div>
@@ -4065,7 +4078,6 @@ export default function App({
       .update({
         full_name: editName,
         company: editCompany,
-        updated_at: new Date().toISOString(),
       })
       .eq("id", session.user.id);
     if (!error) {
@@ -5014,7 +5026,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                       marginBottom: 12,
                     }}
                   >
-                    <div>
+                    <div style={{ gridColumn: "1 / -1" }}>
                       <label
                         style={{
                           fontSize: 11,
@@ -5028,7 +5040,13 @@ Be specific. Reference actual elements visible. No generic advice.`;
                       >
                         Brand / client
                       </label>
-                      <div style={{ display: "flex", gap: 6 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 6,
+                          marginBottom: selectedBrand ? 8 : 0,
+                        }}
+                      >
                         <select
                           value={selectedBrand}
                           onChange={(e) => {
@@ -5064,18 +5082,160 @@ Be specific. Reference actual elements visible. No generic advice.`;
                         <button
                           onClick={() => setShowBrandMgr(true)}
                           style={{
-                            padding: "0 10px",
+                            padding: "0 14px",
                             border: "1px solid #EFEFEF",
                             borderRadius: 8,
                             background: "#fff",
                             cursor: "pointer",
-                            color: "#888",
-                            fontSize: 13,
+                            color: "#555",
+                            fontSize: 12,
+                            fontWeight: 600,
+                            whiteSpace: "nowrap",
                           }}
                         >
-                          +
+                          Manage brands
                         </button>
                       </div>
+                      {/* Brand preview card — only shows when a brand is selected */}
+                      {selectedBrand && brands[selectedBrand] && (
+                        <div
+                          style={{
+                            background: "#F5F3FF",
+                            border: "1px solid #E0DBFF",
+                            borderRadius: 10,
+                            padding: "10px 14px",
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: 12,
+                          }}
+                        >
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8,
+                                marginBottom: 4,
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: 20,
+                                  height: 20,
+                                  borderRadius: 5,
+                                  background: "#6366F1",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  flexShrink: 0,
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    fontSize: 10,
+                                    fontWeight: 800,
+                                    color: "#fff",
+                                  }}
+                                >
+                                  {selectedBrand[0].toUpperCase()}
+                                </span>
+                              </div>
+                              <span
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: 600,
+                                  color: "#6366F1",
+                                }}
+                              >
+                                {selectedBrand}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  padding: "1px 6px",
+                                  borderRadius: 20,
+                                  background: "#6366F1",
+                                  color: "#fff",
+                                }}
+                              >
+                                Active
+                              </span>
+                            </div>
+                            {brands[selectedBrand].notes && (
+                              <p
+                                style={{
+                                  fontSize: 11,
+                                  color: "#6366F180",
+                                  margin: "0 0 6px",
+                                  lineHeight: 1.5,
+                                  overflow: "hidden",
+                                  display: "-webkit-box",
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: "vertical" as any,
+                                }}
+                              >
+                                {brands[selectedBrand].notes}
+                              </p>
+                            )}
+                            {(brands[selectedBrand].files || []).length > 0 && (
+                              <div
+                                style={{
+                                  display: "flex",
+                                  gap: 4,
+                                  flexWrap: "wrap",
+                                }}
+                              >
+                                {(brands[selectedBrand].files || []).map(
+                                  (f, i) => (
+                                    <span
+                                      key={i}
+                                      style={{
+                                        fontSize: 10,
+                                        padding: "2px 7px",
+                                        borderRadius: 4,
+                                        background: "#fff",
+                                        color: "#6366F1",
+                                        border: "1px solid #E0DBFF",
+                                      }}
+                                    >
+                                      {f.type.startsWith("image/")
+                                        ? "🖼️"
+                                        : f.type === "application/pdf"
+                                          ? "📄"
+                                          : "📝"}{" "}
+                                      {f.name.length > 18
+                                        ? f.name.slice(0, 18) + "…"
+                                        : f.name}
+                                    </span>
+                                  ),
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => {
+                              setSelectedBrand("");
+                              setBrandNotes("");
+                              setBrandFiles([]);
+                              setClient("");
+                            }}
+                            style={{
+                              padding: "3px 8px",
+                              borderRadius: 6,
+                              border: "1px solid #E0DBFF",
+                              background: "#fff",
+                              color: "#6366F1",
+                              fontSize: 11,
+                              cursor: "pointer",
+                              fontWeight: 600,
+                              flexShrink: 0,
+                            }}
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label
@@ -5900,12 +6060,13 @@ Be specific. Reference actual elements visible. No generic advice.`;
                         style={{
                           width: "100%",
                           padding: "10px 12px",
-                          border: "1px solid #EFEFEF",
+                          border: "1px solid #E5E7EB",
                           borderRadius: 8,
                           fontSize: 13,
                           outline: "none",
                           boxSizing: "border-box",
                           color: "#111",
+                          background: "#fff",
                         }}
                       />
                     </div>
@@ -5930,12 +6091,13 @@ Be specific. Reference actual elements visible. No generic advice.`;
                         style={{
                           width: "100%",
                           padding: "10px 12px",
-                          border: "1px solid #EFEFEF",
+                          border: "1px solid #E5E7EB",
                           borderRadius: 8,
                           fontSize: 13,
                           outline: "none",
                           boxSizing: "border-box",
                           color: "#111",
+                          background: "#fff",
                         }}
                       />
                     </div>
