@@ -2590,14 +2590,16 @@ function ABResults({
   );
 }
 
-// ─── TEAM MANAGER (full page, Chatling-style) ─────────────────
+// ─── TEAM MANAGER (full page, Chatling-style) ────────────────
+// Replace the entire TeamManager function in App.tsx with this:
+
 function TeamManager({ session }: { session: any }) {
   const [teams, setTeams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
-  const [teamSection, setTeamSection] = useState<
-    "members" | "credits" | "invite"
-  >("members");
+  const [teamView, setTeamView] = useState<"members" | "credits" | "invite">(
+    "members",
+  );
 
   // Create form
   const [showCreate, setShowCreate] = useState(false);
@@ -2659,6 +2661,7 @@ function TeamManager({ session }: { session: any }) {
   const activeTeamData = teams.find(
     (t) => (t.teams as any).id === activeTeamId,
   );
+  const isAdmin = activeTeamData?.role === "admin";
 
   useEffect(() => {
     if (!activeTeamId) return;
@@ -2667,6 +2670,7 @@ function TeamManager({ session }: { session: any }) {
     setInviteStatus(null);
     setInviteEmail("");
     setAllocAmount("");
+    setTeamView("members");
   }, [activeTeamId]);
 
   const loadMembers = async (teamId: string) => {
@@ -2797,7 +2801,6 @@ function TeamManager({ session }: { session: any }) {
     setSendingInvite(false);
   };
 
-  const isAdmin = activeTeamData?.role === "admin";
   const filteredMembers = teamMembers.filter((m) => {
     if (!memberSearch.trim()) return true;
     const q = memberSearch.toLowerCase();
@@ -2806,33 +2809,6 @@ function TeamManager({ session }: { session: any }) {
       (m.profiles?.email || "").toLowerCase().includes(q)
     );
   });
-
-  const navBtn = (
-    section: typeof teamSection,
-    label: string,
-    icon: React.ReactNode,
-  ) => (
-    <button
-      onClick={() => setTeamSection(section)}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        width: "100%",
-        padding: "9px 12px",
-        borderRadius: 8,
-        border: "none",
-        background: teamSection === section ? "#F5F3FF" : "transparent",
-        color: teamSection === section ? "#6366F1" : "#555",
-        fontSize: 13,
-        fontWeight: teamSection === section ? 600 : 500,
-        cursor: "pointer",
-        textAlign: "left",
-      }}
-    >
-      {icon} {label}
-    </button>
-  );
 
   if (loading)
     return (
@@ -2844,39 +2820,40 @@ function TeamManager({ session }: { session: any }) {
           height: 300,
         }}
       >
-        <p style={{ color: "#888" }}>Loading teams...</p>
+        <p style={{ color: "#888", fontSize: 13 }}>Loading teams...</p>
       </div>
     );
 
   return (
-    <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+    <div>
+      {/* Page header */}
       <div
         style={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "flex-start",
-          marginBottom: "2rem",
+          marginBottom: "1.75rem",
         }}
       >
         <div>
           <h1
             style={{
-              fontSize: 24,
+              fontSize: 22,
               fontWeight: 600,
               color: "#111",
               margin: "0 0 4px",
             }}
           >
-            Teams & Credits
+            Teams
           </h1>
-          <p style={{ fontSize: 14, color: "#888", margin: 0 }}>
-            Manage your teams, members, and credit allocation.
+          <p style={{ fontSize: 13, color: "#999", margin: 0 }}>
+            Manage your teams, members, and credits.
           </p>
         </div>
         <button
-          onClick={() => setShowCreate(!showCreate)}
+          onClick={() => setShowCreate((s) => !s)}
           style={{
-            padding: "10px 16px",
+            padding: "9px 16px",
             borderRadius: 8,
             border: "none",
             background: "#111",
@@ -2886,44 +2863,52 @@ function TeamManager({ session }: { session: any }) {
             cursor: "pointer",
           }}
         >
-          + New Team
+          + New team
         </button>
       </div>
 
+      {/* Create form */}
       {showCreate && (
         <div
           style={{
             background: "#fff",
             border: "1px solid #EFEFEF",
             borderRadius: 14,
-            padding: "1.5rem",
-            marginBottom: "1.5rem",
+            padding: "1.25rem",
+            marginBottom: "1.25rem",
           }}
         >
-          <h3
+          <p
             style={{
-              margin: "0 0 16px",
-              fontSize: 15,
+              fontSize: 13,
               fontWeight: 600,
               color: "#111",
+              margin: "0 0 14px",
             }}
           >
-            Create Organization & Team
-          </h3>
-          <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
-            <div style={{ flex: 1 }}>
+            Create organisation & team
+          </p>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 10,
+              marginBottom: 12,
+            }}
+          >
+            <div>
               <label
                 style={{
                   fontSize: 11,
                   fontWeight: 600,
                   color: "#888",
                   display: "block",
-                  marginBottom: 6,
+                  marginBottom: 5,
                   textTransform: "uppercase",
                   letterSpacing: "0.06em",
                 }}
               >
-                Organization
+                Organisation
               </label>
               <input
                 value={orgName}
@@ -2931,28 +2916,29 @@ function TeamManager({ session }: { session: any }) {
                 placeholder="e.g. Acme Corp"
                 style={{
                   width: "100%",
-                  padding: "10px 12px",
+                  padding: "9px 12px",
                   border: "1px solid #EFEFEF",
                   borderRadius: 8,
                   fontSize: 13,
                   outline: "none",
-                  boxSizing: "border-box",
+                  boxSizing: "border-box" as any,
+                  color: "#111",
                 }}
               />
             </div>
-            <div style={{ flex: 1 }}>
+            <div>
               <label
                 style={{
                   fontSize: 11,
                   fontWeight: 600,
                   color: "#888",
                   display: "block",
-                  marginBottom: 6,
+                  marginBottom: 5,
                   textTransform: "uppercase",
                   letterSpacing: "0.06em",
                 }}
               >
-                Team Name
+                Team name
               </label>
               <input
                 value={teamName}
@@ -2960,12 +2946,13 @@ function TeamManager({ session }: { session: any }) {
                 placeholder="e.g. Growth Team"
                 style={{
                   width: "100%",
-                  padding: "10px 12px",
+                  padding: "9px 12px",
                   border: "1px solid #EFEFEF",
                   borderRadius: 8,
                   fontSize: 13,
                   outline: "none",
-                  boxSizing: "border-box",
+                  boxSizing: "border-box" as any,
+                  color: "#111",
                 }}
               />
             </div>
@@ -2975,33 +2962,29 @@ function TeamManager({ session }: { session: any }) {
               onClick={handleCreate}
               disabled={creating || !orgName.trim() || !teamName.trim()}
               style={{
-                padding: "10px 20px",
+                padding: "9px 18px",
                 borderRadius: 8,
                 border: "none",
-                background: "#6366F1",
-                color: "#fff",
+                background:
+                  orgName.trim() && teamName.trim() ? "#6366F1" : "#F0F0F0",
+                color: orgName.trim() && teamName.trim() ? "#fff" : "#AAA",
                 fontSize: 13,
                 fontWeight: 600,
                 cursor:
-                  creating || !orgName.trim() || !teamName.trim()
-                    ? "not-allowed"
-                    : "pointer",
-                opacity:
-                  creating || !orgName.trim() || !teamName.trim() ? 0.7 : 1,
+                  orgName.trim() && teamName.trim() ? "pointer" : "not-allowed",
               }}
             >
-              {creating ? "Creating..." : "Create"}
+              {creating ? "Creating…" : "Create"}
             </button>
             <button
               onClick={() => setShowCreate(false)}
               style={{
-                padding: "10px 20px",
+                padding: "9px 18px",
                 borderRadius: 8,
                 border: "1px solid #EFEFEF",
                 background: "#fff",
                 color: "#555",
                 fontSize: 13,
-                fontWeight: 600,
                 cursor: "pointer",
               }}
             >
@@ -3016,26 +2999,26 @@ function TeamManager({ session }: { session: any }) {
           style={{
             padding: "4rem",
             background: "#fff",
+            border: "1px solid #EFEFEF",
             borderRadius: 14,
             textAlign: "center",
-            border: "1px solid #EFEFEF",
           }}
         >
           <div
             style={{
-              width: 48,
-              height: 48,
+              width: 44,
+              height: 44,
               borderRadius: 12,
               background: "#F5F3FF",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              margin: "0 auto 16px",
+              margin: "0 auto 14px",
             }}
           >
             <svg
-              width="22"
-              height="22"
+              width="20"
+              height="20"
               viewBox="0 0 24 24"
               fill="none"
               stroke="#6366F1"
@@ -3050,20 +3033,20 @@ function TeamManager({ session }: { session: any }) {
           <p
             style={{
               fontWeight: 600,
-              fontSize: 16,
+              fontSize: 15,
               color: "#111",
               margin: "0 0 6px",
             }}
           >
             No teams yet
           </p>
-          <p style={{ color: "#888", fontSize: 14, marginBottom: 20 }}>
+          <p style={{ color: "#AAA", fontSize: 13, marginBottom: 18 }}>
             Create your first team to collaborate with others.
           </p>
           <button
             onClick={() => setShowCreate(true)}
             style={{
-              padding: "10px 20px",
+              padding: "9px 18px",
               borderRadius: 8,
               border: "none",
               background: "#6366F1",
@@ -3073,137 +3056,152 @@ function TeamManager({ session }: { session: any }) {
               cursor: "pointer",
             }}
           >
-            Create First Team
+            Create first team
           </button>
         </div>
       ) : (
         <div
           style={{
-            display: "flex",
-            gap: 0,
-            background: "#fff",
-            border: "1px solid #EFEFEF",
-            borderRadius: 14,
-            overflow: "hidden",
-            minHeight: 520,
+            display: "grid",
+            gridTemplateColumns: "220px 1fr",
+            gap: 16,
+            alignItems: "start",
           }}
         >
-          {/* ── LEFT SIDEBAR — Team list ── */}
+          {/* ── LEFT: Team list ── */}
           <div
             style={{
-              width: 220,
-              borderRight: "1px solid #EFEFEF",
-              padding: "1rem 0.75rem",
-              display: "flex",
-              flexDirection: "column",
-              gap: 2,
-              flexShrink: 0,
+              background: "#fff",
+              border: "1px solid #EFEFEF",
+              borderRadius: 14,
+              overflow: "hidden",
             }}
           >
-            <p
+            <div
               style={{
-                fontSize: 10,
-                fontWeight: 700,
-                color: "#AAA",
-                textTransform: "uppercase",
-                letterSpacing: "0.07em",
-                padding: "0 8px",
-                marginBottom: 8,
+                padding: "12px 14px",
+                borderBottom: "1px solid #F5F5F5",
               }}
             >
-              Your Teams
-            </p>
-            {teams.map((t, i) => {
-              const team = t.teams as any;
-              const isActive = team.id === activeTeamId;
-              return (
-                <button
-                  key={i}
-                  onClick={() => setActiveTeamId(team.id)}
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "flex-start",
-                    width: "100%",
-                    padding: "10px 12px",
-                    borderRadius: 8,
-                    border: "none",
-                    background: isActive ? "#F5F3FF" : "transparent",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    gap: 2,
-                  }}
-                >
-                  <span
+              <p
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: "#BBB",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.07em",
+                  margin: 0,
+                }}
+              >
+                Your teams
+              </p>
+            </div>
+            <div style={{ padding: "6px" }}>
+              {teams.map((t, i) => {
+                const team = t.teams as any;
+                const isActive = team.id === activeTeamId;
+                return (
+                  <button
+                    key={i}
+                    onClick={() => setActiveTeamId(team.id)}
                     style={{
-                      fontSize: 13,
-                      fontWeight: isActive ? 600 : 500,
-                      color: isActive ? "#6366F1" : "#222",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "flex-start",
+                      width: "100%",
+                      padding: "10px 12px",
+                      borderRadius: 9,
+                      border: "none",
+                      background: isActive ? "#F5F3FF" : "transparent",
+                      cursor: "pointer",
+                      textAlign: "left",
+                      gap: 2,
+                      marginBottom: 2,
                     }}
                   >
-                    {team.name}
-                  </span>
-                  <span
-                    style={{
-                      fontSize: 10,
-                      color: isActive ? "#6366F1" : "#AAA",
-                    }}
-                  >
-                    {team.organisations?.name}
-                  </span>
-                </button>
-              );
-            })}
+                    <span
+                      style={{
+                        fontSize: 13,
+                        fontWeight: isActive ? 600 : 500,
+                        color: isActive ? "#6366F1" : "#222",
+                      }}
+                    >
+                      {team.name}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        color: isActive ? "#A5B4FC" : "#BBB",
+                      }}
+                    >
+                      {team.organisations?.name || "—"}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          {/* ── RIGHT CONTENT ── */}
+          {/* ── RIGHT: Team detail ── */}
           {activeTeamData ? (
-            <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-              {/* Team header */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+              {/* Team header card */}
               <div
                 style={{
+                  background: "#fff",
+                  border: "1px solid #EFEFEF",
+                  borderRadius: 14,
                   padding: "1.25rem 1.5rem",
-                  borderBottom: "1px solid #EFEFEF",
+                  marginBottom: 12,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
                   gap: 12,
                 }}
               >
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <h2
+                <div style={{ minWidth: 0 }}>
+                  <div
                     style={{
-                      fontSize: 17,
-                      fontWeight: 600,
-                      color: "#111",
-                      margin: "0 0 2px",
-                      whiteSpace: "nowrap",
-                      overflow: "visible",
-                      textOverflow: "ellipsis",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      marginBottom: 3,
                     }}
                   >
-                    {(activeTeamData.teams as any).name}
-                  </h2>
-                  <p style={{ fontSize: 12, color: "#888", margin: 0 }}>
-                    {(activeTeamData.teams as any).organisations?.name} ·{" "}
+                    <h2
+                      style={{
+                        fontSize: 16,
+                        fontWeight: 600,
+                        color: "#111",
+                        margin: 0,
+                      }}
+                    >
+                      {(activeTeamData.teams as any).name}
+                    </h2>
                     <span
                       style={{
-                        color:
-                          activeTeamData.role === "admin" ? "#6366F1" : "#888",
-                        fontWeight: 600,
+                        fontSize: 10,
+                        fontWeight: 700,
+                        padding: "2px 8px",
+                        borderRadius: 20,
+                        background: isAdmin ? "#F5F3FF" : "#F4F4F5",
+                        color: isAdmin ? "#6366F1" : "#888",
                       }}
                     >
                       {activeTeamData.role.toUpperCase()}
                     </span>
+                  </div>
+                  <p style={{ fontSize: 12, color: "#AAA", margin: 0 }}>
+                    {(activeTeamData.teams as any).organisations?.name}
                   </p>
                 </div>
                 <div
                   style={{
-                    textAlign: "right",
-                    flexShrink: 0,
                     background: "#F5F3FF",
                     borderRadius: 10,
-                    padding: "8px 14px",
+                    padding: "10px 16px",
+                    textAlign: "right",
+                    flexShrink: 0,
                   }}
                 >
                   <p
@@ -3216,14 +3214,15 @@ function TeamManager({ session }: { session: any }) {
                       margin: "0 0 2px",
                     }}
                   >
-                    Team Credits
+                    Credits
                   </p>
                   <p
                     style={{
-                      fontSize: 22,
+                      fontSize: 24,
                       fontWeight: 700,
                       color: "#6366F1",
                       margin: 0,
+                      lineHeight: 1,
                     }}
                   >
                     {(activeTeamData.teams as any).credits_pool ?? 0}
@@ -3231,717 +3230,737 @@ function TeamManager({ session }: { session: any }) {
                 </div>
               </div>
 
-              <div style={{ display: "flex", flex: 1 }}>
-                {/* Section nav */}
+              {/* Sub-nav tabs */}
+              <div
+                style={{
+                  display: "flex",
+                  gap: 6,
+                  background: "#EFEFEF",
+                  borderRadius: 10,
+                  padding: 4,
+                  marginBottom: 16,
+                }}
+              >
+                {(
+                  [
+                    ["members", "Members"],
+                    ...(isAdmin
+                      ? [
+                          ["credits", "Credits"],
+                          ["invite", "Invite"],
+                        ]
+                      : []),
+                  ] as [typeof teamView, string][]
+                ).map(([view, label]) => (
+                  <button
+                    key={view}
+                    onClick={() => setTeamView(view)}
+                    style={{
+                      flex: 1,
+                      padding: "8px 0",
+                      borderRadius: 8,
+                      border: "none",
+                      fontSize: 13,
+                      fontWeight: 500,
+                      background: teamView === view ? "#fff" : "transparent",
+                      color: teamView === view ? "#111" : "#888",
+                      boxShadow:
+                        teamView === view
+                          ? "0 1px 3px rgba(0,0,0,0.08)"
+                          : "none",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {/* ── MEMBERS ── */}
+              {teamView === "members" && (
                 <div
                   style={{
-                    width: 180,
-                    borderRight: "1px solid #EFEFEF",
-                    padding: "1rem 0.75rem",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 2,
-                    flexShrink: 0,
+                    background: "#fff",
+                    border: "1px solid #EFEFEF",
+                    borderRadius: 14,
+                    padding: "1.25rem",
                   }}
                 >
-                  {navBtn(
-                    "members",
-                    "Members",
-                    <svg
-                      width="15"
-                      height="15"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      marginBottom: 14,
+                    }}
+                  >
+                    <p
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 600,
+                        color: "#111",
+                        margin: 0,
+                      }}
                     >
-                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                      <circle cx="9" cy="7" r="4" />
-                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                    </svg>,
-                  )}
-                  {isAdmin &&
-                    navBtn(
-                      "credits",
-                      "Credits",
+                      Members{" "}
+                      <span
+                        style={{ fontSize: 12, color: "#AAA", fontWeight: 400 }}
+                      >
+                        ({teamMembers.length})
+                      </span>
+                    </p>
+                    <div style={{ position: "relative" }}>
                       <svg
-                        width="15"
-                        height="15"
+                        width="13"
+                        height="13"
                         viewBox="0 0 24 24"
                         fill="none"
-                        stroke="currentColor"
+                        stroke="#BBB"
                         strokeWidth="2"
-                      >
-                        <circle cx="12" cy="12" r="10" />
-                        <path d="M12 6v6l4 2" />
-                      </svg>,
-                    )}
-                  {isAdmin &&
-                    navBtn(
-                      "invite",
-                      "Invite",
-                      <svg
-                        width="15"
-                        height="15"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                      >
-                        <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                        <circle cx="8.5" cy="7" r="4" />
-                        <line x1="20" y1="8" x2="20" y2="14" />
-                        <line x1="23" y1="11" x2="17" y2="11" />
-                      </svg>,
-                    )}
-                </div>
-
-                {/* Section content */}
-                <div style={{ flex: 1, padding: "1.5rem", overflowY: "auto" }}>
-                  {/* MEMBERS */}
-                  {teamSection === "members" && (
-                    <div>
-                      <div
                         style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          marginBottom: 16,
+                          position: "absolute",
+                          left: 9,
+                          top: "50%",
+                          transform: "translateY(-50%)",
                         }}
                       >
-                        <h3
-                          style={{
-                            fontSize: 15,
-                            fontWeight: 600,
-                            color: "#111",
-                            margin: 0,
-                          }}
-                        >
-                          Team Members ({teamMembers.length})
-                        </h3>
-                        {/* Search */}
-                        <div style={{ position: "relative" }}>
-                          <svg
-                            width="14"
-                            height="14"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="#AAA"
-                            strokeWidth="2"
-                            style={{
-                              position: "absolute",
-                              left: 10,
-                              top: "50%",
-                              transform: "translateY(-50%)",
-                            }}
-                          >
-                            <circle cx="11" cy="11" r="8" />
-                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                          </svg>
-                          <input
-                            value={memberSearch}
-                            onChange={(e) => setMemberSearch(e.target.value)}
-                            placeholder="Search members…"
-                            style={{
-                              padding: "8px 12px 8px 32px",
-                              border: "1px solid #EFEFEF",
-                              borderRadius: 8,
-                              fontSize: 12,
-                              outline: "none",
-                              width: 200,
-                              background: "#FAFAFA",
-                            }}
-                          />
-                        </div>
-                      </div>
-                      {loadingMembers ? (
-                        <p style={{ color: "#888", fontSize: 13 }}>
-                          Loading...
-                        </p>
-                      ) : (
+                        <circle cx="11" cy="11" r="8" />
+                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                      </svg>
+                      <input
+                        value={memberSearch}
+                        onChange={(e) => setMemberSearch(e.target.value)}
+                        placeholder="Search…"
+                        style={{
+                          padding: "7px 10px 7px 28px",
+                          border: "1px solid #EFEFEF",
+                          borderRadius: 8,
+                          fontSize: 12,
+                          outline: "none",
+                          width: 160,
+                          background: "#FAFAFA",
+                          color: "#111",
+                        }}
+                      />
+                    </div>
+                  </div>
+                  {loadingMembers ? (
+                    <p
+                      style={{
+                        color: "#AAA",
+                        fontSize: 13,
+                        textAlign: "center",
+                        padding: "2rem 0",
+                      }}
+                    >
+                      Loading…
+                    </p>
+                  ) : filteredMembers.length === 0 ? (
+                    <p
+                      style={{
+                        color: "#AAA",
+                        fontSize: 13,
+                        textAlign: "center",
+                        padding: "2rem 0",
+                      }}
+                    >
+                      No members found.
+                    </p>
+                  ) : (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 8,
+                      }}
+                    >
+                      {filteredMembers.map((member) => (
                         <div
+                          key={member.id}
                           style={{
                             display: "flex",
-                            flexDirection: "column",
-                            gap: 8,
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            padding: "12px 14px",
+                            border: "1px solid #F5F5F5",
+                            borderRadius: 10,
+                            background: "#FAFAFA",
                           }}
                         >
-                          {filteredMembers.length === 0 ? (
-                            <p
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 10,
+                            }}
+                          >
+                            <div
                               style={{
-                                color: "#AAA",
-                                fontSize: 13,
-                                textAlign: "center",
-                                padding: "2rem 0",
+                                width: 34,
+                                height: 34,
+                                borderRadius: "50%",
+                                background: "#EEF2FF",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                flexShrink: 0,
                               }}
                             >
-                              No members found.
-                            </p>
-                          ) : (
-                            filteredMembers.map((member) => (
-                              <div
-                                key={member.id}
+                              <span
                                 style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "space-between",
-                                  padding: "12px 16px",
-                                  border: "1px solid #EFEFEF",
-                                  borderRadius: 10,
-                                  background: "#FAFAFA",
+                                  fontSize: 13,
+                                  fontWeight: 700,
+                                  color: "#6366F1",
                                 }}
                               >
-                                <div
+                                {(member.profiles?.full_name ||
+                                  member.profiles?.email ||
+                                  "?")[0].toUpperCase()}
+                              </span>
+                            </div>
+                            <div>
+                              <p
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: 600,
+                                  color: "#111",
+                                  margin: 0,
+                                }}
+                              >
+                                {member.profiles?.full_name || "Guest"}
+                              </p>
+                              <p
+                                style={{
+                                  fontSize: 11,
+                                  color: "#AAA",
+                                  margin: 0,
+                                }}
+                              >
+                                {member.profiles?.email || "—"}
+                              </p>
+                            </div>
+                          </div>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
+                            }}
+                          >
+                            {member.user_id === session.user.id ? (
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  padding: "3px 10px",
+                                  borderRadius: 20,
+                                  background: "#F5F3FF",
+                                  color: "#6366F1",
+                                }}
+                              >
+                                YOU · {member.role.toUpperCase()}
+                              </span>
+                            ) : isAdmin ? (
+                              <>
+                                <select
+                                  value={member.role}
+                                  onChange={(e) =>
+                                    updateMemberRole(member.id, e.target.value)
+                                  }
                                   style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 12,
+                                    padding: "5px 8px",
+                                    borderRadius: 6,
+                                    border: "1px solid #EFEFEF",
+                                    fontSize: 11,
+                                    fontWeight: 600,
+                                    background: "#fff",
+                                    color: "#444",
+                                    cursor: "pointer",
+                                    outline: "none",
                                   }}
                                 >
-                                  <div
-                                    style={{
-                                      width: 36,
-                                      height: 36,
-                                      borderRadius: "50%",
-                                      background: "#6366F120",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      flexShrink: 0,
-                                    }}
-                                  >
-                                    <span
-                                      style={{
-                                        fontSize: 14,
-                                        fontWeight: 700,
-                                        color: "#6366F1",
-                                      }}
-                                    >
-                                      {(member.profiles?.full_name ||
-                                        member.profiles?.email ||
-                                        "?")[0].toUpperCase()}
-                                    </span>
-                                  </div>
-                                  <div>
-                                    <p
-                                      style={{
-                                        fontSize: 13,
-                                        fontWeight: 600,
-                                        color: "#111",
-                                        margin: 0,
-                                      }}
-                                    >
-                                      {member.profiles?.full_name || "Guest"}
-                                    </p>
-                                    <p
-                                      style={{
-                                        fontSize: 11,
-                                        color: "#888",
-                                        margin: 0,
-                                      }}
-                                    >
-                                      {member.profiles?.email || "—"}
-                                    </p>
-                                  </div>
-                                </div>
-                                <div
+                                  <option value="member">Member</option>
+                                  <option value="admin">Admin</option>
+                                </select>
+                                <button
+                                  onClick={() =>
+                                    removeMember(member.id, member.user_id)
+                                  }
                                   style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 10,
+                                    padding: "5px 10px",
+                                    borderRadius: 6,
+                                    border: "1px solid #FECACA",
+                                    background: "#FEF2F2",
+                                    color: "#B91C1C",
+                                    fontSize: 11,
+                                    fontWeight: 600,
+                                    cursor: "pointer",
                                   }}
                                 >
-                                  {member.user_id === session.user.id ? (
-                                    <span
-                                      style={{
-                                        fontSize: 11,
-                                        fontWeight: 700,
-                                        padding: "3px 10px",
-                                        borderRadius: 20,
-                                        background: "#F5F3FF",
-                                        color: "#6366F1",
-                                      }}
-                                    >
-                                      YOU · {member.role.toUpperCase()}
-                                    </span>
-                                  ) : isAdmin ? (
-                                    <>
-                                      <select
-                                        value={member.role}
-                                        onChange={(e) =>
-                                          updateMemberRole(
-                                            member.id,
-                                            e.target.value,
-                                          )
-                                        }
-                                        style={{
-                                          padding: "5px 10px",
-                                          borderRadius: 6,
-                                          border: "1px solid #E5E7EB",
-                                          fontSize: 11,
-                                          fontWeight: 600,
-                                          background: "#fff",
-                                          color: "#444",
-                                          cursor: "pointer",
-                                          outline: "none",
-                                        }}
-                                      >
-                                        <option value="member">Member</option>
-                                        <option value="admin">Admin</option>
-                                      </select>
-                                      <button
-                                        onClick={() =>
-                                          removeMember(
-                                            member.id,
-                                            member.user_id,
-                                          )
-                                        }
-                                        style={{
-                                          padding: "5px 10px",
-                                          borderRadius: 6,
-                                          border: "1px solid #FECACA",
-                                          background: "#FEF2F2",
-                                          color: "#B91C1C",
-                                          fontSize: 11,
-                                          fontWeight: 600,
-                                          cursor: "pointer",
-                                        }}
-                                      >
-                                        Remove
-                                      </button>
-                                    </>
-                                  ) : (
-                                    <span
-                                      style={{
-                                        fontSize: 11,
-                                        fontWeight: 700,
-                                        padding: "3px 10px",
-                                        borderRadius: 20,
-                                        background: "#F4F4F5",
-                                        color: "#888",
-                                      }}
-                                    >
-                                      {member.role.toUpperCase()}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            ))
-                          )}
+                                  Remove
+                                </button>
+                              </>
+                            ) : (
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  padding: "3px 10px",
+                                  borderRadius: 20,
+                                  background: "#F4F4F5",
+                                  color: "#888",
+                                }}
+                              >
+                                {member.role.toUpperCase()}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      )}
+                      ))}
                     </div>
                   )}
+                </div>
+              )}
 
-                  {/* CREDITS */}
-                  {teamSection === "credits" && isAdmin && (
-                    <div>
-                      <h3
-                        style={{
-                          fontSize: 15,
-                          fontWeight: 600,
-                          color: "#111",
-                          margin: "0 0 6px",
-                        }}
-                      >
-                        Credit Allocation
-                      </h3>
+              {/* ── CREDITS ── */}
+              {teamView === "credits" && isAdmin && (
+                <div
+                  style={{
+                    background: "#fff",
+                    border: "1px solid #EFEFEF",
+                    borderRadius: 14,
+                    padding: "1.25rem",
+                  }}
+                >
+                  <p
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: "#111",
+                      margin: "0 0 4px",
+                    }}
+                  >
+                    Credit allocation
+                  </p>
+                  <p
+                    style={{ fontSize: 13, color: "#AAA", margin: "0 0 20px" }}
+                  >
+                    Transfer credits from the org pool to this team.
+                  </p>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: 12,
+                      marginBottom: 20,
+                    }}
+                  >
+                    <div
+                      style={{
+                        background: "#F5F3FF",
+                        borderRadius: 12,
+                        padding: "1.25rem",
+                      }}
+                    >
                       <p
                         style={{
-                          fontSize: 13,
-                          color: "#888",
-                          marginBottom: 24,
+                          fontSize: 10,
+                          fontWeight: 700,
+                          color: "#6366F1",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                          margin: "0 0 8px",
                         }}
                       >
-                        Transfer credits from your org pool to this team.
+                        Org pool
                       </p>
-                      <div
+                      <p
                         style={{
-                          display: "grid",
-                          gridTemplateColumns: "1fr 1fr",
-                          gap: 16,
-                          marginBottom: 24,
+                          fontSize: 30,
+                          fontWeight: 700,
+                          color: "#6366F1",
+                          margin: 0,
+                          lineHeight: 1,
                         }}
                       >
-                        <div
-                          style={{
-                            background: "#F5F3FF",
-                            borderRadius: 12,
-                            padding: "1.25rem",
-                          }}
-                        >
-                          <p
-                            style={{
-                              fontSize: 11,
-                              fontWeight: 700,
-                              color: "#6366F1",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.06em",
-                              margin: "0 0 8px",
-                            }}
-                          >
-                            Org Pool
-                          </p>
-                          <p
-                            style={{
-                              fontSize: 28,
-                              fontWeight: 700,
-                              color: "#6366F1",
-                              margin: 0,
-                            }}
-                          >
-                            {
-                              (activeTeamData.teams as any).organisations
-                                ?.credits_pool
-                            }
-                          </p>
-                          <p
-                            style={{
-                              fontSize: 12,
-                              color: "#6366F180",
-                              margin: "4px 0 0",
-                            }}
-                          >
-                            Available to allocate
-                          </p>
-                        </div>
-                        <div
-                          style={{
-                            background: "#F0FDF4",
-                            borderRadius: 12,
-                            padding: "1.25rem",
-                          }}
-                        >
-                          <p
-                            style={{
-                              fontSize: 11,
-                              fontWeight: 700,
-                              color: "#15803D",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.06em",
-                              margin: "0 0 8px",
-                            }}
-                          >
-                            Team Balance
-                          </p>
-                          <p
-                            style={{
-                              fontSize: 28,
-                              fontWeight: 700,
-                              color: "#15803D",
-                              margin: 0,
-                            }}
-                          >
-                            {(activeTeamData.teams as any).credits_pool}
-                          </p>
-                          <p
-                            style={{
-                              fontSize: 12,
-                              color: "#15803D80",
-                              margin: "4px 0 0",
-                            }}
-                          >
-                            Current team credits
-                          </p>
-                        </div>
-                      </div>
-                      <div
+                        {(activeTeamData.teams as any).organisations
+                          ?.credits_pool ?? 0}
+                      </p>
+                      <p
                         style={{
-                          background: "#FAFAFA",
-                          borderRadius: 12,
-                          padding: "1.25rem",
-                          border: "1px solid #EFEFEF",
+                          fontSize: 11,
+                          color: "#A5B4FC",
+                          margin: "6px 0 0",
                         }}
                       >
-                        <label
-                          style={{
-                            fontSize: 12,
-                            fontWeight: 600,
-                            color: "#555",
-                            display: "block",
-                            marginBottom: 10,
-                          }}
-                        >
-                          Transfer amount
-                        </label>
-                        <div style={{ display: "flex", gap: 8 }}>
-                          <input
-                            type="number"
-                            placeholder="e.g. 50"
-                            value={allocAmount}
-                            onChange={(e) => setAllocAmount(e.target.value)}
-                            style={{
-                              flex: 1,
-                              padding: "10px 12px",
-                              border: "1px solid #EFEFEF",
-                              borderRadius: 8,
-                              fontSize: 13,
-                              outline: "none",
-                            }}
-                          />
-                          <button
-                            onClick={handleAllocateCredits}
-                            disabled={allocating}
-                            style={{
-                              padding: "0 20px",
-                              borderRadius: 8,
-                              border: "none",
-                              background: "#6366F1",
-                              color: "#fff",
-                              fontWeight: 600,
-                              fontSize: 13,
-                              cursor: allocating ? "not-allowed" : "pointer",
-                              opacity: allocating ? 0.7 : 1,
-                            }}
-                          >
-                            {allocating ? "Moving..." : "Transfer"}
-                          </button>
-                        </div>
-                      </div>
+                        Available to allocate
+                      </p>
                     </div>
-                  )}
-
-                  {/* INVITE */}
-                  {teamSection === "invite" && isAdmin && (
-                    <div>
-                      <h3
-                        style={{
-                          fontSize: 15,
-                          fontWeight: 600,
-                          color: "#111",
-                          margin: "0 0 6px",
-                        }}
-                      >
-                        Invite Members
-                      </h3>
+                    <div
+                      style={{
+                        background: "#F0FDF4",
+                        borderRadius: 12,
+                        padding: "1.25rem",
+                      }}
+                    >
                       <p
                         style={{
-                          fontSize: 13,
-                          color: "#888",
-                          marginBottom: 24,
+                          fontSize: 10,
+                          fontWeight: 700,
+                          color: "#15803D",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                          margin: "0 0 8px",
                         }}
                       >
-                        Generate a link or send an email invitation to join this
-                        team.
+                        Team balance
                       </p>
-                      <div
+                      <p
                         style={{
-                          background: "#FAFAFA",
-                          borderRadius: 12,
-                          padding: "1.25rem",
-                          border: "1px solid #EFEFEF",
-                          marginBottom: 16,
+                          fontSize: 30,
+                          fontWeight: 700,
+                          color: "#15803D",
+                          margin: 0,
+                          lineHeight: 1,
                         }}
                       >
-                        <label
-                          style={{
-                            fontSize: 12,
-                            fontWeight: 600,
-                            color: "#555",
-                            display: "block",
-                            marginBottom: 10,
-                          }}
-                        >
-                          Link expiration
-                        </label>
-                        <div
-                          style={{ display: "flex", gap: 8, marginBottom: 12 }}
-                        >
-                          {(["never", "24h", "7d"] as const).map((opt) => (
-                            <button
-                              key={opt}
-                              onClick={() => setInviteExpiration(opt)}
-                              style={{
-                                padding: "7px 14px",
-                                borderRadius: 8,
-                                border: `1px solid ${inviteExpiration === opt ? "#6366F1" : "#EFEFEF"}`,
-                                background:
-                                  inviteExpiration === opt ? "#F5F3FF" : "#fff",
-                                color:
-                                  inviteExpiration === opt ? "#6366F1" : "#555",
-                                fontSize: 12,
-                                fontWeight: 600,
-                                cursor: "pointer",
-                              }}
-                            >
-                              {opt === "never"
-                                ? "Never"
-                                : opt === "24h"
-                                  ? "24 hours"
-                                  : "7 days"}
-                            </button>
-                          ))}
-                        </div>
+                        {(activeTeamData.teams as any).credits_pool ?? 0}
+                      </p>
+                      <p
+                        style={{
+                          fontSize: 11,
+                          color: "#86EFAC",
+                          margin: "6px 0 0",
+                        }}
+                      >
+                        Current balance
+                      </p>
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      background: "#FAFAFA",
+                      border: "1px solid #EFEFEF",
+                      borderRadius: 12,
+                      padding: "1.25rem",
+                    }}
+                  >
+                    <label
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: "#555",
+                        display: "block",
+                        marginBottom: 10,
+                      }}
+                    >
+                      Transfer amount
+                    </label>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <input
+                        type="number"
+                        placeholder="e.g. 50"
+                        value={allocAmount}
+                        onChange={(e) => setAllocAmount(e.target.value)}
+                        style={{
+                          flex: 1,
+                          padding: "10px 12px",
+                          border: "1px solid #EFEFEF",
+                          borderRadius: 8,
+                          fontSize: 13,
+                          outline: "none",
+                          color: "#111",
+                          background: "#fff",
+                        }}
+                      />
+                      <button
+                        onClick={handleAllocateCredits}
+                        disabled={allocating}
+                        style={{
+                          padding: "0 20px",
+                          borderRadius: 8,
+                          border: "none",
+                          background: "#6366F1",
+                          color: "#fff",
+                          fontWeight: 600,
+                          fontSize: 13,
+                          cursor: allocating ? "not-allowed" : "pointer",
+                          opacity: allocating ? 0.7 : 1,
+                        }}
+                      >
+                        {allocating ? "Moving…" : "Transfer"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── INVITE ── */}
+              {teamView === "invite" && isAdmin && (
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 12 }}
+                >
+                  <div
+                    style={{
+                      background: "#fff",
+                      border: "1px solid #EFEFEF",
+                      borderRadius: 14,
+                      padding: "1.25rem",
+                    }}
+                  >
+                    <p
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 600,
+                        color: "#111",
+                        margin: "0 0 4px",
+                      }}
+                    >
+                      Generate invite link
+                    </p>
+                    <p
+                      style={{
+                        fontSize: 13,
+                        color: "#AAA",
+                        margin: "0 0 16px",
+                      }}
+                    >
+                      Anyone with this link can join the team.
+                    </p>
+                    <label
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: "#888",
+                        display: "block",
+                        marginBottom: 8,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                      }}
+                    >
+                      Link expiration
+                    </label>
+                    <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+                      {(["never", "24h", "7d"] as const).map((opt) => (
                         <button
-                          onClick={generateInvite}
+                          key={opt}
+                          onClick={() => setInviteExpiration(opt)}
                           style={{
-                            width: "100%",
-                            padding: "10px",
+                            flex: 1,
+                            padding: "8px 0",
                             borderRadius: 8,
-                            border: "none",
-                            background: "#111",
-                            color: "#fff",
-                            fontSize: 13,
+                            border: `1px solid ${inviteExpiration === opt ? "#6366F1" : "#EFEFEF"}`,
+                            background:
+                              inviteExpiration === opt ? "#F5F3FF" : "#fff",
+                            color:
+                              inviteExpiration === opt ? "#6366F1" : "#555",
+                            fontSize: 12,
                             fontWeight: 600,
                             cursor: "pointer",
                           }}
                         >
-                          Generate Invite Link
+                          {opt === "never"
+                            ? "Never"
+                            : opt === "24h"
+                              ? "24 hours"
+                              : "7 days"}
                         </button>
-                      </div>
-                      {activeInviteLink && (
-                        <div
+                      ))}
+                    </div>
+                    <button
+                      onClick={generateInvite}
+                      style={{
+                        width: "100%",
+                        padding: "10px",
+                        borderRadius: 8,
+                        border: "none",
+                        background: "#111",
+                        color: "#fff",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Generate link
+                    </button>
+                    {activeInviteLink && (
+                      <div
+                        style={{
+                          marginTop: 14,
+                          background: "#FAFAFA",
+                          border: "1px solid #EFEFEF",
+                          borderRadius: 10,
+                          padding: "12px 14px",
+                        }}
+                      >
+                        <p
                           style={{
-                            background: "#fff",
-                            borderRadius: 12,
-                            padding: "1.25rem",
-                            border: "1px solid #EFEFEF",
-                            marginBottom: 16,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: "#BBB",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.06em",
+                            margin: "0 0 8px",
                           }}
                         >
-                          <label
+                          Invite link
+                        </p>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <input
+                            readOnly
+                            value={activeInviteLink}
                             style={{
-                              fontSize: 11,
-                              fontWeight: 700,
-                              color: "#AAA",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.05em",
-                              display: "block",
-                              marginBottom: 8,
-                            }}
-                          >
-                            Invite Link
-                          </label>
-                          <div
-                            style={{
-                              display: "flex",
-                              gap: 8,
-                              marginBottom: 16,
-                            }}
-                          >
-                            <input
-                              readOnly
-                              value={activeInviteLink}
-                              style={{
-                                flex: 1,
-                                padding: "10px 12px",
-                                border: "1px solid #EFEFEF",
-                                borderRadius: 8,
-                                fontSize: 12,
-                                background: "#FAFAFA",
-                                color: "#555",
-                                outline: "none",
-                              }}
-                            />
-                            <button
-                              onClick={copyLink}
-                              style={{
-                                padding: "0 16px",
-                                borderRadius: 8,
-                                border: "none",
-                                background: "#F5F3FF",
-                                color: "#6366F1",
-                                fontSize: 13,
-                                fontWeight: 600,
-                                cursor: "pointer",
-                              }}
-                            >
-                              Copy
-                            </button>
-                          </div>
-                          <div
-                            style={{
-                              height: 1,
-                              background: "#F0F0F0",
-                              marginBottom: 16,
+                              flex: 1,
+                              padding: "9px 12px",
+                              border: "1px solid #EFEFEF",
+                              borderRadius: 8,
+                              fontSize: 12,
+                              background: "#fff",
+                              color: "#555",
+                              outline: "none",
                             }}
                           />
-                          <label
+                          <button
+                            onClick={copyLink}
                             style={{
-                              fontSize: 11,
-                              fontWeight: 700,
-                              color: "#AAA",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.05em",
-                              display: "block",
-                              marginBottom: 8,
+                              padding: "0 14px",
+                              borderRadius: 8,
+                              border: "none",
+                              background: "#F5F3FF",
+                              color: "#6366F1",
+                              fontSize: 12,
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              whiteSpace: "nowrap",
                             }}
                           >
-                            Send via email
-                          </label>
-                          <div style={{ display: "flex", gap: 8 }}>
-                            <input
-                              type="email"
-                              placeholder="colleague@company.com"
-                              value={inviteEmail}
-                              onChange={(e) => setInviteEmail(e.target.value)}
-                              style={{
-                                flex: 1,
-                                padding: "10px 12px",
-                                border: "1px solid #EFEFEF",
-                                borderRadius: 8,
-                                fontSize: 13,
-                                outline: "none",
-                              }}
-                            />
-                            <button
-                              onClick={sendEmailInvite}
-                              disabled={sendingInvite || !inviteEmail}
-                              style={{
-                                padding: "0 16px",
-                                borderRadius: 8,
-                                border: "none",
-                                background: "#111",
-                                color: "#fff",
-                                fontSize: 13,
-                                fontWeight: 600,
-                                cursor:
-                                  sendingInvite || !inviteEmail
-                                    ? "not-allowed"
-                                    : "pointer",
-                                opacity:
-                                  sendingInvite || !inviteEmail ? 0.7 : 1,
-                              }}
-                            >
-                              {sendingInvite ? "Sending..." : "Send"}
-                            </button>
-                          </div>
-                          {inviteStatus && (
-                            <div
-                              style={{
-                                marginTop: 12,
-                                padding: "10px 12px",
-                                borderRadius: 8,
-                                fontSize: 12,
-                                fontWeight: 500,
-                                background:
-                                  inviteStatus.type === "success"
-                                    ? "#F0FDF4"
-                                    : "#FEF2F2",
-                                color:
-                                  inviteStatus.type === "success"
-                                    ? "#15803D"
-                                    : "#B91C1C",
-                              }}
-                            >
-                              {inviteStatus.msg}
-                            </div>
-                          )}
+                            Copy
+                          </button>
                         </div>
-                      )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div
+                    style={{
+                      background: "#fff",
+                      border: "1px solid #EFEFEF",
+                      borderRadius: 14,
+                      padding: "1.25rem",
+                    }}
+                  >
+                    <p
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 600,
+                        color: "#111",
+                        margin: "0 0 4px",
+                      }}
+                    >
+                      Send via email
+                    </p>
+                    <p
+                      style={{
+                        fontSize: 13,
+                        color: "#AAA",
+                        margin: "0 0 14px",
+                      }}
+                    >
+                      Send a magic link directly to a colleague's inbox.
+                    </p>
+                    {!activeInviteLink && (
+                      <p
+                        style={{
+                          fontSize: 12,
+                          color: "#F59E0B",
+                          background: "#FFFBEB",
+                          border: "1px solid #FDE68A",
+                          borderRadius: 8,
+                          padding: "8px 12px",
+                          margin: "0 0 12px",
+                        }}
+                      >
+                        Generate an invite link first before sending via email.
+                      </p>
+                    )}
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <input
+                        type="email"
+                        placeholder="colleague@company.com"
+                        value={inviteEmail}
+                        onChange={(e) => setInviteEmail(e.target.value)}
+                        disabled={!activeInviteLink}
+                        style={{
+                          flex: 1,
+                          padding: "10px 12px",
+                          border: "1px solid #EFEFEF",
+                          borderRadius: 8,
+                          fontSize: 13,
+                          outline: "none",
+                          color: "#111",
+                          background: activeInviteLink ? "#fff" : "#FAFAFA",
+                        }}
+                      />
+                      <button
+                        onClick={sendEmailInvite}
+                        disabled={
+                          sendingInvite || !inviteEmail || !activeInviteLink
+                        }
+                        style={{
+                          padding: "0 16px",
+                          borderRadius: 8,
+                          border: "none",
+                          background: "#111",
+                          color: "#fff",
+                          fontSize: 13,
+                          fontWeight: 600,
+                          cursor:
+                            sendingInvite || !inviteEmail || !activeInviteLink
+                              ? "not-allowed"
+                              : "pointer",
+                          opacity:
+                            sendingInvite || !inviteEmail || !activeInviteLink
+                              ? 0.5
+                              : 1,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {sendingInvite ? "Sending…" : "Send"}
+                      </button>
                     </div>
-                  )}
+                    {inviteStatus && (
+                      <div
+                        style={{
+                          marginTop: 10,
+                          padding: "9px 12px",
+                          borderRadius: 8,
+                          fontSize: 12,
+                          fontWeight: 500,
+                          background:
+                            inviteStatus.type === "success"
+                              ? "#F0FDF4"
+                              : "#FEF2F2",
+                          color:
+                            inviteStatus.type === "success"
+                              ? "#15803D"
+                              : "#B91C1C",
+                        }}
+                      >
+                        {inviteStatus.msg}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           ) : (
             <div
               style={{
-                flex: 1,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
+                background: "#fff",
+                border: "1px solid #EFEFEF",
+                borderRadius: 14,
+                padding: "4rem",
+                textAlign: "center",
               }}
             >
               <p style={{ color: "#AAA", fontSize: 13 }}>
