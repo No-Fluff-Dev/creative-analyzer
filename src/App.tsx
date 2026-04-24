@@ -109,15 +109,23 @@ interface AnalysedCreative extends CreativeFile {
   index: number;
 }
 
-// ─── Team flat entry (what we work with in the grid) ─────────
-interface TeamCard {
+// ─── Org / Client / Team hierarchy ───────────────────────────
+interface TeamEntry {
   teamId: string;
   teamName: string;
-  clientName: string | null; // null = internal/no client
-  orgId: string;
-  orgName: string;
   role: string;
   creditsPool: number;
+}
+interface ClientEntry {
+  clientId: string;
+  clientName: string;
+  teams: TeamEntry[];
+}
+interface OrgEntry {
+  orgId: string;
+  orgName: string;
+  clients: ClientEntry[];
+  internalTeams: TeamEntry[];
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────
@@ -445,6 +453,19 @@ function FilePreviewModal({
             >
               {file.name}
             </p>
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                padding: "2px 7px",
+                borderRadius: 20,
+                background: "#F5F3FF",
+                color: "#6366F1",
+                flexShrink: 0,
+              }}
+            >
+              {isImg ? "Image" : isPdf ? "PDF" : "Document"}
+            </span>
           </div>
           <button
             onClick={onClose}
@@ -477,12 +498,31 @@ function FilePreviewModal({
             <div
               style={{
                 display: "flex",
+                flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
                 padding: "4rem",
               }}
             >
-              <p style={{ fontSize: 13, color: "#888", margin: 0 }}>Loading…</p>
+              <svg
+                width="28"
+                height="28"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#6366F1"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                style={{
+                  animation: "spin 1s linear infinite",
+                  marginBottom: 14,
+                }}
+              >
+                <style>{`@keyframes spin{100%{transform:rotate(360deg)}}`}</style>
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+              </svg>
+              <p style={{ fontSize: 13, color: "#888", margin: 0 }}>
+                Loading preview…
+              </p>
             </div>
           ) : isImg && url ? (
             <img
@@ -515,6 +555,18 @@ function FilePreviewModal({
                 margin: "1.25rem",
               }}
             >
+              <p
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: "#BBB",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.07em",
+                  margin: "0 0 12px",
+                }}
+              >
+                Extracted text
+              </p>
               <pre
                 style={{
                   fontSize: 12,
@@ -531,8 +583,18 @@ function FilePreviewModal({
           ) : (
             <div style={{ textAlign: "center", padding: "3rem" }}>
               <p style={{ fontSize: 32, margin: "0 0 12px" }}>📎</p>
-              <p style={{ fontSize: 13, color: "#AAA", margin: 0 }}>
+              <p
+                style={{
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: "#222",
+                  margin: "0 0 6px",
+                }}
+              >
                 Preview not available
+              </p>
+              <p style={{ fontSize: 13, color: "#AAA", margin: 0 }}>
+                This file could not be loaded.
               </p>
             </div>
           )}
@@ -554,6 +616,7 @@ function FilePreviewModal({
               border: "1px solid #EFEFEF",
               background: "#fff",
               fontSize: 13,
+              fontWeight: 500,
               color: "#555",
               cursor: "pointer",
             }}
@@ -683,7 +746,7 @@ function BrandManager({
       setFiles([]);
       setEditing(null);
     } catch (err) {
-      console.error(err);
+      console.error("Failed to save brand:", err);
     }
     setSaving(false);
   };
@@ -789,7 +852,7 @@ function BrandManager({
             display: "grid",
             gridTemplateColumns: isModal
               ? "1fr"
-              : "repeat(auto-fill,minmax(280px,1fr))",
+              : "repeat(auto-fill, minmax(280px, 1fr))",
             gap: 10,
           }}
         >
@@ -954,7 +1017,7 @@ function BrandManager({
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          placeholder="Colours, fonts, tone, visual rules…"
+          placeholder="Colours, fonts, tone, visual rules, messaging…"
           rows={3}
           style={{
             width: "100%",
@@ -986,10 +1049,12 @@ function BrandManager({
           <p
             style={{ fontSize: 13, fontWeight: 500, color: "#555", margin: 0 }}
           >
-            {uploading ? "Processing…" : "📎 Upload brand guideline"}
+            {uploading
+              ? "Processing file…"
+              : "📎 Upload brand guideline document"}
           </p>
           <p style={{ fontSize: 11, color: "#CCC", margin: "4px 0 0" }}>
-            PDF · Word · PNG · JPG · SVG
+            PDF · Word (.docx) · PNG · JPG · SVG
           </p>
           <input
             ref={fileRef}
@@ -1040,7 +1105,9 @@ function BrandManager({
                   <EyeIcon />
                 </span>
                 {f.extractedText && (
-                  <span style={{ color: "#10B981", fontSize: 9 }}>✓</span>
+                  <span style={{ color: "#10B981", fontSize: 9 }}>
+                    ✓ text extracted
+                  </span>
                 )}
                 <button
                   onClick={() => removeFile(i)}
@@ -1051,6 +1118,7 @@ function BrandManager({
                     color: "#6366F1",
                     fontSize: 12,
                     padding: 0,
+                    lineHeight: 1,
                   }}
                 >
                   ✕
@@ -1093,6 +1161,7 @@ function BrandManager({
               border: "1px solid #EFEFEF",
               background: "#fff",
               fontSize: 13,
+              fontWeight: 500,
               color: "#888",
               cursor: "pointer",
             }}
@@ -1560,6 +1629,7 @@ function AnalysisLoader({ label }: { label: string }) {
         stroke="#6366F1"
         strokeWidth="2.5"
         strokeLinecap="round"
+        strokeLinejoin="round"
         style={{ animation: "spin 1s linear infinite", marginBottom: 16 }}
       >
         <style>{`@keyframes spin{100%{transform:rotate(360deg)}}`}</style>
@@ -2035,8 +2105,8 @@ function SingleResult({
                 No industry selected
               </p>
               <p style={{ fontSize: 13, color: "#AAA", margin: 0 }}>
-                Select an industry in the config panel to get real-world
-                benchmarks.
+                Select an industry in the config panel before analysing to get
+                real-world campaign benchmarks.
               </p>
             </div>
           ) : (
@@ -2075,133 +2145,148 @@ function SingleResult({
                   {result.industry_benchmarks.summary}
                 </p>
               </div>
-              {(result.industry_benchmarks.examples || []).map(
-                (ex: any, i: number) => (
-                  <div
-                    key={i}
-                    style={{
-                      background: "#fff",
-                      border: "1px solid #F0F0F0",
-                      borderRadius: 12,
-                      padding: "1rem 1.25rem",
-                    }}
-                  >
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <p
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: "#BBB",
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    margin: 0,
+                  }}
+                >
+                  Real-world examples
+                </p>
+                {(result.industry_benchmarks.examples || []).map(
+                  (ex: any, i: number) => (
                     <div
+                      key={i}
                       style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                        marginBottom: 8,
+                        background: "#fff",
+                        border: "1px solid #F0F0F0",
+                        borderRadius: 12,
+                        padding: "1rem 1.25rem",
                       }}
                     >
                       <div
                         style={{
-                          width: 28,
-                          height: 28,
-                          borderRadius: 6,
-                          background: i === 0 ? "#6366F1" : "#F59E0B",
                           display: "flex",
                           alignItems: "center",
-                          justifyContent: "center",
+                          gap: 8,
+                          marginBottom: 8,
                         }}
                       >
-                        <span
+                        <div
                           style={{
-                            fontSize: 11,
-                            fontWeight: 800,
-                            color: "#fff",
+                            width: 28,
+                            height: 28,
+                            borderRadius: 6,
+                            background: i === 0 ? "#6366F1" : "#F59E0B",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
                           }}
                         >
-                          {i + 1}
-                        </span>
-                      </div>
-                      <div>
-                        <p
-                          style={{
-                            fontSize: 13,
-                            fontWeight: 700,
-                            color: "#111",
-                            margin: 0,
-                          }}
-                        >
-                          {ex.brand}
-                        </p>
-                        <p style={{ fontSize: 11, color: "#888", margin: 0 }}>
-                          {ex.campaign}
-                        </p>
-                      </div>
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 6,
-                      }}
-                    >
-                      <div
-                        style={{
-                          background: "#F5F3FF",
-                          borderRadius: 8,
-                          padding: "8px 10px",
-                        }}
-                      >
-                        <p
-                          style={{
-                            fontSize: 10,
-                            fontWeight: 700,
-                            color: "#6366F1",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.06em",
-                            margin: "0 0 3px",
-                          }}
-                        >
-                          Technique
-                        </p>
-                        <p
-                          style={{
-                            fontSize: 12,
-                            color: "#444",
-                            margin: 0,
-                            lineHeight: 1.5,
-                          }}
-                        >
-                          {ex.technique}
-                        </p>
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 800,
+                              color: "#fff",
+                            }}
+                          >
+                            {i + 1}
+                          </span>
+                        </div>
+                        <div>
+                          <p
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 700,
+                              color: "#111",
+                              margin: 0,
+                            }}
+                          >
+                            {ex.brand}
+                          </p>
+                          <p style={{ fontSize: 11, color: "#888", margin: 0 }}>
+                            {ex.campaign}
+                          </p>
+                        </div>
                       </div>
                       <div
                         style={{
-                          background: "#F0FDF4",
-                          borderRadius: 8,
-                          padding: "8px 10px",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 6,
                         }}
                       >
-                        <p
+                        <div
                           style={{
-                            fontSize: 10,
-                            fontWeight: 700,
-                            color: "#15803D",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.06em",
-                            margin: "0 0 3px",
+                            background: "#F5F3FF",
+                            borderRadius: 8,
+                            padding: "8px 10px",
                           }}
                         >
-                          What you can learn
-                        </p>
-                        <p
+                          <p
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: "#6366F1",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.06em",
+                              margin: "0 0 3px",
+                            }}
+                          >
+                            Technique
+                          </p>
+                          <p
+                            style={{
+                              fontSize: 12,
+                              color: "#444",
+                              margin: 0,
+                              lineHeight: 1.5,
+                            }}
+                          >
+                            {ex.technique}
+                          </p>
+                        </div>
+                        <div
                           style={{
-                            fontSize: 12,
-                            color: "#444",
-                            margin: 0,
-                            lineHeight: 1.5,
+                            background: "#F0FDF4",
+                            borderRadius: 8,
+                            padding: "8px 10px",
                           }}
                         >
-                          {ex.lesson}
-                        </p>
+                          <p
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: "#15803D",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.06em",
+                              margin: "0 0 3px",
+                            }}
+                          >
+                            What you can learn
+                          </p>
+                          <p
+                            style={{
+                              fontSize: 12,
+                              color: "#444",
+                              margin: 0,
+                              lineHeight: 1.5,
+                            }}
+                          >
+                            {ex.lesson}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ),
-              )}
+                  ),
+                )}
+              </div>
               <div
                 style={{
                   background: "#FEF2F2",
@@ -2572,6 +2657,75 @@ function ABResults({
                   dataUrl={c.dataUrl || ""}
                   zones={c.result.attention_zones || []}
                 />
+                <div
+                  style={{
+                    marginTop: 10,
+                    display: "flex",
+                    gap: 8,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  {(c.result.attention_zones || []).map((z) => (
+                    <div
+                      key={z.priority}
+                      style={{
+                        flex: 1,
+                        minWidth: 120,
+                        background: "#FAFAFA",
+                        borderRadius: 8,
+                        padding: "7px 10px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 5,
+                          marginBottom: 3,
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 14,
+                            height: 14,
+                            borderRadius: "50%",
+                            background:
+                              z.priority === 1
+                                ? "#EF4444"
+                                : z.priority === 2
+                                  ? "#F59E0B"
+                                  : "#EAB308",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: 8,
+                              fontWeight: 800,
+                              color: "#fff",
+                            }}
+                          >
+                            {z.priority}
+                          </span>
+                        </div>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: "#222",
+                          }}
+                        >
+                          {z.label}
+                        </span>
+                      </div>
+                      <p style={{ fontSize: 10, color: "#888", margin: 0 }}>
+                        {z.note}
+                      </p>
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : (
               <div
@@ -2590,6 +2744,9 @@ function ABResults({
               </div>
             ),
           )}
+          <p style={{ fontSize: 10, color: "#CCC", textAlign: "center" }}>
+            Zones based on AI visual analysis — not pixel-level eye tracking
+          </p>
         </div>
       )}
       {activeTab === "detail" && (
@@ -2754,83 +2911,138 @@ function ABResults({
   );
 }
 
-// ─── TEAM SETTINGS VIEW ──────────────────────────────────────
-function TeamSettingsView({
+// ─── TEAMS VIEW ──────────────────────────────────────────────
+function TeamsView({
   session,
-  team,
-  onTeamUpdated,
-  onTeamDeleted,
+  activeOrgId,
+  activeTeamId,
+  orgGroups,
+  onTeamChange,
 }: {
   session: any;
-  team: TeamCard;
-  onTeamUpdated: (t: TeamCard) => void;
-  onTeamDeleted: () => void;
+  activeOrgId: string | null;
+  activeTeamId: string | null;
+  orgGroups: OrgEntry[];
+  onTeamChange: (orgId: string, teamId: string) => void;
 }) {
-  const [tab, setTab] = useState<"members" | "credits" | "invite">("members");
-  const [members, setMembers] = useState<any[]>([]);
+  const [teamView, setTeamView] = useState<"members" | "credits" | "invite">(
+    "members",
+  );
+  const [showCreateClient, setShowCreateClient] = useState(false);
+  const [showAddTeam, setShowAddTeam] = useState<string | null>(null);
+  const [clientName, setClientName] = useState("");
+  const [teamName, setTeamName] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [memberSearch, setMemberSearch] = useState("");
-  const [loadingMembers, setLoadingMembers] = useState(true);
-  const [teamName, setTeamName] = useState(team.teamName);
-  const [renaming, setRenaming] = useState(false);
+  const [loadingMembers, setLoadingMembers] = useState(false);
   const [allocAmount, setAllocAmount] = useState("");
   const [allocating, setAllocating] = useState(false);
-  const [orgCredits, setOrgCredits] = useState(0);
   const [inviteExpiration, setInviteExpiration] = useState<
     "never" | "24h" | "7d"
   >("never");
-  const [inviteLink, setInviteLink] = useState("");
+  const [activeInviteLink, setActiveInviteLink] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [sendingInvite, setSendingInvite] = useState(false);
   const [inviteStatus, setInviteStatus] = useState<{
     type: "success" | "error";
     msg: string;
   } | null>(null);
+  const [allTeamsFlat, setAllTeamsFlat] = useState<any[]>([]);
+
+  const activeOrg = orgGroups.find((o) => o.orgId === activeOrgId);
+  const activeTeamEntry = activeOrg
+    ? [
+        ...activeOrg.internalTeams,
+        ...activeOrg.clients.flatMap((c) => c.teams),
+      ].find((t) => t.teamId === activeTeamId)
+    : null;
+  const isAdmin = activeTeamEntry?.role === "admin";
 
   useEffect(() => {
-    loadMembers();
-    loadOrgCredits();
-  }, [team.teamId]);
+    if (!activeOrgId) return;
+    supabase
+      .from("team_members")
+      .select(
+        `role, teams(id, name, credits_pool, org_id, client_id, clients(id, name), organisations(name, credits_pool))`,
+      )
+      .eq("user_id", session.user.id)
+      .then(({ data }) => {
+        if (data) setAllTeamsFlat(data);
+      });
+  }, [activeOrgId, activeTeamId]);
 
-  const loadMembers = async () => {
+  useEffect(() => {
+    if (!activeTeamId) return;
+    loadMembers(activeTeamId);
+    setActiveInviteLink("");
+    setInviteStatus(null);
+    setInviteEmail("");
+    setAllocAmount("");
+    setTeamView("members");
+  }, [activeTeamId]);
+
+  const loadMembers = async (teamId: string) => {
     setLoadingMembers(true);
     const { data } = await supabase
       .from("team_members")
-      .select("id,role,user_id,profiles!left(full_name,email)")
-      .eq("team_id", team.teamId);
-    if (data) setMembers(data);
+      .select(`id,role,user_id,profiles!left(full_name,email)`)
+      .eq("team_id", teamId);
+    if (data) setTeamMembers(data);
     setLoadingMembers(false);
   };
-  const loadOrgCredits = async () => {
-    const { data } = await supabase
-      .from("organisations")
-      .select("credits_pool")
-      .eq("id", team.orgId)
-      .single();
-    if (data) setOrgCredits(data.credits_pool);
+
+  const handleCreateClient = async () => {
+    if (!clientName.trim() || !teamName.trim() || !activeOrgId) return;
+    setCreating(true);
+    const { data, error } = await supabase.rpc("create_client_and_team", {
+      p_org_id: activeOrgId,
+      p_client_name: clientName.trim(),
+      p_team_name: teamName.trim(),
+    });
+    if (error || !data?.success)
+      alert("Error: " + (error?.message || "Unknown error"));
+    else {
+      setClientName("");
+      setTeamName("");
+      setShowCreateClient(false);
+      onTeamChange(activeOrgId, data.team_id);
+    }
+    setCreating(false);
   };
 
-  const handleRename = async () => {
-    if (!teamName.trim() || renaming) return;
-    setRenaming(true);
-    await supabase
-      .from("teams")
-      .update({ name: teamName.trim() })
-      .eq("id", team.teamId);
-    onTeamUpdated({ ...team, teamName: teamName.trim() });
-    setRenaming(false);
+  const handleAddTeam = async (clientId: string | null) => {
+    if (!teamName.trim() || !activeOrgId) return;
+    setCreating(true);
+    let data: any, error: any;
+    if (clientId)
+      ({ data, error } = await supabase.rpc("add_team_to_client", {
+        p_org_id: activeOrgId,
+        p_client_id: clientId,
+        p_team_name: teamName.trim(),
+      }));
+    else
+      ({ data, error } = await supabase.rpc("create_org_and_team", {
+        org_name: activeOrg?.orgName || "",
+        team_name: teamName.trim(),
+      }));
+    if (error || !data?.success)
+      alert("Error: " + (error?.message || "Unknown error"));
+    else {
+      setTeamName("");
+      setShowAddTeam(null);
+      if (data.team_id) onTeamChange(activeOrgId!, data.team_id);
+    }
+    setCreating(false);
   };
-  const handleDelete = async () => {
-    if (!confirm(`Delete "${team.teamName}"? This cannot be undone.`)) return;
-    await supabase.from("teams").delete().eq("id", team.teamId);
-    onTeamDeleted();
-  };
+
   const updateMemberRole = async (memberId: string, newRole: string) => {
     await supabase
       .from("team_members")
       .update({ role: newRole })
       .eq("id", memberId);
-    setMembers((p) =>
-      p.map((m) => (m.id === memberId ? { ...m, role: newRole } : m)),
+    setTeamMembers((prev) =>
+      prev.map((m) => (m.id === memberId ? { ...m, role: newRole } : m)),
     );
   };
   const removeMember = async (memberId: string, userId: string) => {
@@ -2838,47 +3050,59 @@ function TeamSettingsView({
       alert("You cannot remove yourself.");
       return;
     }
-    if (!confirm("Remove this member?")) return;
+    if (!window.confirm("Remove this member?")) return;
     await supabase.from("team_members").delete().eq("id", memberId);
-    setMembers((p) => p.filter((m) => m.id !== memberId));
+    setTeamMembers((prev) => prev.filter((m) => m.id !== memberId));
   };
+
   const handleAllocate = async () => {
     const amt = parseInt(allocAmount);
-    if (!amt || amt <= 0) return;
+    if (!amt || amt <= 0 || !activeTeamId || !activeOrgId) return;
     setAllocating(true);
     const { data, error } = await supabase.rpc("allocate_credits_to_team", {
-      p_org_id: team.orgId,
-      p_team_id: team.teamId,
+      p_org_id: activeOrgId,
+      p_team_id: activeTeamId,
       p_amount: amt,
     });
     if (error || !data?.success)
-      alert(error?.message || data?.error || "Failed");
+      alert(error?.message || data?.error || "Allocation failed");
     else {
       alert(`Allocated ${amt} credits!`);
       setAllocAmount("");
-      onTeamUpdated({ ...team, creditsPool: team.creditsPool + amt });
-      loadOrgCredits();
+      onTeamChange(activeOrgId!, activeTeamId);
     }
     setAllocating(false);
   };
+
   const generateInvite = async () => {
+    if (!activeTeamId || !activeOrgId) return;
     let expiresAt: string | null = null;
     if (inviteExpiration === "24h")
       expiresAt = new Date(Date.now() + 86400000).toISOString();
     else if (inviteExpiration === "7d")
       expiresAt = new Date(Date.now() + 604800000).toISOString();
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("team_invites")
       .insert({
-        team_id: team.teamId,
-        org_id: team.orgId,
+        team_id: activeTeamId,
+        org_id: activeOrgId,
         created_by: session.user.id,
         is_active: true,
         expires_at: expiresAt,
       })
       .select("token")
       .single();
-    if (data) setInviteLink(`${window.location.origin}/?invite=${data.token}`);
+    if (data)
+      setActiveInviteLink(`${window.location.origin}/?invite=${data.token}`);
+    else {
+      console.error(error);
+      setInviteStatus({ type: "error", msg: "Failed to generate link." });
+    }
+  };
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(activeInviteLink);
+    setInviteStatus({ type: "success", msg: "Link copied!" });
   };
   const sendEmailInvite = async () => {
     if (!inviteEmail.trim() || !inviteEmail.includes("@")) {
@@ -2886,10 +3110,11 @@ function TeamSettingsView({
       return;
     }
     setSendingInvite(true);
+    setInviteStatus(null);
     try {
       const { error } = await supabase.auth.signInWithOtp({
         email: inviteEmail.trim(),
-        options: { emailRedirectTo: inviteLink },
+        options: { emailRedirectTo: activeInviteLink },
       });
       if (error) throw error;
       setInviteStatus({
@@ -2897,14 +3122,13 @@ function TeamSettingsView({
         msg: `Invite sent to ${inviteEmail}!`,
       });
       setInviteEmail("");
-    } catch (e: any) {
-      setInviteStatus({ type: "error", msg: e.message });
+    } catch (err: any) {
+      setInviteStatus({ type: "error", msg: err.message || "Failed to send." });
     }
     setSendingInvite(false);
   };
 
-  const isAdmin = team.role === "admin";
-  const filtered = members.filter((m) => {
+  const filteredMembers = teamMembers.filter((m) => {
     if (!memberSearch.trim()) return true;
     const q = memberSearch.toLowerCase();
     return (
@@ -2913,761 +3137,1367 @@ function TeamSettingsView({
     );
   });
 
+  const orgTeamData = allTeamsFlat.filter(
+    (t) => (t.teams as any)?.org_id === activeOrgId,
+  );
+  const clientGroups: Record<string, { clientName: string; teams: any[] }> = {};
+  const internalTeams: any[] = [];
+  for (const row of orgTeamData) {
+    const team = row.teams as any;
+    if (team?.client_id && team?.clients) {
+      const cid = team.client_id;
+      if (!clientGroups[cid])
+        clientGroups[cid] = { clientName: team.clients.name, teams: [] };
+      clientGroups[cid].teams.push({
+        teamId: team.id,
+        teamName: team.name,
+        role: row.role,
+        creditsPool: team.credits_pool,
+        clientId: cid,
+      });
+    } else if (team) {
+      internalTeams.push({
+        teamId: team.id,
+        teamName: team.name,
+        role: row.role,
+        creditsPool: team.credits_pool,
+        clientId: null,
+      });
+    }
+  }
+
+  const activeTeamFull = allTeamsFlat.find(
+    (t) => (t.teams as any)?.id === activeTeamId,
+  );
+  const activeTeamOrg = activeTeamFull
+    ? (activeTeamFull.teams as any)?.organisations
+    : null;
+
+  // rest of TeamsView JSX is unchanged — omitted for brevity, keep your existing TeamsView return
   return (
     <div>
-      <div style={{ marginBottom: "1.75rem" }}>
-        <h1
-          style={{
-            fontSize: 22,
-            fontWeight: 600,
-            color: "#111",
-            margin: "0 0 4px",
-          }}
-        >
-          Team settings
-        </h1>
-        <p style={{ fontSize: 13, color: "#999", margin: 0 }}>
-          {team.clientName ? `${team.clientName} · ` : ""}
-          {team.teamName}
-        </p>
-      </div>
-
-      {/* Rename / delete — admin only */}
-      {isAdmin && (
-        <div
-          style={{
-            background: "#fff",
-            border: "1px solid #EFEFEF",
-            borderRadius: 14,
-            padding: "1.25rem",
-            marginBottom: 16,
-          }}
-        >
-          <p
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              color: "#111",
-              margin: "0 0 12px",
-            }}
-          >
-            General
-          </p>
-          <label
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              color: "#888",
-              display: "block",
-              marginBottom: 6,
-              textTransform: "uppercase",
-              letterSpacing: "0.06em",
-            }}
-          >
-            Team name
-          </label>
-          <div style={{ display: "flex", gap: 8 }}>
-            <input
-              value={teamName}
-              onChange={(e) => setTeamName(e.target.value)}
-              style={{
-                flex: 1,
-                padding: "9px 12px",
-                border: "1px solid #EFEFEF",
-                borderRadius: 8,
-                fontSize: 13,
-                outline: "none",
-                color: "#111",
-              }}
-            />
-            <button
-              onClick={handleRename}
-              disabled={
-                renaming || !teamName.trim() || teamName === team.teamName
-              }
-              style={{
-                padding: "0 18px",
-                borderRadius: 8,
-                border: "none",
-                background:
-                  teamName.trim() && teamName !== team.teamName
-                    ? "#111"
-                    : "#F0F0F0",
-                color:
-                  teamName.trim() && teamName !== team.teamName
-                    ? "#fff"
-                    : "#AAA",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              {renaming ? "Saving…" : "Rename"}
-            </button>
-          </div>
-          <div
-            style={{
-              marginTop: 16,
-              paddingTop: 16,
-              borderTop: "1px solid #F5F5F5",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
-            <div>
-              <p
-                style={{
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: "#B91C1C",
-                  margin: "0 0 2px",
-                }}
-              >
-                Delete team
-              </p>
-              <p style={{ fontSize: 12, color: "#EF4444", margin: 0 }}>
-                This action cannot be undone.
-              </p>
-            </div>
-            <button
-              onClick={handleDelete}
-              style={{
-                padding: "8px 16px",
-                borderRadius: 8,
-                border: "none",
-                background: "#EF4444",
-                color: "#fff",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              Delete
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Sub-nav */}
       <div
         style={{
           display: "flex",
-          gap: 6,
-          background: "#EFEFEF",
-          borderRadius: 10,
-          padding: 4,
-          marginBottom: 16,
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          marginBottom: "1.75rem",
         }}
       >
-        {[
-          ["members", "Members"],
-          ...(isAdmin
-            ? [
-                ["credits", "Credits"],
-                ["invite", "Invite"],
-              ]
-            : []),
-        ].map(([v, l]) => (
-          <button
-            key={v}
-            onClick={() => setTab(v as typeof tab)}
+        <div>
+          <h1
             style={{
-              flex: 1,
-              padding: "8px 0",
-              borderRadius: 8,
-              border: "none",
-              fontSize: 13,
-              fontWeight: 500,
-              background: tab === v ? "#fff" : "transparent",
-              color: tab === v ? "#111" : "#888",
-              boxShadow: tab === v ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
-              cursor: "pointer",
-            }}
-          >
-            {l}
-          </button>
-        ))}
-      </div>
-
-      {tab === "members" && (
-        <div
-          style={{
-            background: "#fff",
-            border: "1px solid #EFEFEF",
-            borderRadius: 14,
-            padding: "1.25rem",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: 14,
-            }}
-          >
-            <p
-              style={{
-                fontSize: 14,
-                fontWeight: 600,
-                color: "#111",
-                margin: 0,
-              }}
-            >
-              Members{" "}
-              <span style={{ fontSize: 12, color: "#AAA", fontWeight: 400 }}>
-                ({members.length})
-              </span>
-            </p>
-            <div style={{ position: "relative" }}>
-              <svg
-                width="13"
-                height="13"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#BBB"
-                strokeWidth="2"
-                style={{
-                  position: "absolute",
-                  left: 9,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                }}
-              >
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-              <input
-                value={memberSearch}
-                onChange={(e) => setMemberSearch(e.target.value)}
-                placeholder="Search…"
-                style={{
-                  padding: "7px 10px 7px 28px",
-                  border: "1px solid #EFEFEF",
-                  borderRadius: 8,
-                  fontSize: 12,
-                  outline: "none",
-                  width: 160,
-                  background: "#FAFAFA",
-                  color: "#111",
-                }}
-              />
-            </div>
-          </div>
-          {loadingMembers ? (
-            <p
-              style={{
-                color: "#AAA",
-                fontSize: 13,
-                textAlign: "center",
-                padding: "2rem 0",
-              }}
-            >
-              Loading…
-            </p>
-          ) : filtered.length === 0 ? (
-            <p
-              style={{
-                color: "#AAA",
-                fontSize: 13,
-                textAlign: "center",
-                padding: "2rem 0",
-              }}
-            >
-              No members found.
-            </p>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {filtered.map((m) => (
-                <div
-                  key={m.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "12px 14px",
-                    border: "1px solid #F5F5F5",
-                    borderRadius: 10,
-                    background: "#FAFAFA",
-                  }}
-                >
-                  <div
-                    style={{ display: "flex", alignItems: "center", gap: 10 }}
-                  >
-                    <div
-                      style={{
-                        width: 34,
-                        height: 34,
-                        borderRadius: "50%",
-                        background: "#EEF2FF",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 700,
-                          color: "#6366F1",
-                        }}
-                      >
-                        {(m.profiles?.full_name ||
-                          m.profiles?.email ||
-                          "?")[0].toUpperCase()}
-                      </span>
-                    </div>
-                    <div>
-                      <p
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 600,
-                          color: "#111",
-                          margin: 0,
-                        }}
-                      >
-                        {m.profiles?.full_name || "Guest"}
-                      </p>
-                      <p style={{ fontSize: 11, color: "#AAA", margin: 0 }}>
-                        {m.profiles?.email || "—"}
-                      </p>
-                    </div>
-                  </div>
-                  <div
-                    style={{ display: "flex", alignItems: "center", gap: 8 }}
-                  >
-                    {m.user_id === session.user.id ? (
-                      <span
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 700,
-                          padding: "3px 10px",
-                          borderRadius: 20,
-                          background: "#F5F3FF",
-                          color: "#6366F1",
-                        }}
-                      >
-                        YOU · {m.role.toUpperCase()}
-                      </span>
-                    ) : isAdmin ? (
-                      <>
-                        <select
-                          value={m.role}
-                          onChange={(e) =>
-                            updateMemberRole(m.id, e.target.value)
-                          }
-                          style={{
-                            padding: "5px 8px",
-                            borderRadius: 6,
-                            border: "1px solid #EFEFEF",
-                            fontSize: 11,
-                            fontWeight: 600,
-                            background: "#fff",
-                            color: "#444",
-                            cursor: "pointer",
-                            outline: "none",
-                          }}
-                        >
-                          <option value="member">Member</option>
-                          <option value="admin">Admin</option>
-                        </select>
-                        <button
-                          onClick={() => removeMember(m.id, m.user_id)}
-                          style={{
-                            padding: "5px 10px",
-                            borderRadius: 6,
-                            border: "1px solid #FECACA",
-                            background: "#FEF2F2",
-                            color: "#B91C1C",
-                            fontSize: 11,
-                            fontWeight: 600,
-                            cursor: "pointer",
-                          }}
-                        >
-                          Remove
-                        </button>
-                      </>
-                    ) : (
-                      <span
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 700,
-                          padding: "3px 10px",
-                          borderRadius: 20,
-                          background: "#F4F4F5",
-                          color: "#888",
-                        }}
-                      >
-                        {m.role.toUpperCase()}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {tab === "credits" && isAdmin && (
-        <div
-          style={{
-            background: "#fff",
-            border: "1px solid #EFEFEF",
-            borderRadius: 14,
-            padding: "1.25rem",
-          }}
-        >
-          <p
-            style={{
-              fontSize: 14,
+              fontSize: 22,
               fontWeight: 600,
               color: "#111",
               margin: "0 0 4px",
             }}
           >
-            Credit allocation
+            Teams
+          </h1>
+          <p style={{ fontSize: 13, color: "#999", margin: 0 }}>
+            Manage clients, teams, members and credits
+            {activeOrg ? ` · ${activeOrg.orgName}` : ""}
           </p>
-          <p style={{ fontSize: 13, color: "#AAA", margin: "0 0 20px" }}>
-            Transfer credits from the org pool to this team.
+        </div>
+        {isAdmin && (
+          <button
+            onClick={() => setShowCreateClient((s) => !s)}
+            style={{
+              padding: "9px 16px",
+              borderRadius: 8,
+              border: "none",
+              background: "#111",
+              color: "#fff",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            + New client
+          </button>
+        )}
+      </div>
+      {showCreateClient && (
+        <div
+          style={{
+            background: "#fff",
+            border: "1px solid #EFEFEF",
+            borderRadius: 14,
+            padding: "1.25rem",
+            marginBottom: "1.25rem",
+          }}
+        >
+          <p
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: "#111",
+              margin: "0 0 14px",
+            }}
+          >
+            Add new client
           </p>
           <div
             style={{
               display: "grid",
               gridTemplateColumns: "1fr 1fr",
-              gap: 12,
-              marginBottom: 20,
+              gap: 10,
+              marginBottom: 12,
             }}
           >
-            <div
-              style={{
-                background: "#F5F3FF",
-                borderRadius: 12,
-                padding: "1.25rem",
-              }}
-            >
-              <p
+            <div>
+              <label
                 style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  color: "#6366F1",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: "#888",
+                  display: "block",
+                  marginBottom: 5,
                   textTransform: "uppercase",
                   letterSpacing: "0.06em",
-                  margin: "0 0 8px",
                 }}
               >
-                Org pool
-              </p>
-              <p
-                style={{
-                  fontSize: 30,
-                  fontWeight: 700,
-                  color: "#6366F1",
-                  margin: 0,
-                  lineHeight: 1,
-                }}
-              >
-                {orgCredits}
-              </p>
-              <p style={{ fontSize: 11, color: "#A5B4FC", margin: "6px 0 0" }}>
-                Available to allocate
-              </p>
-            </div>
-            <div
-              style={{
-                background: "#F0FDF4",
-                borderRadius: 12,
-                padding: "1.25rem",
-              }}
-            >
-              <p
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  color: "#15803D",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.06em",
-                  margin: "0 0 8px",
-                }}
-              >
-                Team balance
-              </p>
-              <p
-                style={{
-                  fontSize: 30,
-                  fontWeight: 700,
-                  color: "#15803D",
-                  margin: 0,
-                  lineHeight: 1,
-                }}
-              >
-                {team.creditsPool}
-              </p>
-              <p style={{ fontSize: 11, color: "#86EFAC", margin: "6px 0 0" }}>
-                Current balance
-              </p>
-            </div>
-          </div>
-          <div
-            style={{
-              background: "#FAFAFA",
-              border: "1px solid #EFEFEF",
-              borderRadius: 12,
-              padding: "1.25rem",
-            }}
-          >
-            <label
-              style={{
-                fontSize: 12,
-                fontWeight: 600,
-                color: "#555",
-                display: "block",
-                marginBottom: 10,
-              }}
-            >
-              Transfer amount
-            </label>
-            <div style={{ display: "flex", gap: 8 }}>
+                Client name
+              </label>
               <input
-                type="number"
-                placeholder="e.g. 50"
-                value={allocAmount}
-                onChange={(e) => setAllocAmount(e.target.value)}
+                value={clientName}
+                onChange={(e) => setClientName(e.target.value)}
+                placeholder="e.g. ZeroGrid"
                 style={{
-                  flex: 1,
-                  padding: "10px 12px",
+                  width: "100%",
+                  padding: "9px 12px",
                   border: "1px solid #EFEFEF",
                   borderRadius: 8,
                   fontSize: 13,
                   outline: "none",
+                  boxSizing: "border-box" as any,
                   color: "#111",
-                  background: "#fff",
                 }}
               />
-              <button
-                onClick={handleAllocate}
-                disabled={allocating}
+            </div>
+            <div>
+              <label
                 style={{
-                  padding: "0 20px",
-                  borderRadius: 8,
-                  border: "none",
-                  background: "#6366F1",
-                  color: "#fff",
+                  fontSize: 11,
                   fontWeight: 600,
-                  fontSize: 13,
-                  cursor: "pointer",
-                  opacity: allocating ? 0.7 : 1,
+                  color: "#888",
+                  display: "block",
+                  marginBottom: 5,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
                 }}
               >
-                {allocating ? "Moving…" : "Transfer"}
-              </button>
+                First team name
+              </label>
+              <input
+                value={teamName}
+                onChange={(e) => setTeamName(e.target.value)}
+                placeholder="e.g. Marketing"
+                style={{
+                  width: "100%",
+                  padding: "9px 12px",
+                  border: "1px solid #EFEFEF",
+                  borderRadius: 8,
+                  fontSize: 13,
+                  outline: "none",
+                  boxSizing: "border-box" as any,
+                  color: "#111",
+                }}
+              />
             </div>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={handleCreateClient}
+              disabled={creating || !clientName.trim() || !teamName.trim()}
+              style={{
+                padding: "9px 18px",
+                borderRadius: 8,
+                border: "none",
+                background:
+                  clientName.trim() && teamName.trim() ? "#6366F1" : "#F0F0F0",
+                color: clientName.trim() && teamName.trim() ? "#fff" : "#AAA",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor:
+                  clientName.trim() && teamName.trim()
+                    ? "pointer"
+                    : "not-allowed",
+              }}
+            >
+              {creating ? "Creating…" : "Create"}
+            </button>
+            <button
+              onClick={() => setShowCreateClient(false)}
+              style={{
+                padding: "9px 18px",
+                borderRadius: 8,
+                border: "1px solid #EFEFEF",
+                background: "#fff",
+                color: "#555",
+                fontSize: 13,
+                cursor: "pointer",
+              }}
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}
-
-      {tab === "invite" && isAdmin && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "260px 1fr",
+          gap: 16,
+          alignItems: "start",
+        }}
+      >
+        <div
+          style={{
+            background: "#fff",
+            border: "1px solid #EFEFEF",
+            borderRadius: 14,
+            overflow: "hidden",
+          }}
+        >
           <div
-            style={{
-              background: "#fff",
-              border: "1px solid #EFEFEF",
-              borderRadius: 14,
-              padding: "1.25rem",
-            }}
+            style={{ padding: "12px 14px", borderBottom: "1px solid #F5F5F5" }}
           >
             <p
               style={{
-                fontSize: 14,
-                fontWeight: 600,
-                color: "#111",
-                margin: "0 0 4px",
+                fontSize: 10,
+                fontWeight: 700,
+                color: "#BBB",
+                textTransform: "uppercase",
+                letterSpacing: "0.07em",
+                margin: 0,
               }}
             >
-              Generate invite link
+              Clients & teams
             </p>
-            <p style={{ fontSize: 13, color: "#AAA", margin: "0 0 16px" }}>
-              Anyone with this link can join the team.
-            </p>
-            <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
-              {(["never", "24h", "7d"] as const).map((opt) => (
+          </div>
+          <div style={{ padding: "6px" }}>
+            {Object.entries(clientGroups).map(([cid, cg]) => (
+              <div key={cid} style={{ marginBottom: 4 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "8px 10px",
+                  }}
+                >
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: 7 }}
+                  >
+                    <div
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: "50%",
+                        background: "#6366F1",
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span
+                      style={{ fontSize: 12, fontWeight: 700, color: "#222" }}
+                    >
+                      {cg.clientName}
+                    </span>
+                  </div>
+                  {isAdmin && (
+                    <button
+                      onClick={() => {
+                        setShowAddTeam(cid);
+                        setTeamName("");
+                      }}
+                      style={{
+                        fontSize: 10,
+                        padding: "2px 7px",
+                        borderRadius: 5,
+                        border: "1px solid #E0DBFF",
+                        background: "#F5F3FF",
+                        color: "#6366F1",
+                        cursor: "pointer",
+                        fontWeight: 600,
+                      }}
+                    >
+                      + Team
+                    </button>
+                  )}
+                </div>
+                {showAddTeam === cid && (
+                  <div
+                    style={{
+                      padding: "8px 10px 10px",
+                      background: "#FAFAFA",
+                      borderRadius: 8,
+                      margin: "0 6px 6px",
+                    }}
+                  >
+                    <input
+                      value={teamName}
+                      onChange={(e) => setTeamName(e.target.value)}
+                      placeholder="Team name…"
+                      style={{
+                        width: "100%",
+                        padding: "7px 10px",
+                        border: "1px solid #EFEFEF",
+                        borderRadius: 6,
+                        fontSize: 12,
+                        outline: "none",
+                        boxSizing: "border-box" as any,
+                        marginBottom: 6,
+                        color: "#111",
+                      }}
+                    />
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button
+                        onClick={() => handleAddTeam(cid)}
+                        disabled={creating || !teamName.trim()}
+                        style={{
+                          flex: 1,
+                          padding: "6px",
+                          borderRadius: 6,
+                          border: "none",
+                          background: teamName.trim() ? "#6366F1" : "#F0F0F0",
+                          color: teamName.trim() ? "#fff" : "#AAA",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: teamName.trim() ? "pointer" : "not-allowed",
+                        }}
+                      >
+                        {creating ? "…" : "Add"}
+                      </button>
+                      <button
+                        onClick={() => setShowAddTeam(null)}
+                        style={{
+                          padding: "6px 10px",
+                          borderRadius: 6,
+                          border: "1px solid #EFEFEF",
+                          background: "#fff",
+                          fontSize: 11,
+                          color: "#888",
+                          cursor: "pointer",
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {cg.teams.map((team) => {
+                  const isActive = team.teamId === activeTeamId;
+                  return (
+                    <button
+                      key={team.teamId}
+                      onClick={() =>
+                        activeOrgId && onTeamChange(activeOrgId, team.teamId)
+                      }
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        width: "100%",
+                        padding: "8px 10px 8px 24px",
+                        borderRadius: 8,
+                        border: "none",
+                        background: isActive ? "#F5F3FF" : "transparent",
+                        cursor: "pointer",
+                        textAlign: "left",
+                        marginBottom: 1,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 12,
+                          fontWeight: isActive ? 600 : 400,
+                          color: isActive ? "#6366F1" : "#444",
+                        }}
+                      >
+                        {team.teamName}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 10,
+                          color: isActive ? "#A5B4FC" : "#CCC",
+                        }}
+                      >
+                        {team.role}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+            {internalTeams.length > 0 && (
+              <div
+                style={{
+                  marginTop: Object.keys(clientGroups).length > 0 ? 8 : 0,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "8px 10px",
+                  }}
+                >
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: 7 }}
+                  >
+                    <div
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: "50%",
+                        background: "#888",
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span
+                      style={{ fontSize: 12, fontWeight: 700, color: "#888" }}
+                    >
+                      Internal
+                    </span>
+                  </div>
+                  {isAdmin && (
+                    <button
+                      onClick={() => {
+                        setShowAddTeam("internal");
+                        setTeamName("");
+                      }}
+                      style={{
+                        fontSize: 10,
+                        padding: "2px 7px",
+                        borderRadius: 5,
+                        border: "1px solid #EFEFEF",
+                        background: "#F4F4F5",
+                        color: "#888",
+                        cursor: "pointer",
+                        fontWeight: 600,
+                      }}
+                    >
+                      + Team
+                    </button>
+                  )}
+                </div>
+                {showAddTeam === "internal" && (
+                  <div
+                    style={{
+                      padding: "8px 10px 10px",
+                      background: "#FAFAFA",
+                      borderRadius: 8,
+                      margin: "0 6px 6px",
+                    }}
+                  >
+                    <input
+                      value={teamName}
+                      onChange={(e) => setTeamName(e.target.value)}
+                      placeholder="Team name…"
+                      style={{
+                        width: "100%",
+                        padding: "7px 10px",
+                        border: "1px solid #EFEFEF",
+                        borderRadius: 6,
+                        fontSize: 12,
+                        outline: "none",
+                        boxSizing: "border-box" as any,
+                        marginBottom: 6,
+                        color: "#111",
+                      }}
+                    />
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button
+                        onClick={() => handleAddTeam(null)}
+                        disabled={creating || !teamName.trim()}
+                        style={{
+                          flex: 1,
+                          padding: "6px",
+                          borderRadius: 6,
+                          border: "none",
+                          background: teamName.trim() ? "#111" : "#F0F0F0",
+                          color: teamName.trim() ? "#fff" : "#AAA",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: teamName.trim() ? "pointer" : "not-allowed",
+                        }}
+                      >
+                        {creating ? "…" : "Add"}
+                      </button>
+                      <button
+                        onClick={() => setShowAddTeam(null)}
+                        style={{
+                          padding: "6px 10px",
+                          borderRadius: 6,
+                          border: "1px solid #EFEFEF",
+                          background: "#fff",
+                          fontSize: 11,
+                          color: "#888",
+                          cursor: "pointer",
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {internalTeams.map((team) => {
+                  const isActive = team.teamId === activeTeamId;
+                  return (
+                    <button
+                      key={team.teamId}
+                      onClick={() =>
+                        activeOrgId && onTeamChange(activeOrgId, team.teamId)
+                      }
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        width: "100%",
+                        padding: "8px 10px 8px 24px",
+                        borderRadius: 8,
+                        border: "none",
+                        background: isActive ? "#F5F3FF" : "transparent",
+                        cursor: "pointer",
+                        textAlign: "left",
+                        marginBottom: 1,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 12,
+                          fontWeight: isActive ? 600 : 400,
+                          color: isActive ? "#6366F1" : "#444",
+                        }}
+                      >
+                        {team.teamName}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 10,
+                          color: isActive ? "#A5B4FC" : "#CCC",
+                        }}
+                      >
+                        {team.role}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {Object.keys(clientGroups).length === 0 &&
+              internalTeams.length === 0 && (
+                <p
+                  style={{
+                    fontSize: 12,
+                    color: "#CCC",
+                    textAlign: "center",
+                    padding: "1.5rem 0",
+                  }}
+                >
+                  No teams yet
+                </p>
+              )}
+          </div>
+        </div>
+        {activeTeamFull && activeTeamId ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+            <div
+              style={{
+                background: "#fff",
+                border: "1px solid #EFEFEF",
+                borderRadius: 14,
+                padding: "1.25rem 1.5rem",
+                marginBottom: 12,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    marginBottom: 3,
+                  }}
+                >
+                  <h2
+                    style={{
+                      fontSize: 16,
+                      fontWeight: 600,
+                      color: "#111",
+                      margin: 0,
+                    }}
+                  >
+                    {(activeTeamFull.teams as any).name}
+                  </h2>
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      padding: "2px 8px",
+                      borderRadius: 20,
+                      background: isAdmin ? "#F5F3FF" : "#F4F4F5",
+                      color: isAdmin ? "#6366F1" : "#888",
+                    }}
+                  >
+                    {activeTeamFull.role.toUpperCase()}
+                  </span>
+                  {(activeTeamFull.teams as any).clients && (
+                    <span style={{ fontSize: 11, color: "#AAA" }}>
+                      · {(activeTeamFull.teams as any).clients.name}
+                    </span>
+                  )}
+                </div>
+                <p style={{ fontSize: 12, color: "#AAA", margin: 0 }}>
+                  {activeTeamOrg?.name || ""}
+                </p>
+              </div>
+              <div
+                style={{
+                  background: "#F5F3FF",
+                  borderRadius: 10,
+                  padding: "10px 16px",
+                  textAlign: "right",
+                  flexShrink: 0,
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: "#6366F1",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                    margin: "0 0 2px",
+                  }}
+                >
+                  Credits
+                </p>
+                <p
+                  style={{
+                    fontSize: 24,
+                    fontWeight: 700,
+                    color: "#6366F1",
+                    margin: 0,
+                    lineHeight: 1,
+                  }}
+                >
+                  {(activeTeamFull.teams as any).credits_pool ?? 0}
+                </p>
+              </div>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                gap: 6,
+                background: "#EFEFEF",
+                borderRadius: 10,
+                padding: 4,
+                marginBottom: 16,
+              }}
+            >
+              {[
+                ["members", "Members"],
+                ...(isAdmin
+                  ? [
+                      ["credits", "Credits"],
+                      ["invite", "Invite"],
+                    ]
+                  : []),
+              ].map(([v, l]) => (
                 <button
-                  key={opt}
-                  onClick={() => setInviteExpiration(opt)}
+                  key={v}
+                  onClick={() => setTeamView(v as typeof teamView)}
                   style={{
                     flex: 1,
                     padding: "8px 0",
                     borderRadius: 8,
-                    border: `1px solid ${inviteExpiration === opt ? "#6366F1" : "#EFEFEF"}`,
-                    background: inviteExpiration === opt ? "#F5F3FF" : "#fff",
-                    color: inviteExpiration === opt ? "#6366F1" : "#555",
-                    fontSize: 12,
-                    fontWeight: 600,
+                    border: "none",
+                    fontSize: 13,
+                    fontWeight: 500,
+                    background: teamView === v ? "#fff" : "transparent",
+                    color: teamView === v ? "#111" : "#888",
+                    boxShadow:
+                      teamView === v ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
                     cursor: "pointer",
                   }}
                 >
-                  {opt === "never"
-                    ? "Never"
-                    : opt === "24h"
-                      ? "24 hours"
-                      : "7 days"}
+                  {l}
                 </button>
               ))}
             </div>
-            <button
-              onClick={generateInvite}
-              style={{
-                width: "100%",
-                padding: "10px",
-                borderRadius: 8,
-                border: "none",
-                background: "#111",
-                color: "#fff",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              Generate link
-            </button>
-            {inviteLink && (
+            {teamView === "members" && (
               <div
                 style={{
-                  marginTop: 14,
-                  background: "#FAFAFA",
+                  background: "#fff",
                   border: "1px solid #EFEFEF",
-                  borderRadius: 10,
-                  padding: "12px 14px",
+                  borderRadius: 14,
+                  padding: "1.25rem",
                 }}
               >
-                <div style={{ display: "flex", gap: 8 }}>
-                  <input
-                    readOnly
-                    value={inviteLink}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginBottom: 14,
+                  }}
+                >
+                  <p
                     style={{
-                      flex: 1,
-                      padding: "9px 12px",
-                      border: "1px solid #EFEFEF",
-                      borderRadius: 8,
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: "#111",
+                      margin: 0,
+                    }}
+                  >
+                    Members{" "}
+                    <span
+                      style={{ fontSize: 12, color: "#AAA", fontWeight: 400 }}
+                    >
+                      ({teamMembers.length})
+                    </span>
+                  </p>
+                  <div style={{ position: "relative" }}>
+                    <svg
+                      width="13"
+                      height="13"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#BBB"
+                      strokeWidth="2"
+                      style={{
+                        position: "absolute",
+                        left: 9,
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                      }}
+                    >
+                      <circle cx="11" cy="11" r="8" />
+                      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg>
+                    <input
+                      value={memberSearch}
+                      onChange={(e) => setMemberSearch(e.target.value)}
+                      placeholder="Search…"
+                      style={{
+                        padding: "7px 10px 7px 28px",
+                        border: "1px solid #EFEFEF",
+                        borderRadius: 8,
+                        fontSize: 12,
+                        outline: "none",
+                        width: 160,
+                        background: "#FAFAFA",
+                        color: "#111",
+                      }}
+                    />
+                  </div>
+                </div>
+                {loadingMembers ? (
+                  <p
+                    style={{
+                      color: "#AAA",
+                      fontSize: 13,
+                      textAlign: "center",
+                      padding: "2rem 0",
+                    }}
+                  >
+                    Loading…
+                  </p>
+                ) : filteredMembers.length === 0 ? (
+                  <p
+                    style={{
+                      color: "#AAA",
+                      fontSize: 13,
+                      textAlign: "center",
+                      padding: "2rem 0",
+                    }}
+                  >
+                    No members found.
+                  </p>
+                ) : (
+                  <div
+                    style={{ display: "flex", flexDirection: "column", gap: 8 }}
+                  >
+                    {filteredMembers.map((m) => (
+                      <div
+                        key={m.id}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          padding: "12px 14px",
+                          border: "1px solid #F5F5F5",
+                          borderRadius: 10,
+                          background: "#FAFAFA",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: 34,
+                              height: 34,
+                              borderRadius: "50%",
+                              background: "#EEF2FF",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              flexShrink: 0,
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: 13,
+                                fontWeight: 700,
+                                color: "#6366F1",
+                              }}
+                            >
+                              {(m.profiles?.full_name ||
+                                m.profiles?.email ||
+                                "?")[0].toUpperCase()}
+                            </span>
+                          </div>
+                          <div>
+                            <p
+                              style={{
+                                fontSize: 13,
+                                fontWeight: 600,
+                                color: "#111",
+                                margin: 0,
+                              }}
+                            >
+                              {m.profiles?.full_name || "Guest"}
+                            </p>
+                            <p
+                              style={{ fontSize: 11, color: "#AAA", margin: 0 }}
+                            >
+                              {m.profiles?.email || "—"}
+                            </p>
+                          </div>
+                        </div>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                          }}
+                        >
+                          {m.user_id === session.user.id ? (
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 700,
+                                padding: "3px 10px",
+                                borderRadius: 20,
+                                background: "#F5F3FF",
+                                color: "#6366F1",
+                              }}
+                            >
+                              YOU · {m.role.toUpperCase()}
+                            </span>
+                          ) : isAdmin ? (
+                            <>
+                              <select
+                                value={m.role}
+                                onChange={(e) =>
+                                  updateMemberRole(m.id, e.target.value)
+                                }
+                                style={{
+                                  padding: "5px 8px",
+                                  borderRadius: 6,
+                                  border: "1px solid #EFEFEF",
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  background: "#fff",
+                                  color: "#444",
+                                  cursor: "pointer",
+                                  outline: "none",
+                                }}
+                              >
+                                <option value="member">Member</option>
+                                <option value="admin">Admin</option>
+                              </select>
+                              <button
+                                onClick={() => removeMember(m.id, m.user_id)}
+                                style={{
+                                  padding: "5px 10px",
+                                  borderRadius: 6,
+                                  border: "1px solid #FECACA",
+                                  background: "#FEF2F2",
+                                  color: "#B91C1C",
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                Remove
+                              </button>
+                            </>
+                          ) : (
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 700,
+                                padding: "3px 10px",
+                                borderRadius: 20,
+                                background: "#F4F4F5",
+                                color: "#888",
+                              }}
+                            >
+                              {m.role.toUpperCase()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {teamView === "credits" && isAdmin && (
+              <div
+                style={{
+                  background: "#fff",
+                  border: "1px solid #EFEFEF",
+                  borderRadius: 14,
+                  padding: "1.25rem",
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: "#111",
+                    margin: "0 0 4px",
+                  }}
+                >
+                  Credit allocation
+                </p>
+                <p style={{ fontSize: 13, color: "#AAA", margin: "0 0 20px" }}>
+                  Transfer credits from the org pool to this team.
+                </p>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 12,
+                    marginBottom: 20,
+                  }}
+                >
+                  <div
+                    style={{
+                      background: "#F5F3FF",
+                      borderRadius: 12,
+                      padding: "1.25rem",
+                    }}
+                  >
+                    <p
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        color: "#6366F1",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                        margin: "0 0 8px",
+                      }}
+                    >
+                      Org pool
+                    </p>
+                    <p
+                      style={{
+                        fontSize: 30,
+                        fontWeight: 700,
+                        color: "#6366F1",
+                        margin: 0,
+                        lineHeight: 1,
+                      }}
+                    >
+                      {activeTeamOrg?.credits_pool ?? 0}
+                    </p>
+                    <p
+                      style={{
+                        fontSize: 11,
+                        color: "#A5B4FC",
+                        margin: "6px 0 0",
+                      }}
+                    >
+                      Available to allocate
+                    </p>
+                  </div>
+                  <div
+                    style={{
+                      background: "#F0FDF4",
+                      borderRadius: 12,
+                      padding: "1.25rem",
+                    }}
+                  >
+                    <p
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        color: "#15803D",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                        margin: "0 0 8px",
+                      }}
+                    >
+                      Team balance
+                    </p>
+                    <p
+                      style={{
+                        fontSize: 30,
+                        fontWeight: 700,
+                        color: "#15803D",
+                        margin: 0,
+                        lineHeight: 1,
+                      }}
+                    >
+                      {(activeTeamFull.teams as any).credits_pool ?? 0}
+                    </p>
+                    <p
+                      style={{
+                        fontSize: 11,
+                        color: "#86EFAC",
+                        margin: "6px 0 0",
+                      }}
+                    >
+                      Current balance
+                    </p>
+                  </div>
+                </div>
+                <div
+                  style={{
+                    background: "#FAFAFA",
+                    border: "1px solid #EFEFEF",
+                    borderRadius: 12,
+                    padding: "1.25rem",
+                  }}
+                >
+                  <label
+                    style={{
                       fontSize: 12,
-                      background: "#fff",
+                      fontWeight: 600,
                       color: "#555",
-                      outline: "none",
+                      display: "block",
+                      marginBottom: 10,
                     }}
-                  />
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(inviteLink);
-                      setInviteStatus({ type: "success", msg: "Copied!" });
-                    }}
+                  >
+                    Transfer amount
+                  </label>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input
+                      type="number"
+                      placeholder="e.g. 50"
+                      value={allocAmount}
+                      onChange={(e) => setAllocAmount(e.target.value)}
+                      style={{
+                        flex: 1,
+                        padding: "10px 12px",
+                        border: "1px solid #EFEFEF",
+                        borderRadius: 8,
+                        fontSize: 13,
+                        outline: "none",
+                        color: "#111",
+                        background: "#fff",
+                      }}
+                    />
+                    <button
+                      onClick={handleAllocate}
+                      disabled={allocating}
+                      style={{
+                        padding: "0 20px",
+                        borderRadius: 8,
+                        border: "none",
+                        background: "#6366F1",
+                        color: "#fff",
+                        fontWeight: 600,
+                        fontSize: 13,
+                        cursor: allocating ? "not-allowed" : "pointer",
+                        opacity: allocating ? 0.7 : 1,
+                      }}
+                    >
+                      {allocating ? "Moving…" : "Transfer"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+            {teamView === "invite" && isAdmin && (
+              <div
+                style={{ display: "flex", flexDirection: "column", gap: 12 }}
+              >
+                <div
+                  style={{
+                    background: "#fff",
+                    border: "1px solid #EFEFEF",
+                    borderRadius: 14,
+                    padding: "1.25rem",
+                  }}
+                >
+                  <p
                     style={{
-                      padding: "0 14px",
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: "#111",
+                      margin: "0 0 4px",
+                    }}
+                  >
+                    Generate invite link
+                  </p>
+                  <p
+                    style={{ fontSize: 13, color: "#AAA", margin: "0 0 16px" }}
+                  >
+                    Anyone with this link can join the team.
+                  </p>
+                  <label
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: "#888",
+                      display: "block",
+                      marginBottom: 8,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                    }}
+                  >
+                    Link expiration
+                  </label>
+                  <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+                    {(["never", "24h", "7d"] as const).map((opt) => (
+                      <button
+                        key={opt}
+                        onClick={() => setInviteExpiration(opt)}
+                        style={{
+                          flex: 1,
+                          padding: "8px 0",
+                          borderRadius: 8,
+                          border: `1px solid ${inviteExpiration === opt ? "#6366F1" : "#EFEFEF"}`,
+                          background:
+                            inviteExpiration === opt ? "#F5F3FF" : "#fff",
+                          color: inviteExpiration === opt ? "#6366F1" : "#555",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {opt === "never"
+                          ? "Never"
+                          : opt === "24h"
+                            ? "24 hours"
+                            : "7 days"}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={generateInvite}
+                    style={{
+                      width: "100%",
+                      padding: "10px",
                       borderRadius: 8,
                       border: "none",
-                      background: "#F5F3FF",
-                      color: "#6366F1",
-                      fontSize: 12,
+                      background: "#111",
+                      color: "#fff",
+                      fontSize: 13,
                       fontWeight: 600,
                       cursor: "pointer",
                     }}
                   >
-                    Copy
+                    Generate link
                   </button>
+                  {activeInviteLink && (
+                    <div
+                      style={{
+                        marginTop: 14,
+                        background: "#FAFAFA",
+                        border: "1px solid #EFEFEF",
+                        borderRadius: 10,
+                        padding: "12px 14px",
+                      }}
+                    >
+                      <p
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: "#BBB",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                          margin: "0 0 8px",
+                        }}
+                      >
+                        Invite link
+                      </p>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <input
+                          readOnly
+                          value={activeInviteLink}
+                          style={{
+                            flex: 1,
+                            padding: "9px 12px",
+                            border: "1px solid #EFEFEF",
+                            borderRadius: 8,
+                            fontSize: 12,
+                            background: "#fff",
+                            color: "#555",
+                            outline: "none",
+                          }}
+                        />
+                        <button
+                          onClick={copyLink}
+                          style={{
+                            padding: "0 14px",
+                            borderRadius: 8,
+                            border: "none",
+                            background: "#F5F3FF",
+                            color: "#6366F1",
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div
+                  style={{
+                    background: "#fff",
+                    border: "1px solid #EFEFEF",
+                    borderRadius: 14,
+                    padding: "1.25rem",
+                  }}
+                >
+                  <p
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: "#111",
+                      margin: "0 0 4px",
+                    }}
+                  >
+                    Send via email
+                  </p>
+                  <p
+                    style={{ fontSize: 13, color: "#AAA", margin: "0 0 14px" }}
+                  >
+                    Send a magic link directly to a colleague's inbox.
+                  </p>
+                  {!activeInviteLink && (
+                    <p
+                      style={{
+                        fontSize: 12,
+                        color: "#F59E0B",
+                        background: "#FFFBEB",
+                        border: "1px solid #FDE68A",
+                        borderRadius: 8,
+                        padding: "8px 12px",
+                        margin: "0 0 12px",
+                      }}
+                    >
+                      Generate an invite link first.
+                    </p>
+                  )}
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input
+                      type="email"
+                      placeholder="colleague@company.com"
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                      disabled={!activeInviteLink}
+                      style={{
+                        flex: 1,
+                        padding: "10px 12px",
+                        border: "1px solid #EFEFEF",
+                        borderRadius: 8,
+                        fontSize: 13,
+                        outline: "none",
+                        color: "#111",
+                        background: activeInviteLink ? "#fff" : "#FAFAFA",
+                      }}
+                    />
+                    <button
+                      onClick={sendEmailInvite}
+                      disabled={
+                        sendingInvite || !inviteEmail || !activeInviteLink
+                      }
+                      style={{
+                        padding: "0 16px",
+                        borderRadius: 8,
+                        border: "none",
+                        background: "#111",
+                        color: "#fff",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        cursor:
+                          sendingInvite || !inviteEmail || !activeInviteLink
+                            ? "not-allowed"
+                            : "pointer",
+                        opacity:
+                          sendingInvite || !inviteEmail || !activeInviteLink
+                            ? 0.5
+                            : 1,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {sendingInvite ? "Sending…" : "Send"}
+                    </button>
+                  </div>
+                  {inviteStatus && (
+                    <div
+                      style={{
+                        marginTop: 10,
+                        padding: "9px 12px",
+                        borderRadius: 8,
+                        fontSize: 12,
+                        fontWeight: 500,
+                        background:
+                          inviteStatus.type === "success"
+                            ? "#F0FDF4"
+                            : "#FEF2F2",
+                        color:
+                          inviteStatus.type === "success"
+                            ? "#15803D"
+                            : "#B91C1C",
+                      }}
+                    >
+                      {inviteStatus.msg}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
           </div>
+        ) : (
           <div
             style={{
               background: "#fff",
               border: "1px solid #EFEFEF",
               borderRadius: 14,
-              padding: "1.25rem",
+              padding: "4rem",
+              textAlign: "center",
             }}
           >
-            <p
-              style={{
-                fontSize: 14,
-                fontWeight: 600,
-                color: "#111",
-                margin: "0 0 4px",
-              }}
-            >
-              Send via email
+            <p style={{ color: "#AAA", fontSize: 13 }}>
+              Select a team from the left
             </p>
-            {!inviteLink && (
-              <p
-                style={{
-                  fontSize: 12,
-                  color: "#F59E0B",
-                  background: "#FFFBEB",
-                  border: "1px solid #FDE68A",
-                  borderRadius: 8,
-                  padding: "8px 12px",
-                  margin: "0 0 12px",
-                }}
-              >
-                Generate an invite link first.
-              </p>
-            )}
-            <div style={{ display: "flex", gap: 8 }}>
-              <input
-                type="email"
-                placeholder="colleague@company.com"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                disabled={!inviteLink}
-                style={{
-                  flex: 1,
-                  padding: "10px 12px",
-                  border: "1px solid #EFEFEF",
-                  borderRadius: 8,
-                  fontSize: 13,
-                  outline: "none",
-                  color: "#111",
-                  background: inviteLink ? "#fff" : "#FAFAFA",
-                }}
-              />
-              <button
-                onClick={sendEmailInvite}
-                disabled={sendingInvite || !inviteEmail || !inviteLink}
-                style={{
-                  padding: "0 16px",
-                  borderRadius: 8,
-                  border: "none",
-                  background: "#111",
-                  color: "#fff",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  opacity:
-                    sendingInvite || !inviteEmail || !inviteLink ? 0.5 : 1,
-                }}
-              >
-                {sendingInvite ? "Sending…" : "Send"}
-              </button>
-            </div>
-            {inviteStatus && (
-              <div
-                style={{
-                  marginTop: 10,
-                  padding: "9px 12px",
-                  borderRadius: 8,
-                  fontSize: 12,
-                  fontWeight: 500,
-                  background:
-                    inviteStatus.type === "success" ? "#F0FDF4" : "#FEF2F2",
-                  color:
-                    inviteStatus.type === "success" ? "#15803D" : "#B91C1C",
-                }}
-              >
-                {inviteStatus.msg}
-              </div>
-            )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
@@ -3678,18 +4508,22 @@ export default function App({
 }: {
   session: import("@supabase/supabase-js").Session;
 }) {
-  // ── Layer 1 state ─────────────────────────────────────────
-  const [allTeams, setAllTeams] = useState<TeamCard[]>([]);
-  const [loadingTeams, setLoadingTeams] = useState(true);
-  const [activeTeam, setActiveTeam] = useState<TeamCard | null>(null); // null = Layer 1 grid
+  const [orgGroups, setOrgGroups] = useState<OrgEntry[]>([]);
+  const [activeOrgId, setActiveOrgId] = useState<string | null>(null);
+  const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
+  const [orgDropdownOpen, setOrgDropdownOpen] = useState(false);
+  const [teamDropdownOpen, setTeamDropdownOpen] = useState(false);
 
-  // ── Layer 2 state ─────────────────────────────────────────
   const [currentView, setCurrentView] = useState<
-    "analyzer" | "history" | "brands" | "settings"
+    "analyzer" | "dashboard" | "brands" | "profile" | "teams"
   >("analyzer");
   const [profile, setProfile] = useState<any>(null);
   const [analysesHistory, setAnalysesHistory] = useState<any[]>([]);
   const [viewingHistoryItem, setViewingHistoryItem] = useState<any>(null);
+  const [editName, setEditName] = useState("");
+  const [editCompany, setEditCompany] = useState("");
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [mode, setMode] = useState("single");
   const [showBrandMgr, setShowBrandMgr] = useState(false);
   const [brands, setBrands] = useState<BrandMap>({});
   const [selectedBrand, setSelectedBrand] = useState("");
@@ -3715,165 +4549,280 @@ export default function App({
   const [concept, setConcept] = useState("");
   const [conceptThreshold, setConceptThreshold] = useState(70);
   const [referenceLinks, setReferenceLinks] = useState<string[]>([""]);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [analyserPreviewFile, setAnalyserPreviewFile] =
     useState<BrandFile | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  // New client/team creation
-  const [showNewClient, setShowNewClient] = useState(false);
-  const [newClientName, setNewClientName] = useState("");
-  const [newTeamName, setNewTeamName] = useState("");
-  const [creating, setCreating] = useState(false);
 
-  // ── Load all teams flat ────────────────────────────────────
-  const loadAllTeams = async () => {
-    setLoadingTeams(true);
+  // Derived helpers
+  const activeOrg = orgGroups.find((o) => o.orgId === activeOrgId);
+  const activeTeamEntry = activeOrg
+    ? [
+        ...(activeOrg.internalTeams || []),
+        ...(activeOrg.clients || []).flatMap((c) => c.teams),
+      ].find((t) => t.teamId === activeTeamId)
+    : null;
+
+  // ── FIX: client name for active team ──────────────────────
+  const activeTeamClient =
+    activeOrg?.clients.find((c) =>
+      c.teams.some((t) => t.teamId === activeTeamId),
+    )?.clientName ?? null;
+
+  // ── FIX: close dropdowns on outside click ─────────────────
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest("[data-dropdown]")) {
+        setOrgDropdownOpen(false);
+        setTeamDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // ─── Load org / client / team hierarchy ─────────────────────
+  const loadOrgGroups = async () => {
     const { data } = await supabase
       .from("team_members")
       .select(
-        "role, teams(id, name, credits_pool, org_id, client_id, clients(id,name), organisations(id,name))",
+        `role, teams(id, name, credits_pool, org_id, client_id, clients(id, name), organisations(id, name))`,
       )
       .eq("user_id", session.user.id);
-    if (!data) {
-      setLoadingTeams(false);
-      return;
-    }
-    const cards: TeamCard[] = data
-      .map((row: any) => {
-        const team = row.teams;
-        return {
-          teamId: team.id,
-          teamName: team.name,
-          clientName: team.clients?.name || null,
-          orgId: team.organisations?.id || "",
-          orgName: team.organisations?.name || "",
-          role: row.role,
-          creditsPool: team.credits_pool || 0,
+    if (!data) return;
+    const orgMap: Record<string, OrgEntry> = {};
+    for (const row of data) {
+      const team = row.teams as any;
+      const org = team?.organisations;
+      if (!org || !team) continue;
+      if (!orgMap[org.id])
+        orgMap[org.id] = {
+          orgId: org.id,
+          orgName: org.name,
+          clients: [],
+          internalTeams: [],
         };
-      })
-      .filter((c: TeamCard) => c.teamId);
-    setAllTeams(cards);
-    setLoadingTeams(false);
+      const entry: TeamEntry = {
+        teamId: team.id,
+        teamName: team.name,
+        role: row.role,
+        creditsPool: team.credits_pool || 0,
+      };
+      if (team.client_id && team.clients) {
+        const existing = orgMap[org.id].clients.find(
+          (c) => c.clientId === team.client_id,
+        );
+        if (existing) existing.teams.push(entry);
+        else
+          orgMap[org.id].clients.push({
+            clientId: team.client_id,
+            clientName: team.clients.name,
+            teams: [entry],
+          });
+      } else {
+        orgMap[org.id].internalTeams.push(entry);
+      }
+    }
+    const groups = Object.values(orgMap);
+    setOrgGroups(groups);
+    if (groups.length > 0 && !activeOrgId) {
+      const firstOrg = groups[0];
+      setActiveOrgId(firstOrg.orgId);
+      const firstTeam = [
+        ...firstOrg.internalTeams,
+        ...firstOrg.clients.flatMap((c) => c.teams),
+      ][0];
+      if (firstTeam) setActiveTeamId(firstTeam.teamId);
+    }
   };
 
-  const fetchProfile = async () => {
-    const { data } = await supabase
+  const fetchUserData = async () => {
+    const { data: prof } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", session.user.id)
       .single();
-    if (data) setProfile(data);
-  };
-
-  const fetchHistory = async (teamId: string) => {
-    const { data } = await supabase
+    if (prof) {
+      setProfile(prof);
+      setEditName(prof.full_name || "");
+      setEditCompany(prof.company || "");
+    }
+    let q = supabase
       .from("analyses")
       .select("*")
-      .eq("team_id", teamId)
       .order("created_at", { ascending: false });
-    if (data) setAnalysesHistory(data);
+    if (activeTeamId) q = q.eq("team_id", activeTeamId);
+    else q = q.eq("user_id", session.user.id);
+    const { data: hist } = await q;
+    if (hist) setAnalysesHistory(hist);
   };
 
   useEffect(() => {
-    loadAllTeams();
-    fetchProfile();
-    // Handle invite tokens
-    const inviteToken = new URLSearchParams(window.location.search).get(
-      "invite",
-    );
+    if (!session?.user?.id) return;
+    loadOrgGroups();
+    fetchUserData();
+    const params = new URLSearchParams(window.location.search);
+    const inviteToken = params.get("invite");
     if (inviteToken) {
       supabase
         .rpc("join_team_via_invite", { invite_token: inviteToken })
-        .then(({ data }) => {
-          if (data?.success) {
+        .then(({ data, error }) => {
+          if (error) alert("Failed to join team.");
+          else if (data?.success) {
             alert("Successfully joined the team!");
+            setCurrentView("teams");
             window.history.replaceState({}, document.title, "/");
-            loadAllTeams();
           } else alert(data?.error || "Invalid invite link.");
         });
     }
-  }, []);
+  }, [session]);
 
-  // When entering a team, load its data
-  const enterTeam = (team: TeamCard) => {
-    setActiveTeam(team);
-    setCurrentView("analyzer");
-    setSingleResult(null);
-    setSingle(null);
-    setCreatives([null, null]);
-    fetchHistory(team.teamId);
-    loadBrandsFromSupabase(session.user.id, team.teamId).then((b) =>
-      setBrands(b),
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    loadBrandsFromSupabase(session.user.id, activeTeamId || undefined).then(
+      (b) => setBrands(b),
     );
-  };
+    fetchUserData();
+  }, [activeTeamId]);
 
-  const exitToGrid = () => {
-    setActiveTeam(null);
-    setSingleResult(null);
-    setSingle(null);
-    setCreatives([null, null]);
-    setViewingHistoryItem(null);
-    loadAllTeams();
-  };
-
-  const handleCreateClient = async () => {
-    if (!newClientName.trim() || !newTeamName.trim()) return;
-    setCreating(true);
-    // Get first org (No Fluff)
-    const { data: memberData } = await supabase
-      .from("team_members")
-      .select("teams(organisations(id))")
-      .eq("user_id", session.user.id)
-      .limit(1)
-      .single();
-    const orgId = (memberData?.teams as any)?.organisations?.id;
-    if (!orgId) {
-      alert("No organisation found.");
-      setCreating(false);
-      return;
+  const handleOrgSelect = (orgId: string) => {
+    setActiveOrgId(orgId);
+    const org = orgGroups.find((o) => o.orgId === orgId);
+    if (org) {
+      const first = [
+        ...org.internalTeams,
+        ...org.clients.flatMap((c) => c.teams),
+      ][0];
+      if (first) setActiveTeamId(first.teamId);
+      else setActiveTeamId(null);
     }
-    const { data, error } = await supabase.rpc("create_client_and_team", {
-      p_org_id: orgId,
-      p_client_name: newClientName.trim(),
-      p_team_name: newTeamName.trim(),
-    });
-    if (error || !data?.success)
-      alert("Error: " + (error?.message || "Unknown"));
-    else {
-      setNewClientName("");
-      setNewTeamName("");
-      setShowNewClient(false);
-      await loadAllTeams();
-    }
-    setCreating(false);
+    setOrgDropdownOpen(false);
   };
 
-  // ── Analysis helpers ───────────────────────────────────────
+  const handleTeamChange = (orgId: string, teamId: string) => {
+    setActiveOrgId(orgId);
+    setActiveTeamId(teamId);
+    setTeamDropdownOpen(false);
+    loadOrgGroups();
+  };
+
+  const handleSaveProfile = async () => {
+    setSavingProfile(true);
+    const { error } = await supabase
+      .from("profiles")
+      .update({ full_name: editName, company: editCompany })
+      .eq("id", session.user.id);
+    if (!error) {
+      setProfile({ ...profile, full_name: editName, company: editCompany });
+      alert("Profile updated!");
+    } else alert("Failed: " + error.message);
+    setSavingProfile(false);
+  };
+
+  const deleteAnalysis = async (id: string) => {
+    if (!window.confirm("Permanently delete this report?")) return;
+    const item = analysesHistory.find((h) => h.id === id);
+    if (item?.result?.creative_storage_path)
+      await supabase.storage
+        .from("brand-assets")
+        .remove([item.result.creative_storage_path]);
+    await supabase.from("analyses").delete().eq("id", id);
+    setAnalysesHistory((prev) => prev.filter((i) => i.id !== id));
+  };
+
+  const handleViewHistory = async (item: any) => {
+    setViewingHistoryItem(item);
+    setHistoryCreative(null);
+    setIsLoadingHistory(true);
+    if (item.result?.creative_storage_path) {
+      try {
+        const { data, error } = await supabase.storage
+          .from("brand-assets")
+          .download(item.result.creative_storage_path);
+        if (data && !error) {
+          const dataUrl = await new Promise<string>((res) => {
+            const r = new FileReader();
+            r.onload = () => res(r.result as string);
+            r.readAsDataURL(data);
+          });
+          setHistoryCreative({
+            file: new File([data], item.result.creative_name || "creative"),
+            type: item.result.creative_type || "image",
+            dataUrl,
+            name: item.result.creative_name || "Archived Creative",
+            mimeType: item.result.creative_mimeType || data.type,
+          });
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    setIsLoadingHistory(false);
+  };
+
+  const addReferenceLink = () => {
+    if (referenceLinks.length < 3) setReferenceLinks((p) => [...p, ""]);
+  };
+  const updateReferenceLink = (idx: number, val: string) =>
+    setReferenceLinks((p) => p.map((l, i) => (i === idx ? val : l)));
+  const removeReferenceLink = (idx: number) =>
+    setReferenceLinks((p) => p.filter((_, i) => i !== idx));
+
   const buildSystem = (isVideo: boolean) => {
     const fc = brandFiles
       .filter((f) => f.extractedText)
       .map((f) => `[Brand file: ${f.name}]\n${f.extractedText}`)
       .join("\n\n");
     const is = industry
-      ? `"industry_benchmarks": { "summary": "<2-3 sentences>", "examples": [{ "brand":"<>","campaign":"<>","technique":"<>","lesson":"<>" },{ "brand":"<>","campaign":"<>","technique":"<>","lesson":"<>" }], "gap": "<single sentence>" },`
+      ? `
+  "industry_benchmarks": {
+    "summary": "<2-3 sentences on what the best ${industry} campaigns globally are doing in 2024-2025>",
+    "examples": [
+      { "brand": "<real brand>", "campaign": "<real campaign>", "technique": "<technique>", "lesson": "<lesson>" },
+      { "brand": "<real brand>", "campaign": "<real campaign>", "technique": "<technique>", "lesson": "<lesson>" }
+    ],
+    "gap": "<single sentence — the biggest difference between this creative and what top ${industry} players are doing>"
+  },`
       : "";
     return `You are a senior creative strategist at No Fluff, a behavioural marketing agency for D2C brands. Analyse advertising creatives through consumer psychology, visual hierarchy, and conversion optimisation.${industry ? ` Use your web search tool to find current 2024-2025 ${industry} campaign examples before completing the industry_benchmarks section.` : ""}
 
 Return ONLY raw JSON. No markdown. No backticks. No explanation. Start with { end with }.
 
-{ "overall_score":<0-100>, "overall_verdict":"<one punchy sentence>", "pass":<true if score>=${threshold}>, "dimensions":{ "visual_hierarchy":{"score":<0-100>,"recommendation":"<specific observation>"},"clarity_readability":{"score":<0-100>,"recommendation":"<>"},"three_second_test":{"score":<0-100>,"recommendation":"<>"},"behavioural_triggers":{"score":<0-100>,"recommendation":"<>"},"cta_strength":{"score":<0-100>,"recommendation":"<>"},"cognitive_load":{"score":<0-100>,"recommendation":"<>"},"emotional_resonance":{"score":<0-100>,"recommendation":"<>"},"brand_consistency":{"score":<0-100>,"recommendation":"<>"},"concept_alignment":{"score":<0-100>,"recommendation":"<>"} }, "top_fixes":["<>","<>","<>"], "attention_zones":[{"priority":1,"label":"<>","x":<0-1>,"y":<0-1>,"w":<0-1>,"h":<0-1>,"note":"<>"},{"priority":2,"label":"<>","x":<0-1>,"y":<0-1>,"w":<0-1>,"h":<0-1>,"note":"<>"},{"priority":3,"label":"<>","x":<0-1>,"y":<0-1>,"w":<0-1>,"h":<0-1>,"note":"<>"}]${industry ? `,${is}` : ""} }
+{
+  "overall_score": <integer 0-100>,
+  "overall_verdict": "<one punchy sentence>",
+  "pass": <true if score >= ${threshold}, else false>,
+  "dimensions": {
+    "visual_hierarchy": { "score": <0-100>, "recommendation": "<specific 1-2 sentence observation>" },
+    "clarity_readability": { "score": <0-100>, "recommendation": "<specific observation>" },
+    "three_second_test": { "score": <0-100>, "recommendation": "<specific observation>" },
+    "behavioural_triggers": { "score": <0-100>, "recommendation": "<psychology principles present or missing>" },
+    "cta_strength": { "score": <0-100>, "recommendation": "<specific observation>" },
+    "cognitive_load": { "score": <0-100>, "recommendation": "<specific observation>" },
+    "emotional_resonance": { "score": <0-100>, "recommendation": "<specific observation>" },
+    "brand_consistency": { "score": <0-100>, "recommendation": "<specific observation>" },
+    "concept_alignment": { "score": <0-100>, "recommendation": "<how clearly the creative communicates the intended concept>" }
+  },
+  "top_fixes": ["<most impactful fix>", "<second fix>", "<third fix>"],
+  "attention_zones": [
+    { "priority": 1, "label": "<element>", "x": <0.0-1.0>, "y": <0.0-1.0>, "w": <0.0-1.0>, "h": <0.0-1.0>, "note": "<why this draws attention>" },
+    { "priority": 2, "label": "<element>", "x": <0.0-1.0>, "y": <0.0-1.0>, "w": <0.0-1.0>, "h": <0.0-1.0>, "note": "<note>" },
+    { "priority": 3, "label": "<element>", "x": <0.0-1.0>, "y": <0.0-1.0>, "w": <0.0-1.0>, "h": <0.0-1.0>, "note": "<note>" }
+  ]${industry ? `,${is}` : ""}
+}
 
+x/y = top-left corner as fraction of image width/height. w/h = width/height as fraction.
 ${platform ? `Platform: ${platform}.` : ""}${client ? ` Client: ${client}.` : ""}${industry ? ` Industry: ${industry}.` : ""}${brandNotes ? ` Brand notes: ${brandNotes}.` : ""}${fc ? `\n\nBrand guideline documents:\n${fc}` : ""}
-${concept ? `\nConcept: "${concept}". Score concept_alignment on how clearly it communicates this goal.` : "\nNo concept — score concept_alignment on general message clarity."}
+${concept ? `\nConcept / campaign goal: "${concept}". Score concept_alignment on how clearly and directly the creative communicates this specific goal. Flag in your recommendation if it falls below ${conceptThreshold}/100.` : "\nNo concept provided — score concept_alignment based on general message clarity."}
 ${
   referenceLinks.filter((l) => l.trim()).length > 0
-    ? `\nReference creatives:\n${referenceLinks
+    ? `\nReference creatives provided by the client — use these for stylistic and tonal benchmarking only:\n${referenceLinks
         .filter((l) => l.trim())
         .map((l, i) => `${i + 1}. ${l}`)
         .join("\n")}`
     : ""
 }
 ${isVideo ? "Video creative — benchmark against best-practice standards for the format." : ""}
-Be specific. Reference actual elements. No generic advice.`;
+Be specific. Reference actual elements visible. No generic advice.`;
   };
 
   const callAPI = async (creative: CreativeFile): Promise<AnalysisResult> => {
@@ -3905,15 +4854,16 @@ Be specific. Reference actual elements. No generic advice.`;
     } else
       parts.push({
         type: "text",
-        text: `Video file: "${creative.name}". Return raw JSON only, starting with {`,
+        text: `Video file: "${creative.name}". Provide the JSON analysis. Raw JSON only, starting with {`,
       });
+    const messages = [
+      { role: "user", content: isV ? parts[parts.length - 1] : parts },
+    ];
     const body: Record<string, unknown> = {
       model: selectedModel,
       max_tokens: 4000,
       system: buildSystem(isV),
-      messages: [
-        { role: "user", content: isV ? parts[parts.length - 1] : parts },
-      ],
+      messages,
     };
     if (industry)
       body.tools = [{ type: "web_search_20250305", name: "web_search" }];
@@ -3928,8 +4878,8 @@ Be specific. Reference actual elements. No generic advice.`;
     }
     const data = await resp.json();
     const raw = (data.content || [])
-      .filter((b: any) => b.type === "text")
-      .map((b: any) => b.text || "")
+      .filter((b: { type: string }) => b.type === "text")
+      .map((b: { text?: string }) => b.text || "")
       .join("")
       .trim();
     const s = raw.indexOf("{"),
@@ -3937,7 +4887,7 @@ Be specific. Reference actual elements. No generic advice.`;
     if (s === -1 || e === -1) throw new Error("No JSON found in response");
     const parsed = JSON.parse(raw.slice(s, e + 1));
     if (!parsed.dimensions || !parsed.overall_score)
-      throw new Error("Incomplete analysis — please try again.");
+      throw new Error("Incomplete analysis returned — please try again.");
     return parsed;
   };
 
@@ -3948,7 +4898,6 @@ Be specific. Reference actual elements. No generic advice.`;
     creative: CreativeFile | null,
     analysisType: string,
   ) => {
-    if (!activeTeam) return;
     let updated = { ...fullResult };
     if (creative?.file) {
       const safe = creative.name.replace(/[^a-zA-Z0-9.-]/g, "_");
@@ -3965,34 +4914,32 @@ Be specific. Reference actual elements. No generic advice.`;
     }
     const creditsUsed =
       MODELS.find((m) => m.id === selectedModel)?.credits || 1;
-    const { data: deduct } = await supabase.rpc("deduct_team_credits", {
-      p_team_id: activeTeam.teamId,
-      p_user_id: session.user.id,
-      p_amount: creditsUsed,
-    });
-    if (!deduct?.success)
-      throw new Error(deduct?.error || "Insufficient credits");
-    await supabase
-      .from("analyses")
-      .insert({
-        user_id: session.user.id,
-        team_id: activeTeam.teamId,
-        org_id: activeTeam.orgId,
-        client: client || "Unnamed",
-        platform: platform || "Unknown",
-        industry: industry || "Unknown",
-        concept: concept || null,
-        type: analysisType,
-        model: selectedModel,
-        credits_used: creditsUsed,
-        overall_score: score,
-        pass,
-        result: updated,
+    if (activeTeamId) {
+      const { data: deduct } = await supabase.rpc("deduct_team_credits", {
+        p_team_id: activeTeamId,
+        p_user_id: session.user.id,
+        p_amount: creditsUsed,
       });
-    setActiveTeam((prev) =>
-      prev ? { ...prev, creditsPool: prev.creditsPool - creditsUsed } : prev,
-    );
-    fetchHistory(activeTeam.teamId);
+      if (!deduct?.success)
+        throw new Error(deduct?.error || "Insufficient credits");
+      loadOrgGroups();
+    }
+    await supabase.from("analyses").insert({
+      user_id: session.user.id,
+      team_id: activeTeamId || null,
+      org_id: activeOrgId || null,
+      client: client || "Unnamed Analysis",
+      platform: platform || "Unknown",
+      industry: industry || "Unknown",
+      concept: concept || null,
+      type: analysisType,
+      model: selectedModel,
+      credits_used: creditsUsed,
+      overall_score: score,
+      pass,
+      result: updated,
+    });
+    fetchUserData();
   };
 
   const runSingle = async () => {
@@ -4015,6 +4962,7 @@ Be specific. Reference actual elements. No generic advice.`;
     }
     setSingleAnalysing(false);
   };
+
   const runAB = async () => {
     if (creatives.filter(Boolean).length < 2) return;
     setError(null);
@@ -4167,39 +5115,9 @@ Be specific. Reference actual elements. No generic advice.`;
         }
       }
     } catch (err) {
-      console.error(err);
+      console.error("Export failed:", err);
       alert("Export failed.");
     }
-  };
-
-  const handleViewHistory = async (item: any) => {
-    setViewingHistoryItem(item);
-    setHistoryCreative(null);
-    setIsLoadingHistory(true);
-    if (item.result?.creative_storage_path) {
-      try {
-        const { data, error } = await supabase.storage
-          .from("brand-assets")
-          .download(item.result.creative_storage_path);
-        if (data && !error) {
-          const dataUrl = await new Promise<string>((res) => {
-            const r = new FileReader();
-            r.onload = () => res(r.result as string);
-            r.readAsDataURL(data);
-          });
-          setHistoryCreative({
-            file: new File([data], item.result.creative_name || "creative"),
-            type: item.result.creative_type || "image",
-            dataUrl,
-            name: item.result.creative_name || "Archived Creative",
-            mimeType: item.result.creative_mimeType || data.type,
-          });
-        }
-      } catch (err) {
-        console.error(err);
-      }
-    }
-    setIsLoadingHistory(false);
   };
 
   const brandList = Object.keys(brands);
@@ -4216,535 +5134,121 @@ Be specific. Reference actual elements. No generic advice.`;
           a.result.overall_score > b.result.overall_score ? a : b,
         )
       : null;
+  const allTeamsInOrg = activeOrg
+    ? [
+        ...(activeOrg.internalTeams || []),
+        ...(activeOrg.clients || []).flatMap((c) => c.teams),
+      ]
+    : [];
 
-  // ── LAYER 1: Teams Grid ────────────────────────────────────
-  if (!activeTeam) {
-    return (
-      <div
-        style={{
-          minHeight: "100vh",
-          background: "#FAFAFA",
-          fontFamily: "system-ui",
-        }}
-      >
-        {/* Top bar */}
-        <div
-          style={{
-            background: "#fff",
-            borderBottom: "1px solid #EFEFEF",
-            padding: "0 2rem",
-            height: 60,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            position: "sticky",
-            top: 0,
-            zIndex: 10,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: 7,
-                background: "#111",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <span style={{ fontSize: 13, color: "#fff", fontWeight: 800 }}>
-                P
-              </span>
-            </div>
-            <span style={{ fontSize: 16, fontWeight: 700, color: "#111" }}>
-              Preflyght
-            </span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {profile && (
-              <span style={{ fontSize: 13, color: "#888" }}>
-                {profile.full_name || profile.email}
-              </span>
-            )}
-            <button
-              onClick={() => setShowNewClient(true)}
-              style={{
-                padding: "8px 16px",
-                borderRadius: 8,
-                border: "none",
-                background: "#111",
-                color: "#fff",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              + New client
-            </button>
-            <button
-              onClick={() => supabase.auth.signOut()}
-              style={{
-                padding: "8px 14px",
-                borderRadius: 8,
-                border: "1px solid #EFEFEF",
-                background: "#fff",
-                color: "#888",
-                fontSize: 13,
-                cursor: "pointer",
-              }}
-            >
-              Sign out
-            </button>
-          </div>
-        </div>
-
-        <div
-          style={{ maxWidth: 1100, margin: "0 auto", padding: "2rem 1.5rem" }}
-        >
-          <div style={{ marginBottom: "2rem" }}>
-            <h1
-              style={{
-                fontSize: 24,
-                fontWeight: 700,
-                color: "#111",
-                margin: "0 0 4px",
-              }}
-            >
-              Teams
-            </h1>
-            <p style={{ fontSize: 14, color: "#999", margin: 0 }}>
-              Select a team to start analysing
-            </p>
-          </div>
-
-          {/* New client modal */}
-          {showNewClient && (
-            <div
-              style={{
-                background: "#fff",
-                border: "1px solid #EFEFEF",
-                borderRadius: 14,
-                padding: "1.5rem",
-                marginBottom: "1.5rem",
-              }}
-            >
-              <p
-                style={{
-                  fontSize: 14,
-                  fontWeight: 600,
-                  color: "#111",
-                  margin: "0 0 14px",
-                }}
-              >
-                New client + team
-              </p>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: 10,
-                  marginBottom: 12,
-                }}
-              >
-                <div>
-                  <label
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 600,
-                      color: "#888",
-                      display: "block",
-                      marginBottom: 5,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.06em",
-                    }}
-                  >
-                    Client name
-                  </label>
-                  <input
-                    value={newClientName}
-                    onChange={(e) => setNewClientName(e.target.value)}
-                    placeholder="e.g. Zero Grid"
-                    style={{
-                      width: "100%",
-                      padding: "9px 12px",
-                      border: "1px solid #EFEFEF",
-                      borderRadius: 8,
-                      fontSize: 13,
-                      outline: "none",
-                      boxSizing: "border-box",
-                      color: "#111",
-                    }}
-                  />
-                </div>
-                <div>
-                  <label
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 600,
-                      color: "#888",
-                      display: "block",
-                      marginBottom: 5,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.06em",
-                    }}
-                  >
-                    First team name
-                  </label>
-                  <input
-                    value={newTeamName}
-                    onChange={(e) => setNewTeamName(e.target.value)}
-                    placeholder="e.g. Performance"
-                    style={{
-                      width: "100%",
-                      padding: "9px 12px",
-                      border: "1px solid #EFEFEF",
-                      borderRadius: 8,
-                      fontSize: 13,
-                      outline: "none",
-                      boxSizing: "border-box",
-                      color: "#111",
-                    }}
-                  />
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  onClick={handleCreateClient}
-                  disabled={
-                    creating || !newClientName.trim() || !newTeamName.trim()
-                  }
-                  style={{
-                    padding: "9px 18px",
-                    borderRadius: 8,
-                    border: "none",
-                    background:
-                      newClientName.trim() && newTeamName.trim()
-                        ? "#6366F1"
-                        : "#F0F0F0",
-                    color:
-                      newClientName.trim() && newTeamName.trim()
-                        ? "#fff"
-                        : "#AAA",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  {creating ? "Creating…" : "Create"}
-                </button>
-                <button
-                  onClick={() => setShowNewClient(false)}
-                  style={{
-                    padding: "9px 18px",
-                    borderRadius: 8,
-                    border: "1px solid #EFEFEF",
-                    background: "#fff",
-                    color: "#555",
-                    fontSize: 13,
-                    cursor: "pointer",
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-
-          {loadingTeams ? (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "6rem",
-              }}
-            >
-              <p style={{ fontSize: 13, color: "#AAA" }}>Loading teams…</p>
-            </div>
-          ) : allTeams.length === 0 ? (
-            <div
-              style={{
-                background: "#fff",
-                border: "1px solid #EFEFEF",
-                borderRadius: 16,
-                padding: "5rem",
-                textAlign: "center",
-              }}
-            >
-              <p style={{ fontSize: 40, margin: "0 0 12px" }}>🏗️</p>
-              <p
-                style={{
-                  fontSize: 16,
-                  fontWeight: 600,
-                  color: "#222",
-                  margin: "0 0 6px",
-                }}
-              >
-                No teams yet
-              </p>
-              <p style={{ fontSize: 14, color: "#AAA", margin: "0 0 20px" }}>
-                Create your first client and team to get started.
-              </p>
-              <button
-                onClick={() => setShowNewClient(true)}
-                style={{
-                  padding: "10px 22px",
-                  borderRadius: 8,
-                  border: "none",
-                  background: "#111",
-                  color: "#fff",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                + New client
-              </button>
-            </div>
-          ) : (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))",
-                gap: 16,
-              }}
-            >
-              {allTeams.map((team) => (
-                <div
-                  key={team.teamId}
-                  onClick={() => enterTeam(team)}
-                  style={{
-                    background: "#fff",
-                    border: "1px solid #EFEFEF",
-                    borderRadius: 14,
-                    padding: "1.25rem 1.5rem",
-                    cursor: "pointer",
-                    transition: "all 0.15s",
-                  }}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLDivElement).style.borderColor =
-                      "#6366F1";
-                    (e.currentTarget as HTMLDivElement).style.boxShadow =
-                      "0 4px 16px rgba(99,102,241,0.1)";
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLDivElement).style.borderColor =
-                      "#EFEFEF";
-                    (e.currentTarget as HTMLDivElement).style.boxShadow =
-                      "none";
-                  }}
-                >
-                  {/* Avatar */}
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      marginBottom: 12,
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 44,
-                        height: 44,
-                        borderRadius: 12,
-                        background: "#111",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <span
-                        style={{ fontSize: 16, fontWeight: 800, color: "#fff" }}
-                      >
-                        {(team.clientName || team.teamName)[0].toUpperCase()}
-                      </span>
-                    </div>
-                    <span
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 700,
-                        padding: "3px 9px",
-                        borderRadius: 20,
-                        background:
-                          team.role === "admin" ? "#F5F3FF" : "#F4F4F5",
-                        color: team.role === "admin" ? "#6366F1" : "#888",
-                      }}
-                    >
-                      {team.role.toUpperCase()}
-                    </span>
-                  </div>
-                  {/* Names */}
-                  {team.clientName && (
-                    <p
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 600,
-                        color: "#AAA",
-                        margin: "0 0 2px",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
-                      }}
-                    >
-                      {team.clientName}
-                    </p>
-                  )}
-                  <p
-                    style={{
-                      fontSize: 15,
-                      fontWeight: 700,
-                      color: "#111",
-                      margin: "0 0 12px",
-                    }}
-                  >
-                    {team.teamName}
-                  </p>
-                  {/* Credits */}
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      paddingTop: 12,
-                      borderTop: "1px solid #F5F5F5",
-                    }}
-                  >
-                    <span style={{ fontSize: 12, color: "#AAA" }}>Credits</span>
-                    <span
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 700,
-                        color: team.creditsPool > 0 ? "#6366F1" : "#EF4444",
-                      }}
-                    >
-                      {team.creditsPool}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // ── LAYER 2: Inside a team ─────────────────────────────────
-  const mode_state = useState("single");
-  const [mode, setMode] = [mode_state[0], mode_state[1]];
-
-  return (
-    <div
+  // ─── SIDEBAR ────────────────────────────────────────────────
+  const Sidebar = () => (
+    <aside
       style={{
+        width: isSidebarOpen ? 260 : 76,
+        transition: "width 0.3s ease",
+        background: "#fff",
+        borderRight: "1px solid #EFEFEF",
         display: "flex",
-        fontFamily: "system-ui",
-        background: "#FAFAFA",
-        minHeight: "100vh",
+        flexDirection: "column",
+        height: "100vh",
+        position: "fixed",
+        left: 0,
+        top: 0,
+        overflow: "hidden",
+        zIndex: 100,
       }}
     >
-      {/* ── SIDEBAR ── */}
-      <aside
-        style={{
-          width: isSidebarOpen ? 260 : 76,
-          transition: "width 0.3s ease",
-          background: "#fff",
-          borderRight: "1px solid #EFEFEF",
-          display: "flex",
-          flexDirection: "column",
-          height: "100vh",
-          position: "fixed",
-          left: 0,
-          top: 0,
-          overflow: "hidden",
-          zIndex: 100,
-        }}
-      >
-        {/* Back + breadcrumb */}
+      <div style={{ borderBottom: "1px solid #EFEFEF" }}>
         <div
           style={{
-            padding: "1rem 0.75rem 0.75rem",
-            borderBottom: "1px solid #EFEFEF",
+            padding: isSidebarOpen
+              ? "1.25rem 1rem 0.75rem"
+              : "1.25rem 0 0.75rem",
+            display: "flex",
+            justifyContent: "center",
           }}
         >
-          <button
-            onClick={exitToGrid}
+          <div
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 8,
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              padding: "6px 8px",
-              borderRadius: 8,
+              gap: 10,
+              justifyContent: isSidebarOpen ? "flex-start" : "center",
               width: "100%",
-              marginBottom: isSidebarOpen ? 10 : 0,
+              paddingLeft: isSidebarOpen ? 4 : 0,
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = "#F5F5F5")}
-            onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
           >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#888"
-              strokeWidth="2.5"
+            <div
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: 6,
+                background: "#111",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
             >
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
+              <span style={{ fontSize: 12, color: "#fff", fontWeight: 800 }}>
+                P
+              </span>
+            </div>
             {isSidebarOpen && (
-              <span style={{ fontSize: 12, color: "#888", fontWeight: 500 }}>
-                All teams
+              <span style={{ fontSize: 15, fontWeight: 700, color: "#111" }}>
+                Preflyght
               </span>
             )}
-          </button>
-          {isSidebarOpen && (
-            <div style={{ padding: "0 8px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 8,
-                    background: "#111",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                  }}
-                >
-                  <span
-                    style={{ fontSize: 13, fontWeight: 800, color: "#fff" }}
-                  >
-                    {(activeTeam.clientName ||
-                      activeTeam.teamName)[0].toUpperCase()}
-                  </span>
-                </div>
+          </div>
+        </div>
+
+        {/* Org selector */}
+        {isSidebarOpen && orgGroups.length > 0 && (
+          <div
+            style={{
+              padding: "0 0.75rem 0.75rem",
+              display: "flex",
+              flexDirection: "column",
+              gap: 6,
+            }}
+          >
+            {/* ── Org dropdown ── */}
+            <div style={{ position: "relative" }} data-dropdown="org">
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOrgDropdownOpen((o) => !o);
+                  setTeamDropdownOpen(false);
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "7px 10px",
+                  borderRadius: 8,
+                  border: "1px solid #F0F0F0",
+                  background: "#FAFAFA",
+                  cursor: "pointer",
+                }}
+              >
                 <div style={{ minWidth: 0 }}>
-                  {activeTeam.clientName && (
-                    <p
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 600,
-                        color: "#AAA",
-                        margin: 0,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                      }}
-                    >
-                      {activeTeam.clientName}
-                    </p>
-                  )}
+                  <p
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: "#BBB",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                      margin: "0 0 1px",
+                    }}
+                  >
+                    Organisation
+                  </p>
                   <p
                     style={{
                       fontSize: 13,
-                      fontWeight: 700,
+                      fontWeight: 600,
                       color: "#111",
                       margin: 0,
                       whiteSpace: "nowrap",
@@ -4752,285 +5256,715 @@ Be specific. Reference actual elements. No generic advice.`;
                       textOverflow: "ellipsis",
                     }}
                   >
-                    {activeTeam.teamName}
+                    {activeOrg?.orgName || "Select org"}
                   </p>
                 </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Nav */}
-        <nav
-          style={{
-            flex: 1,
-            padding: "0.75rem 0.5rem",
-            display: "flex",
-            flexDirection: "column",
-            gap: 2,
-          }}
-        >
-          {(
-            [
-              [
-                "analyzer",
-                "Analyser",
                 <svg
-                  width="15"
-                  height="15"
+                  width="11"
+                  height="11"
                   viewBox="0 0 24 24"
                   fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-                </svg>,
-              ],
-              [
-                "history",
-                "History",
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <rect x="3" y="3" width="7" height="7" />
-                  <rect x="14" y="3" width="7" height="7" />
-                  <rect x="14" y="14" width="7" height="7" />
-                  <rect x="3" y="14" width="7" height="7" />
-                </svg>,
-              ],
-              [
-                "brands",
-                "Brands",
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-                </svg>,
-              ],
-              [
-                "settings",
-                "Settings",
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <circle cx="12" cy="12" r="3" />
-                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                </svg>,
-              ],
-            ] as [string, string, React.ReactNode][]
-          ).map(([view, label, icon]) => {
-            const active = currentView === view;
-            return (
-              <button
-                key={view}
-                onClick={() => setCurrentView(view as typeof currentView)}
-                title={!isSidebarOpen ? label : undefined}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  width: "100%",
-                  padding: isSidebarOpen ? "9px 12px" : "9px 0",
-                  justifyContent: isSidebarOpen ? "flex-start" : "center",
-                  borderRadius: 8,
-                  border: "none",
-                  background: active ? "#F5F3FF" : "transparent",
-                  color: active ? "#6366F1" : "#555",
-                  fontSize: 13,
-                  fontWeight: active ? 600 : 500,
-                  cursor: "pointer",
-                  textAlign: "left",
-                }}
-              >
-                {icon}
-                {isSidebarOpen && label}
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* Bottom */}
-        <div
-          style={{
-            padding: "0.75rem 0.5rem",
-            borderTop: "1px solid #EFEFEF",
-            display: "flex",
-            flexDirection: "column",
-            gap: 8,
-          }}
-        >
-          {isSidebarOpen && (
-            <div
-              style={{
-                padding: "8px 10px",
-                borderRadius: 8,
-                background: "#FAFAFA",
-                border: "1px solid #F0F0F0",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: 4,
-                }}
-              >
-                <span
+                  stroke="#BBB"
+                  strokeWidth="2.5"
                   style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: "#AAA",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.06em",
+                    flexShrink: 0,
+                    marginLeft: 6,
+                    transform: orgDropdownOpen
+                      ? "rotate(180deg)"
+                      : "rotate(0deg)",
+                    transition: "transform 0.2s",
                   }}
                 >
-                  Credits
-                </span>
-                <span
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 700,
-                    color: activeTeam.creditsPool > 0 ? "#111" : "#EF4444",
-                  }}
-                >
-                  {activeTeam.creditsPool}
-                </span>
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
               </div>
-              <div
-                style={{ height: 4, background: "#F0F0F0", borderRadius: 2 }}
-              >
+              {orgDropdownOpen && (
                 <div
                   style={{
-                    height: 4,
-                    borderRadius: 2,
-                    width: `${Math.min(100, (activeTeam.creditsPool / 200) * 100)}%`,
-                    background: "#6366F1",
-                    transition: "width 0.5s ease",
+                    position: "absolute",
+                    top: "calc(100% + 4px)",
+                    left: 0,
+                    right: 0,
+                    background: "#fff",
+                    border: "1px solid #EFEFEF",
+                    borderRadius: 8,
+                    boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
+                    zIndex: 50,
+                    overflow: "hidden",
                   }}
-                />
-              </div>
-              <p style={{ fontSize: 10, color: "#BBB", margin: "4px 0 0" }}>
-                Team pool
-              </p>
+                >
+                  {orgGroups.map((org) => (
+                    <div
+                      key={org.orgId}
+                      onClick={() => handleOrgSelect(org.orgId)}
+                      style={{
+                        padding: "9px 12px",
+                        cursor: "pointer",
+                        background:
+                          activeOrgId === org.orgId ? "#F5F3FF" : "#fff",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                      }}
+                      onMouseEnter={(e) => {
+                        if (activeOrgId !== org.orgId)
+                          (e.currentTarget as HTMLDivElement).style.background =
+                            "#FAFAFA";
+                      }}
+                      onMouseLeave={(e) => {
+                        if (activeOrgId !== org.orgId)
+                          (e.currentTarget as HTMLDivElement).style.background =
+                            "#fff";
+                      }}
+                    >
+                      <div>
+                        <p
+                          style={{
+                            fontSize: 13,
+                            fontWeight: activeOrgId === org.orgId ? 600 : 500,
+                            color:
+                              activeOrgId === org.orgId ? "#6366F1" : "#222",
+                            margin: 0,
+                          }}
+                        >
+                          {org.orgName}
+                        </p>
+                        <p style={{ fontSize: 10, color: "#BBB", margin: 0 }}>
+                          {org.clients.length} client
+                          {org.clients.length !== 1 ? "s" : ""} ·{" "}
+                          {org.internalTeams.length +
+                            org.clients.reduce(
+                              (a, c) => a + c.teams.length,
+                              0,
+                            )}{" "}
+                          team
+                          {org.internalTeams.length +
+                            org.clients.reduce(
+                              (a, c) => a + c.teams.length,
+                              0,
+                            ) !==
+                          1
+                            ? "s"
+                            : ""}
+                        </p>
+                      </div>
+                      {activeOrgId === org.orgId && (
+                        <svg
+                          width="13"
+                          height="13"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#6366F1"
+                          strokeWidth="2.5"
+                        >
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-          <button
-            onClick={() => setIsSidebarOpen((o) => !o)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: isSidebarOpen ? "flex-start" : "center",
-              gap: 8,
-              padding: isSidebarOpen ? "8px 10px" : "8px 0",
-              borderRadius: 8,
-              border: "none",
-              background: "transparent",
-              color: "#AAA",
-              cursor: "pointer",
-              fontSize: 12,
-              width: "100%",
-            }}
-          >
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              style={{
-                transform: isSidebarOpen ? "rotate(0deg)" : "rotate(180deg)",
-                transition: "transform 0.3s",
-              }}
-            >
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
-            {isSidebarOpen && "Collapse"}
-          </button>
-          {isSidebarOpen && (
-            <button
-              onClick={() => supabase.auth.signOut()}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "8px 10px",
-                borderRadius: 8,
-                border: "none",
-                background: "transparent",
-                color: "#CCC",
-                cursor: "pointer",
-                fontSize: 12,
-                width: "100%",
-              }}
-            >
+
+            {/* ── Team dropdown (2+ teams) ── */}
+            {activeOrg && allTeamsInOrg.length > 1 && (
+              <div style={{ position: "relative" }} data-dropdown="team">
+                <div
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setTeamDropdownOpen((o) => !o);
+                    setOrgDropdownOpen(false);
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "7px 10px",
+                    borderRadius: 8,
+                    border: "1px solid #F0F0F0",
+                    background: "#FAFAFA",
+                    cursor: "pointer",
+                  }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <p
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        color: "#BBB",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                        margin: "0 0 1px",
+                      }}
+                    >
+                      {activeTeamClient ? `Client · Team` : "Team"}
+                    </p>
+                    <p
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: "#111",
+                        margin: 0,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      {activeTeamClient
+                        ? `${activeTeamClient} · ${activeTeamEntry?.teamName || ""}`
+                        : activeTeamEntry?.teamName || "Select team"}
+                    </p>
+                  </div>
+                  <svg
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#BBB"
+                    strokeWidth="2.5"
+                    style={{
+                      flexShrink: 0,
+                      marginLeft: 6,
+                      transform: teamDropdownOpen
+                        ? "rotate(180deg)"
+                        : "rotate(0deg)",
+                      transition: "transform 0.2s",
+                    }}
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </div>
+                {teamDropdownOpen && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "calc(100% + 4px)",
+                      left: 0,
+                      right: 0,
+                      background: "#fff",
+                      border: "1px solid #EFEFEF",
+                      borderRadius: 8,
+                      boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
+                      zIndex: 50,
+                      overflow: "hidden",
+                      maxHeight: 260,
+                      overflowY: "auto",
+                    }}
+                  >
+                    {activeOrg.clients.map((c) => (
+                      <div key={c.clientId}>
+                        <div
+                          style={{
+                            padding: "6px 12px 3px",
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: "#BBB",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.05em",
+                            background: "#FAFAFA",
+                            borderBottom: "1px solid #F5F5F5",
+                          }}
+                        >
+                          {c.clientName}
+                        </div>
+                        {c.teams.map((t) => (
+                          <div
+                            key={t.teamId}
+                            onClick={() =>
+                              handleTeamChange(activeOrgId!, t.teamId)
+                            }
+                            style={{
+                              padding: "9px 12px 9px 20px",
+                              cursor: "pointer",
+                              background:
+                                activeTeamId === t.teamId ? "#F5F3FF" : "#fff",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                            }}
+                            onMouseEnter={(e) => {
+                              if (activeTeamId !== t.teamId)
+                                (
+                                  e.currentTarget as HTMLDivElement
+                                ).style.background = "#FAFAFA";
+                            }}
+                            onMouseLeave={(e) => {
+                              if (activeTeamId !== t.teamId)
+                                (
+                                  e.currentTarget as HTMLDivElement
+                                ).style.background = "#fff";
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: 12,
+                                fontWeight:
+                                  activeTeamId === t.teamId ? 600 : 400,
+                                color:
+                                  activeTeamId === t.teamId
+                                    ? "#6366F1"
+                                    : "#333",
+                              }}
+                            >
+                              {t.teamName}
+                            </span>
+                            {activeTeamId === t.teamId && (
+                              <svg
+                                width="12"
+                                height="12"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="#6366F1"
+                                strokeWidth="2.5"
+                              >
+                                <polyline points="20 6 9 17 4 12" />
+                              </svg>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                    {activeOrg.internalTeams.length > 0 && (
+                      <div>
+                        <div
+                          style={{
+                            padding: "6px 12px 3px",
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: "#BBB",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.05em",
+                            background: "#FAFAFA",
+                            borderBottom: "1px solid #F5F5F5",
+                          }}
+                        >
+                          Internal
+                        </div>
+                        {activeOrg.internalTeams.map((t) => (
+                          <div
+                            key={t.teamId}
+                            onClick={() =>
+                              handleTeamChange(activeOrgId!, t.teamId)
+                            }
+                            style={{
+                              padding: "9px 12px 9px 20px",
+                              cursor: "pointer",
+                              background:
+                                activeTeamId === t.teamId ? "#F5F3FF" : "#fff",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                            }}
+                            onMouseEnter={(e) => {
+                              if (activeTeamId !== t.teamId)
+                                (
+                                  e.currentTarget as HTMLDivElement
+                                ).style.background = "#FAFAFA";
+                            }}
+                            onMouseLeave={(e) => {
+                              if (activeTeamId !== t.teamId)
+                                (
+                                  e.currentTarget as HTMLDivElement
+                                ).style.background = "#fff";
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: 12,
+                                fontWeight:
+                                  activeTeamId === t.teamId ? 600 : 400,
+                                color:
+                                  activeTeamId === t.teamId
+                                    ? "#6366F1"
+                                    : "#333",
+                              }}
+                            >
+                              {t.teamName}
+                            </span>
+                            {activeTeamId === t.teamId && (
+                              <svg
+                                width="12"
+                                height="12"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="#6366F1"
+                                strokeWidth="2.5"
+                              >
+                                <polyline points="20 6 9 17 4 12" />
+                              </svg>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Single team pill ── */}
+            {activeOrg && allTeamsInOrg.length === 1 && (
+              <div
+                style={{
+                  padding: "6px 10px",
+                  borderRadius: 8,
+                  background: "#F5F3FF",
+                  border: "1px solid #E0DBFF",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <div>
+                  <p
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: "#BBB",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                      margin: "0 0 1px",
+                    }}
+                  >
+                    {activeTeamClient ? "Client · Team" : "Team"}
+                  </p>
+                  <p
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: "#6366F1",
+                      margin: 0,
+                    }}
+                  >
+                    {(() => {
+                      const singleTeam = allTeamsInOrg[0];
+                      const singleClient = activeOrg?.clients.find((c) =>
+                        c.teams.some((t) => t.teamId === singleTeam.teamId),
+                      )?.clientName;
+                      return singleClient
+                        ? `${singleClient} · ${singleTeam.teamName}`
+                        : singleTeam.teamName;
+                    })()}
+                  </p>
+                </div>
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    padding: "2px 7px",
+                    borderRadius: 20,
+                    background: "#6366F1",
+                    color: "#fff",
+                  }}
+                >
+                  {allTeamsInOrg[0].role.toUpperCase()}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Nav */}
+      <nav
+        style={{
+          flex: 1,
+          padding: "0.75rem 0.5rem",
+          display: "flex",
+          flexDirection: "column",
+          gap: 2,
+          overflowY: "auto",
+        }}
+      >
+        {(
+          [
+            [
+              "analyzer",
+              "Analyser",
               <svg
-                width="14"
-                height="14"
+                width="15"
+                height="15"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="2"
               >
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <polyline points="16 17 21 12 16 7" />
-                <line x1="21" y1="12" x2="9" y2="12" />
-              </svg>
-              Sign out
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+              </svg>,
+            ],
+            [
+              "dashboard",
+              "History",
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <rect x="3" y="3" width="7" height="7" />
+                <rect x="14" y="3" width="7" height="7" />
+                <rect x="14" y="14" width="7" height="7" />
+                <rect x="3" y="14" width="7" height="7" />
+              </svg>,
+            ],
+            [
+              "brands",
+              "Brands",
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+              </svg>,
+            ],
+            [
+              "teams",
+              "Teams",
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>,
+            ],
+            [
+              "profile",
+              "Profile",
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>,
+            ],
+          ] as [string, string, React.ReactNode][]
+        ).map(([view, label, icon]) => {
+          const active = currentView === view;
+          return (
+            <button
+              key={view}
+              onClick={() => setCurrentView(view as typeof currentView)}
+              title={!isSidebarOpen ? label : undefined}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                width: "100%",
+                padding: isSidebarOpen ? "9px 12px" : "9px 0",
+                justifyContent: isSidebarOpen ? "flex-start" : "center",
+                borderRadius: 8,
+                border: "none",
+                background: active ? "#F5F3FF" : "transparent",
+                color: active ? "#6366F1" : "#555",
+                fontSize: 13,
+                fontWeight: active ? 600 : 500,
+                cursor: "pointer",
+                textAlign: "left",
+              }}
+            >
+              {icon}
+              {isSidebarOpen && label}
             </button>
-          )}
-        </div>
-      </aside>
+          );
+        })}
+      </nav>
 
-      {/* ── MAIN ── */}
+      {/* Bottom */}
+      <div
+        style={{
+          padding: "0.75rem 0.5rem",
+          borderTop: "1px solid #EFEFEF",
+          display: "flex",
+          flexDirection: "column",
+          gap: 8,
+        }}
+      >
+        {isSidebarOpen && profile && (
+          <div
+            style={{
+              padding: "8px 10px",
+              borderRadius: 8,
+              background: "#FAFAFA",
+              border: "1px solid #F0F0F0",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 4,
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "#AAA",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                }}
+              >
+                Credits
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#111" }}>
+                {activeTeamEntry?.creditsPool ?? profile.credits_balance ?? 0}
+              </span>
+            </div>
+            <div style={{ height: 4, background: "#F0F0F0", borderRadius: 2 }}>
+              <div
+                style={{
+                  height: 4,
+                  borderRadius: 2,
+                  width: `${Math.min(100, ((activeTeamEntry?.creditsPool || 0) / 200) * 100)}%`,
+                  background: "#6366F1",
+                  transition: "width 0.5s ease",
+                }}
+              />
+            </div>
+            {isSidebarOpen && activeTeamEntry && (
+              <p style={{ fontSize: 10, color: "#BBB", margin: "4px 0 0" }}>
+                Team pool ·{" "}
+                {activeTeamClient
+                  ? `${activeTeamClient} · ${activeTeamEntry.teamName}`
+                  : activeTeamEntry.teamName}
+              </p>
+            )}
+          </div>
+        )}
+        <button
+          onClick={() => setIsSidebarOpen((o) => !o)}
+          title={isSidebarOpen ? "Collapse" : "Expand"}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: isSidebarOpen ? "flex-start" : "center",
+            gap: 8,
+            padding: isSidebarOpen ? "8px 10px" : "8px 0",
+            borderRadius: 8,
+            border: "none",
+            background: "transparent",
+            color: "#AAA",
+            cursor: "pointer",
+            fontSize: 12,
+            fontWeight: 500,
+            width: "100%",
+          }}
+        >
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            style={{
+              transform: isSidebarOpen ? "rotate(0deg)" : "rotate(180deg)",
+              transition: "transform 0.3s",
+            }}
+          >
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+          {isSidebarOpen && "Collapse"}
+        </button>
+        {isSidebarOpen && (
+          <button
+            onClick={() => supabase.auth.signOut()}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "8px 10px",
+              borderRadius: 8,
+              border: "none",
+              background: "transparent",
+              color: "#CCC",
+              cursor: "pointer",
+              fontSize: 12,
+              fontWeight: 500,
+              width: "100%",
+            }}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+            Sign out
+          </button>
+        )}
+      </div>
+    </aside>
+  );
+
+  // ─── MAIN LAYOUT ───────────────────────────────────────────
+  return (
+    <div
+      style={{
+        display: "flex",
+        fontFamily: "var(--font-sans,system-ui)",
+        background: "#FAFAFA",
+        minHeight: "100vh",
+      }}
+    >
+      <Sidebar />
+      {analyserPreviewFile && (
+        <FilePreviewModal
+          file={analyserPreviewFile}
+          onClose={() => setAnalyserPreviewFile(null)}
+        />
+      )}
+      {showBrandMgr && (
+        <BrandManager
+          userId={session.user.id}
+          teamId={activeTeamId || undefined}
+          selectedBrand={selectedBrand}
+          onSelect={(n, notes, files) => {
+            setSelectedBrand(n);
+            setBrandNotes(notes || "");
+            setBrandFiles(files || []);
+            if (n) setClient(n);
+          }}
+          onClose={() => setShowBrandMgr(false)}
+          onUpdated={(b) => setBrands(b)}
+        />
+      )}
       <main
         style={{
           marginLeft: isSidebarOpen ? 260 : 76,
           flex: 1,
           padding: "2rem 1.5rem",
           transition: "margin-left 0.3s ease",
+          maxWidth: "100%",
         }}
       >
         <div style={{ maxWidth: 900 }}>
-          {analyserPreviewFile && (
-            <FilePreviewModal
-              file={analyserPreviewFile}
-              onClose={() => setAnalyserPreviewFile(null)}
-            />
-          )}
-          {showBrandMgr && (
-            <BrandManager
-              userId={session.user.id}
-              teamId={activeTeam.teamId}
-              selectedBrand={selectedBrand}
-              onSelect={(n, notes, files) => {
-                setSelectedBrand(n);
-                setBrandNotes(notes || "");
-                setBrandFiles(files || []);
-                if (n) setClient(n);
-              }}
-              onClose={() => setShowBrandMgr(false)}
-              onUpdated={(b) => setBrands(b)}
-            />
-          )}
-
           {/* ── ANALYSER ── */}
           {currentView === "analyzer" && (
             <div>
@@ -5047,8 +5981,17 @@ Be specific. Reference actual elements. No generic advice.`;
                 </h1>
                 <p style={{ fontSize: 13, color: "#999", margin: 0 }}>
                   Pre-flight analysis powered by behavioural science
-                  {activeTeam.creditsPool === 0 && (
-                    <span style={{ color: "#EF4444" }}> · No credits</span>
+                  {activeTeamEntry && (
+                    <span style={{ color: "#6366F1", fontWeight: 500 }}>
+                      {" "}
+                      ·{" "}
+                      {activeTeamClient
+                        ? `${activeTeamClient} · ${activeTeamEntry.teamName}`
+                        : activeTeamEntry.teamName}
+                      {activeTeamEntry.creditsPool === 0 && (
+                        <span style={{ color: "#EF4444" }}> · No credits</span>
+                      )}
+                    </span>
                   )}
                 </p>
               </div>
@@ -5155,6 +6098,161 @@ Be specific. Reference actual elements. No generic advice.`;
                           Manage brands
                         </button>
                       </div>
+                      {selectedBrand && brands[selectedBrand] && (
+                        <div
+                          style={{
+                            background: "#F5F3FF",
+                            border: "1px solid #E0DBFF",
+                            borderRadius: 10,
+                            padding: "10px 14px",
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: 12,
+                          }}
+                        >
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8,
+                                marginBottom: 4,
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: 20,
+                                  height: 20,
+                                  borderRadius: 5,
+                                  background: "#6366F1",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  flexShrink: 0,
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    fontSize: 10,
+                                    fontWeight: 800,
+                                    color: "#fff",
+                                  }}
+                                >
+                                  {selectedBrand[0].toUpperCase()}
+                                </span>
+                              </div>
+                              <span
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: 600,
+                                  color: "#6366F1",
+                                }}
+                              >
+                                {selectedBrand}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  padding: "1px 6px",
+                                  borderRadius: 20,
+                                  background: "#6366F1",
+                                  color: "#fff",
+                                }}
+                              >
+                                Active
+                              </span>
+                            </div>
+                            {brands[selectedBrand].notes && (
+                              <p
+                                style={{
+                                  fontSize: 11,
+                                  color: "#6366F180",
+                                  margin: "0 0 6px",
+                                  lineHeight: 1.5,
+                                  overflow: "hidden",
+                                  display: "-webkit-box",
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: "vertical" as any,
+                                }}
+                              >
+                                {brands[selectedBrand].notes}
+                              </p>
+                            )}
+                            {(brands[selectedBrand].files || []).length > 0 && (
+                              <div
+                                style={{
+                                  display: "flex",
+                                  gap: 4,
+                                  flexWrap: "wrap",
+                                }}
+                              >
+                                {(brands[selectedBrand].files || []).map(
+                                  (f, i) => (
+                                    <span
+                                      key={i}
+                                      onClick={() => setAnalyserPreviewFile(f)}
+                                      style={{
+                                        fontSize: 10,
+                                        padding: "2px 7px",
+                                        borderRadius: 4,
+                                        background: "#fff",
+                                        color: "#6366F1",
+                                        border: "1px solid #E0DBFF",
+                                        cursor: "pointer",
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: 3,
+                                      }}
+                                    >
+                                      {f.type.startsWith("image/")
+                                        ? "🖼️"
+                                        : f.type === "application/pdf"
+                                          ? "📄"
+                                          : "📝"}{" "}
+                                      {f.name.length > 18
+                                        ? f.name.slice(0, 18) + "…"
+                                        : f.name}
+                                      <svg
+                                        width="9"
+                                        height="9"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2.5"
+                                      >
+                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                        <circle cx="12" cy="12" r="3" />
+                                      </svg>
+                                    </span>
+                                  ),
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => {
+                              setSelectedBrand("");
+                              setBrandNotes("");
+                              setBrandFiles([]);
+                              setClient("");
+                            }}
+                            style={{
+                              padding: "3px 8px",
+                              borderRadius: 6,
+                              border: "1px solid #E0DBFF",
+                              background: "#fff",
+                              color: "#6366F1",
+                              fontSize: 11,
+                              cursor: "pointer",
+                              fontWeight: 600,
+                              flexShrink: 0,
+                            }}
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label
@@ -5268,7 +6366,7 @@ Be specific. Reference actual elements. No generic advice.`;
                         letterSpacing: "0.06em",
                       }}
                     >
-                      Concept{" "}
+                      Concept / campaign goal{" "}
                       <span
                         style={{
                           fontSize: 10,
@@ -5362,7 +6460,7 @@ Be specific. Reference actual elements. No generic advice.`;
                       </label>
                       {referenceLinks.length < 3 && (
                         <button
-                          onClick={() => setReferenceLinks((p) => [...p, ""])}
+                          onClick={addReferenceLink}
                           style={{
                             fontSize: 11,
                             padding: "2px 8px",
@@ -5386,11 +6484,9 @@ Be specific. Reference actual elements. No generic advice.`;
                         <input
                           value={l}
                           onChange={(e) =>
-                            setReferenceLinks((p) =>
-                              p.map((x, j) => (j === i ? e.target.value : x)),
-                            )
+                            updateReferenceLink(i, e.target.value)
                           }
-                          placeholder="https://example.com/ad.jpg"
+                          placeholder="https://example.com/ad-image.jpg"
                           style={{
                             flex: 1,
                             padding: "8px 12px",
@@ -5404,11 +6500,7 @@ Be specific. Reference actual elements. No generic advice.`;
                         />
                         {referenceLinks.length > 1 && (
                           <button
-                            onClick={() =>
-                              setReferenceLinks((p) =>
-                                p.filter((_, j) => j !== i),
-                              )
-                            }
+                            onClick={() => removeReferenceLink(i)}
                             style={{
                               padding: "0 10px",
                               border: "1px solid #EFEFEF",
@@ -5664,7 +6756,7 @@ Be specific. Reference actual elements. No generic advice.`;
           )}
 
           {/* ── HISTORY ── */}
-          {currentView === "history" && (
+          {currentView === "dashboard" && (
             <div>
               <div style={{ marginBottom: "1.75rem" }}>
                 <h1
@@ -5679,9 +6771,10 @@ Be specific. Reference actual elements. No generic advice.`;
                 </h1>
                 <p style={{ fontSize: 13, color: "#999", margin: 0 }}>
                   {analysesHistory.length} report
-                  {analysesHistory.length !== 1 ? "s" : ""} ·{" "}
-                  {activeTeam.clientName ? `${activeTeam.clientName} · ` : ""}
-                  {activeTeam.teamName}
+                  {analysesHistory.length !== 1 ? "s" : ""} saved
+                  {activeTeamEntry
+                    ? ` · ${activeTeamClient ? `${activeTeamClient} · ${activeTeamEntry.teamName}` : activeTeamEntry.teamName}`
+                    : ""}
                 </p>
               </div>
               {viewingHistoryItem ? (
@@ -5711,7 +6804,11 @@ Be specific. Reference actual elements. No generic advice.`;
                   <SingleResult
                     creative={historyCreative}
                     result={viewingHistoryItem.result}
-                    threshold={threshold}
+                    threshold={
+                      viewingHistoryItem.result?.pass !== undefined
+                        ? threshold
+                        : 65
+                    }
                     client={viewingHistoryItem.client}
                     platform={viewingHistoryItem.platform}
                     industry={viewingHistoryItem.industry}
@@ -5852,13 +6949,7 @@ Be specific. Reference actual elements. No generic advice.`;
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (confirm("Delete this report?")) {
-                                supabase
-                                  .from("analyses")
-                                  .delete()
-                                  .eq("id", item.id)
-                                  .then(() => fetchHistory(activeTeam.teamId));
-                              }
+                              deleteAnalysis(item.id);
                             }}
                             style={{
                               padding: "4px 8px",
@@ -5897,14 +6988,15 @@ Be specific. Reference actual elements. No generic advice.`;
                   Brand guidelines
                 </h1>
                 <p style={{ fontSize: 13, color: "#999", margin: 0 }}>
-                  Manage brand assets ·{" "}
-                  {activeTeam.clientName ? `${activeTeam.clientName} · ` : ""}
-                  {activeTeam.teamName}
+                  Manage brand assets for analysis
+                  {activeTeamEntry
+                    ? ` · ${activeTeamClient ? `${activeTeamClient} · ${activeTeamEntry.teamName}` : activeTeamEntry.teamName}`
+                    : ""}
                 </p>
               </div>
               <BrandManager
                 userId={session.user.id}
-                teamId={activeTeam.teamId}
+                teamId={activeTeamId || undefined}
                 isModal={false}
                 selectedBrand={selectedBrand}
                 onSelect={(n, notes, files) => {
@@ -5919,19 +7011,271 @@ Be specific. Reference actual elements. No generic advice.`;
             </div>
           )}
 
-          {/* ── SETTINGS ── */}
-          {currentView === "settings" && (
-            <TeamSettingsView
+          {/* ── TEAMS ── */}
+          {currentView === "teams" && (
+            <TeamsView
               session={session}
-              team={activeTeam}
-              onTeamUpdated={(updated) => {
-                setActiveTeam(updated);
-                setAllTeams((prev) =>
-                  prev.map((t) => (t.teamId === updated.teamId ? updated : t)),
-                );
-              }}
-              onTeamDeleted={exitToGrid}
+              activeOrgId={activeOrgId}
+              activeTeamId={activeTeamId}
+              orgGroups={orgGroups}
+              onTeamChange={handleTeamChange}
             />
+          )}
+
+          {/* ── PROFILE ── */}
+          {currentView === "profile" && (
+            <div>
+              <div style={{ marginBottom: "1.75rem" }}>
+                <h1
+                  style={{
+                    fontSize: 22,
+                    fontWeight: 600,
+                    color: "#111",
+                    margin: "0 0 4px",
+                  }}
+                >
+                  Profile
+                </h1>
+                <p style={{ fontSize: 13, color: "#999", margin: 0 }}>
+                  Manage your account settings.
+                </p>
+              </div>
+              <div
+                style={{ display: "flex", flexDirection: "column", gap: 12 }}
+              >
+                <div
+                  style={{
+                    background: "#fff",
+                    border: "1px solid #EFEFEF",
+                    borderRadius: 14,
+                    padding: "1.5rem",
+                  }}
+                >
+                  <p
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: "#BBB",
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase",
+                      marginBottom: 14,
+                    }}
+                  >
+                    Account
+                  </p>
+                  <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
+                    <div style={{ flex: 1 }}>
+                      <label
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: "#888",
+                          display: "block",
+                          marginBottom: 6,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                        }}
+                      >
+                        Full name
+                      </label>
+                      <input
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        placeholder="Your name"
+                        style={{
+                          width: "100%",
+                          padding: "10px 12px",
+                          border: "1px solid #E5E7EB",
+                          borderRadius: 8,
+                          fontSize: 13,
+                          outline: "none",
+                          boxSizing: "border-box",
+                          color: "#111",
+                          background: "#fff",
+                        }}
+                      />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: "#888",
+                          display: "block",
+                          marginBottom: 6,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                        }}
+                      >
+                        Company
+                      </label>
+                      <input
+                        value={editCompany}
+                        onChange={(e) => setEditCompany(e.target.value)}
+                        placeholder="Your company"
+                        style={{
+                          width: "100%",
+                          padding: "10px 12px",
+                          border: "1px solid #E5E7EB",
+                          borderRadius: 8,
+                          fontSize: 13,
+                          outline: "none",
+                          boxSizing: "border-box",
+                          color: "#111",
+                          background: "#fff",
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <p style={{ fontSize: 12, color: "#AAA", marginBottom: 16 }}>
+                    Email: {session.user.email}
+                  </p>
+                  <button
+                    onClick={handleSaveProfile}
+                    disabled={savingProfile}
+                    style={{
+                      padding: "10px 20px",
+                      borderRadius: 8,
+                      border: "none",
+                      background: savingProfile ? "#F0F0F0" : "#111",
+                      color: savingProfile ? "#AAA" : "#fff",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: savingProfile ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    {savingProfile ? "Saving…" : "Save profile"}
+                  </button>
+                </div>
+                <div
+                  style={{
+                    background: "#fff",
+                    border: "1px solid #EFEFEF",
+                    borderRadius: 14,
+                    padding: "1.5rem",
+                  }}
+                >
+                  <p
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: "#BBB",
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase",
+                      marginBottom: 14,
+                    }}
+                  >
+                    Credits
+                  </p>
+                  <div style={{ display: "flex", gap: 16 }}>
+                    <div
+                      style={{
+                        background: "#F5F3FF",
+                        borderRadius: 12,
+                        padding: "1rem 1.25rem",
+                        flex: 1,
+                      }}
+                    >
+                      <p
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: "#6366F1",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                          margin: "0 0 6px",
+                        }}
+                      >
+                        Personal balance
+                      </p>
+                      <p
+                        style={{
+                          fontSize: 28,
+                          fontWeight: 700,
+                          color: "#6366F1",
+                          margin: 0,
+                        }}
+                      >
+                        {profile?.credits_balance ?? 0}
+                      </p>
+                    </div>
+                    <div
+                      style={{
+                        background: "#FAFAFA",
+                        borderRadius: 12,
+                        padding: "1rem 1.25rem",
+                        flex: 1,
+                      }}
+                    >
+                      <p
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: "#888",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                          margin: "0 0 6px",
+                        }}
+                      >
+                        Total used
+                      </p>
+                      <p
+                        style={{
+                          fontSize: 28,
+                          fontWeight: 700,
+                          color: "#111",
+                          margin: 0,
+                        }}
+                      >
+                        {profile?.credits_used ?? 0}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div
+                  style={{
+                    background: "#FEF2F2",
+                    border: "1px solid #FECACA",
+                    borderRadius: 14,
+                    padding: "1.25rem",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <div>
+                    <p
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: "#B91C1C",
+                        margin: "0 0 2px",
+                      }}
+                    >
+                      Sign out
+                    </p>
+                    <p style={{ fontSize: 12, color: "#EF4444", margin: 0 }}>
+                      You will be redirected to the login screen.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => supabase.auth.signOut()}
+                    style={{
+                      padding: "9px 16px",
+                      borderRadius: 8,
+                      border: "none",
+                      background: "#EF4444",
+                      color: "#fff",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Sign out
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </main>
