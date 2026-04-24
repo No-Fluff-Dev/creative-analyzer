@@ -108,8 +108,6 @@ interface AnalysedCreative extends CreativeFile {
   result: AnalysisResult;
   index: number;
 }
-
-// ─── Org / Client / Team hierarchy ───────────────────────────
 interface TeamEntry {
   teamId: string;
   teamName: string;
@@ -852,7 +850,7 @@ function BrandManager({
             display: "grid",
             gridTemplateColumns: isModal
               ? "1fr"
-              : "repeat(auto-fill, minmax(280px, 1fr))",
+              : "repeat(auto-fill,minmax(280px,1fr))",
             gap: 10,
           }}
         >
@@ -2657,75 +2655,6 @@ function ABResults({
                   dataUrl={c.dataUrl || ""}
                   zones={c.result.attention_zones || []}
                 />
-                <div
-                  style={{
-                    marginTop: 10,
-                    display: "flex",
-                    gap: 8,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  {(c.result.attention_zones || []).map((z) => (
-                    <div
-                      key={z.priority}
-                      style={{
-                        flex: 1,
-                        minWidth: 120,
-                        background: "#FAFAFA",
-                        borderRadius: 8,
-                        padding: "7px 10px",
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 5,
-                          marginBottom: 3,
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: 14,
-                            height: 14,
-                            borderRadius: "50%",
-                            background:
-                              z.priority === 1
-                                ? "#EF4444"
-                                : z.priority === 2
-                                  ? "#F59E0B"
-                                  : "#EAB308",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: 8,
-                              fontWeight: 800,
-                              color: "#fff",
-                            }}
-                          >
-                            {z.priority}
-                          </span>
-                        </div>
-                        <span
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 600,
-                            color: "#222",
-                          }}
-                        >
-                          {z.label}
-                        </span>
-                      </div>
-                      <p style={{ fontSize: 10, color: "#888", margin: 0 }}>
-                        {z.note}
-                      </p>
-                    </div>
-                  ))}
-                </div>
               </div>
             ) : (
               <div
@@ -2971,7 +2900,6 @@ function TeamsView({
         if (data) setAllTeamsFlat(data);
       });
   }, [activeOrgId, activeTeamId]);
-
   useEffect(() => {
     if (!activeTeamId) return;
     loadMembers(activeTeamId);
@@ -2991,7 +2919,6 @@ function TeamsView({
     if (data) setTeamMembers(data);
     setLoadingMembers(false);
   };
-
   const handleCreateClient = async () => {
     if (!clientName.trim() || !teamName.trim() || !activeOrgId) return;
     setCreating(true);
@@ -3010,7 +2937,6 @@ function TeamsView({
     }
     setCreating(false);
   };
-
   const handleAddTeam = async (clientId: string | null) => {
     if (!teamName.trim() || !activeOrgId) return;
     setCreating(true);
@@ -3035,7 +2961,6 @@ function TeamsView({
     }
     setCreating(false);
   };
-
   const updateMemberRole = async (memberId: string, newRole: string) => {
     await supabase
       .from("team_members")
@@ -3054,7 +2979,6 @@ function TeamsView({
     await supabase.from("team_members").delete().eq("id", memberId);
     setTeamMembers((prev) => prev.filter((m) => m.id !== memberId));
   };
-
   const handleAllocate = async () => {
     const amt = parseInt(allocAmount);
     if (!amt || amt <= 0 || !activeTeamId || !activeOrgId) return;
@@ -3073,7 +2997,6 @@ function TeamsView({
     }
     setAllocating(false);
   };
-
   const generateInvite = async () => {
     if (!activeTeamId || !activeOrgId) return;
     let expiresAt: string | null = null;
@@ -3099,7 +3022,6 @@ function TeamsView({
       setInviteStatus({ type: "error", msg: "Failed to generate link." });
     }
   };
-
   const copyLink = () => {
     navigator.clipboard.writeText(activeInviteLink);
     setInviteStatus({ type: "success", msg: "Link copied!" });
@@ -3127,7 +3049,6 @@ function TeamsView({
     }
     setSendingInvite(false);
   };
-
   const filteredMembers = teamMembers.filter((m) => {
     if (!memberSearch.trim()) return true;
     const q = memberSearch.toLowerCase();
@@ -3136,7 +3057,6 @@ function TeamsView({
       (m.profiles?.email || "").toLowerCase().includes(q)
     );
   });
-
   const orgTeamData = allTeamsFlat.filter(
     (t) => (t.teams as any)?.org_id === activeOrgId,
   );
@@ -3165,7 +3085,6 @@ function TeamsView({
       });
     }
   }
-
   const activeTeamFull = allTeamsFlat.find(
     (t) => (t.teams as any)?.id === activeTeamId,
   );
@@ -3173,7 +3092,6 @@ function TeamsView({
     ? (activeTeamFull.teams as any)?.organisations
     : null;
 
-  // rest of TeamsView JSX is unchanged — omitted for brevity, keep your existing TeamsView return
   return (
     <div>
       <div
@@ -4511,7 +4429,8 @@ export default function App({
   const [orgGroups, setOrgGroups] = useState<OrgEntry[]>([]);
   const [activeOrgId, setActiveOrgId] = useState<string | null>(null);
   const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
-  const [orgDropdownOpen, setOrgDropdownOpen] = useState(false);
+  // ── CHANGED: replaced orgDropdownOpen with clientDropdownOpen ──
+  const [clientDropdownOpen, setClientDropdownOpen] = useState(false);
   const [teamDropdownOpen, setTeamDropdownOpen] = useState(false);
 
   const [currentView, setCurrentView] = useState<
@@ -4561,18 +4480,21 @@ export default function App({
         ...(activeOrg.clients || []).flatMap((c) => c.teams),
       ].find((t) => t.teamId === activeTeamId)
     : null;
-
-  // ── FIX: client name for active team ──────────────────────
   const activeTeamClient =
     activeOrg?.clients.find((c) =>
       c.teams.some((t) => t.teamId === activeTeamId),
     )?.clientName ?? null;
+  // ── CHANGED: activeClient object for dropdown logic ──
+  const activeClient =
+    activeOrg?.clients.find((c) =>
+      c.teams.some((t) => t.teamId === activeTeamId),
+    ) ?? null;
 
-  // ── FIX: close dropdowns on outside click ─────────────────
+  // ── CHANGED: close dropdowns on outside click ─────────────
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (!(e.target as HTMLElement).closest("[data-dropdown]")) {
-        setOrgDropdownOpen(false);
+        setClientDropdownOpen(false);
         setTeamDropdownOpen(false);
       }
     };
@@ -4580,7 +4502,6 @@ export default function App({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // ─── Load org / client / team hierarchy ─────────────────────
   const loadOrgGroups = async () => {
     const { data } = await supabase
       .from("team_members")
@@ -4684,24 +4605,19 @@ export default function App({
     fetchUserData();
   }, [activeTeamId]);
 
-  const handleOrgSelect = (orgId: string) => {
-    setActiveOrgId(orgId);
-    const org = orgGroups.find((o) => o.orgId === orgId);
-    if (org) {
-      const first = [
-        ...org.internalTeams,
-        ...org.clients.flatMap((c) => c.teams),
-      ][0];
-      if (first) setActiveTeamId(first.teamId);
-      else setActiveTeamId(null);
-    }
-    setOrgDropdownOpen(false);
+  // ── CHANGED: handleClientSelect replaces handleOrgSelect ──
+  const handleClientSelect = (clientId: string) => {
+    const c = activeOrg?.clients.find((c) => c.clientId === clientId);
+    if (c?.teams[0]) setActiveTeamId(c.teams[0].teamId);
+    setClientDropdownOpen(false);
+    setTeamDropdownOpen(false);
   };
 
   const handleTeamChange = (orgId: string, teamId: string) => {
     setActiveOrgId(orgId);
     setActiveTeamId(teamId);
     setTeamDropdownOpen(false);
+    setClientDropdownOpen(false);
     loadOrgGroups();
   };
 
@@ -4773,15 +4689,7 @@ export default function App({
       .map((f) => `[Brand file: ${f.name}]\n${f.extractedText}`)
       .join("\n\n");
     const is = industry
-      ? `
-  "industry_benchmarks": {
-    "summary": "<2-3 sentences on what the best ${industry} campaigns globally are doing in 2024-2025>",
-    "examples": [
-      { "brand": "<real brand>", "campaign": "<real campaign>", "technique": "<technique>", "lesson": "<lesson>" },
-      { "brand": "<real brand>", "campaign": "<real campaign>", "technique": "<technique>", "lesson": "<lesson>" }
-    ],
-    "gap": "<single sentence — the biggest difference between this creative and what top ${industry} players are doing>"
-  },`
+      ? `\n  "industry_benchmarks": {\n    "summary": "<2-3 sentences on what the best ${industry} campaigns globally are doing in 2024-2025>",\n    "examples": [\n      { "brand": "<real brand>", "campaign": "<real campaign>", "technique": "<technique>", "lesson": "<lesson>" },\n      { "brand": "<real brand>", "campaign": "<real campaign>", "technique": "<technique>", "lesson": "<lesson>" }\n    ],\n    "gap": "<single sentence — the biggest difference between this creative and what top ${industry} players are doing>"\n  },`
       : "";
     return `You are a senior creative strategist at No Fluff, a behavioural marketing agency for D2C brands. Analyse advertising creatives through consumer psychology, visual hierarchy, and conversion optimisation.${industry ? ` Use your web search tool to find current 2024-2025 ${industry} campaign examples before completing the industry_benchmarks section.` : ""}
 
@@ -4924,21 +4832,23 @@ Be specific. Reference actual elements visible. No generic advice.`;
         throw new Error(deduct?.error || "Insufficient credits");
       loadOrgGroups();
     }
-    await supabase.from("analyses").insert({
-      user_id: session.user.id,
-      team_id: activeTeamId || null,
-      org_id: activeOrgId || null,
-      client: client || "Unnamed Analysis",
-      platform: platform || "Unknown",
-      industry: industry || "Unknown",
-      concept: concept || null,
-      type: analysisType,
-      model: selectedModel,
-      credits_used: creditsUsed,
-      overall_score: score,
-      pass,
-      result: updated,
-    });
+    await supabase
+      .from("analyses")
+      .insert({
+        user_id: session.user.id,
+        team_id: activeTeamId || null,
+        org_id: activeOrgId || null,
+        client: client || "Unnamed Analysis",
+        platform: platform || "Unknown",
+        industry: industry || "Unknown",
+        concept: concept || null,
+        type: analysisType,
+        model: selectedModel,
+        credits_used: creditsUsed,
+        overall_score: score,
+        pass,
+        result: updated,
+      });
     fetchUserData();
   };
 
@@ -4962,7 +4872,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
     }
     setSingleAnalysing(false);
   };
-
   const runAB = async () => {
     if (creatives.filter(Boolean).length < 2) return;
     setError(null);
@@ -5160,6 +5069,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
       }}
     >
       <div style={{ borderBottom: "1px solid #EFEFEF" }}>
+        {/* Logo */}
         <div
           style={{
             padding: isSidebarOpen
@@ -5203,8 +5113,8 @@ Be specific. Reference actual elements visible. No generic advice.`;
           </div>
         </div>
 
-        {/* Org selector */}
-        {isSidebarOpen && orgGroups.length > 0 && (
+        {/* ── CHANGED: Client + Team selectors (no org dropdown) ── */}
+        {isSidebarOpen && activeOrg && (
           <div
             style={{
               padding: "0 0.75rem 0.75rem",
@@ -5213,167 +5123,14 @@ Be specific. Reference actual elements visible. No generic advice.`;
               gap: 6,
             }}
           >
-            {/* ── Org dropdown ── */}
-            <div style={{ position: "relative" }} data-dropdown="org">
-              <div
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setOrgDropdownOpen((o) => !o);
-                  setTeamDropdownOpen(false);
-                }}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "7px 10px",
-                  borderRadius: 8,
-                  border: "1px solid #F0F0F0",
-                  background: "#FAFAFA",
-                  cursor: "pointer",
-                }}
-              >
-                <div style={{ minWidth: 0 }}>
-                  <p
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 700,
-                      color: "#BBB",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.06em",
-                      margin: "0 0 1px",
-                    }}
-                  >
-                    Organisation
-                  </p>
-                  <p
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: "#111",
-                      margin: 0,
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
-                  >
-                    {activeOrg?.orgName || "Select org"}
-                  </p>
-                </div>
-                <svg
-                  width="11"
-                  height="11"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#BBB"
-                  strokeWidth="2.5"
-                  style={{
-                    flexShrink: 0,
-                    marginLeft: 6,
-                    transform: orgDropdownOpen
-                      ? "rotate(180deg)"
-                      : "rotate(0deg)",
-                    transition: "transform 0.2s",
-                  }}
-                >
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
-              </div>
-              {orgDropdownOpen && (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "calc(100% + 4px)",
-                    left: 0,
-                    right: 0,
-                    background: "#fff",
-                    border: "1px solid #EFEFEF",
-                    borderRadius: 8,
-                    boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
-                    zIndex: 50,
-                    overflow: "hidden",
-                  }}
-                >
-                  {orgGroups.map((org) => (
-                    <div
-                      key={org.orgId}
-                      onClick={() => handleOrgSelect(org.orgId)}
-                      style={{
-                        padding: "9px 12px",
-                        cursor: "pointer",
-                        background:
-                          activeOrgId === org.orgId ? "#F5F3FF" : "#fff",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                      }}
-                      onMouseEnter={(e) => {
-                        if (activeOrgId !== org.orgId)
-                          (e.currentTarget as HTMLDivElement).style.background =
-                            "#FAFAFA";
-                      }}
-                      onMouseLeave={(e) => {
-                        if (activeOrgId !== org.orgId)
-                          (e.currentTarget as HTMLDivElement).style.background =
-                            "#fff";
-                      }}
-                    >
-                      <div>
-                        <p
-                          style={{
-                            fontSize: 13,
-                            fontWeight: activeOrgId === org.orgId ? 600 : 500,
-                            color:
-                              activeOrgId === org.orgId ? "#6366F1" : "#222",
-                            margin: 0,
-                          }}
-                        >
-                          {org.orgName}
-                        </p>
-                        <p style={{ fontSize: 10, color: "#BBB", margin: 0 }}>
-                          {org.clients.length} client
-                          {org.clients.length !== 1 ? "s" : ""} ·{" "}
-                          {org.internalTeams.length +
-                            org.clients.reduce(
-                              (a, c) => a + c.teams.length,
-                              0,
-                            )}{" "}
-                          team
-                          {org.internalTeams.length +
-                            org.clients.reduce(
-                              (a, c) => a + c.teams.length,
-                              0,
-                            ) !==
-                          1
-                            ? "s"
-                            : ""}
-                        </p>
-                      </div>
-                      {activeOrgId === org.orgId && (
-                        <svg
-                          width="13"
-                          height="13"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="#6366F1"
-                          strokeWidth="2.5"
-                        >
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* ── Team dropdown (2+ teams) ── */}
-            {activeOrg && allTeamsInOrg.length > 1 && (
-              <div style={{ position: "relative" }} data-dropdown="team">
+            {/* Client dropdown */}
+            {activeOrg.clients.length > 0 && (
+              <div style={{ position: "relative" }} data-dropdown="client">
                 <div
                   onClick={(e) => {
                     e.stopPropagation();
-                    setTeamDropdownOpen((o) => !o);
-                    setOrgDropdownOpen(false);
+                    setClientDropdownOpen((o) => !o);
+                    setTeamDropdownOpen(false);
                   }}
                   style={{
                     display: "flex",
@@ -5397,7 +5154,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                         margin: "0 0 1px",
                       }}
                     >
-                      {activeTeamClient ? `Client · Team` : "Team"}
+                      Client
                     </p>
                     <p
                       style={{
@@ -5410,9 +5167,275 @@ Be specific. Reference actual elements visible. No generic advice.`;
                         textOverflow: "ellipsis",
                       }}
                     >
-                      {activeTeamClient
-                        ? `${activeTeamClient} · ${activeTeamEntry?.teamName || ""}`
-                        : activeTeamEntry?.teamName || "Select team"}
+                      {activeClient?.clientName || "Select client"}
+                    </p>
+                  </div>
+                  <svg
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#BBB"
+                    strokeWidth="2.5"
+                    style={{
+                      flexShrink: 0,
+                      marginLeft: 6,
+                      transform: clientDropdownOpen
+                        ? "rotate(180deg)"
+                        : "rotate(0deg)",
+                      transition: "transform 0.2s",
+                    }}
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </div>
+                {clientDropdownOpen && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "calc(100% + 4px)",
+                      left: 0,
+                      right: 0,
+                      background: "#fff",
+                      border: "1px solid #EFEFEF",
+                      borderRadius: 8,
+                      boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
+                      zIndex: 50,
+                      overflow: "hidden",
+                    }}
+                  >
+                    {activeOrg.clients.map((c) => (
+                      <div
+                        key={c.clientId}
+                        onClick={() => handleClientSelect(c.clientId)}
+                        style={{
+                          padding: "9px 12px",
+                          cursor: "pointer",
+                          background:
+                            activeClient?.clientId === c.clientId
+                              ? "#F5F3FF"
+                              : "#fff",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (activeClient?.clientId !== c.clientId)
+                            (
+                              e.currentTarget as HTMLDivElement
+                            ).style.background = "#FAFAFA";
+                        }}
+                        onMouseLeave={(e) => {
+                          if (activeClient?.clientId !== c.clientId)
+                            (
+                              e.currentTarget as HTMLDivElement
+                            ).style.background = "#fff";
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: 22,
+                              height: 22,
+                              borderRadius: 6,
+                              background:
+                                activeClient?.clientId === c.clientId
+                                  ? "#6366F1"
+                                  : "#E5E7EB",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              flexShrink: 0,
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: 10,
+                                fontWeight: 800,
+                                color:
+                                  activeClient?.clientId === c.clientId
+                                    ? "#fff"
+                                    : "#888",
+                              }}
+                            >
+                              {c.clientName[0].toUpperCase()}
+                            </span>
+                          </div>
+                          <p
+                            style={{
+                              fontSize: 13,
+                              fontWeight:
+                                activeClient?.clientId === c.clientId
+                                  ? 600
+                                  : 500,
+                              color:
+                                activeClient?.clientId === c.clientId
+                                  ? "#6366F1"
+                                  : "#222",
+                              margin: 0,
+                            }}
+                          >
+                            {c.clientName}
+                          </p>
+                        </div>
+                        {activeClient?.clientId === c.clientId && (
+                          <svg
+                            width="13"
+                            height="13"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="#6366F1"
+                            strokeWidth="2.5"
+                          >
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        )}
+                      </div>
+                    ))}
+                    {/* Internal teams entry */}
+                    {activeOrg.internalTeams.length > 0 && (
+                      <div
+                        onClick={() => {
+                          if (activeOrg.internalTeams[0]) {
+                            handleTeamChange(
+                              activeOrgId!,
+                              activeOrg.internalTeams[0].teamId,
+                            );
+                            setClientDropdownOpen(false);
+                          }
+                        }}
+                        style={{
+                          padding: "9px 12px",
+                          cursor: "pointer",
+                          background:
+                            !activeClient && activeTeamId ? "#F5F3FF" : "#fff",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          borderTop: "1px solid #F5F5F5",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (activeClient)
+                            (
+                              e.currentTarget as HTMLDivElement
+                            ).style.background = "#FAFAFA";
+                        }}
+                        onMouseLeave={(e) => {
+                          if (activeClient)
+                            (
+                              e.currentTarget as HTMLDivElement
+                            ).style.background = "#fff";
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: 22,
+                              height: 22,
+                              borderRadius: 6,
+                              background: !activeClient ? "#6366F1" : "#E5E7EB",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: 10,
+                                fontWeight: 800,
+                                color: !activeClient ? "#fff" : "#888",
+                              }}
+                            >
+                              N
+                            </span>
+                          </div>
+                          <p
+                            style={{
+                              fontSize: 13,
+                              fontWeight: !activeClient ? 600 : 500,
+                              color: !activeClient ? "#6366F1" : "#222",
+                              margin: 0,
+                            }}
+                          >
+                            Internal
+                          </p>
+                        </div>
+                        {!activeClient && activeTeamId && (
+                          <svg
+                            width="13"
+                            height="13"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="#6366F1"
+                            strokeWidth="2.5"
+                          >
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Team dropdown — only when selected client has 2+ teams */}
+            {activeClient && activeClient.teams.length > 1 && (
+              <div style={{ position: "relative" }} data-dropdown="team">
+                <div
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setTeamDropdownOpen((o) => !o);
+                    setClientDropdownOpen(false);
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "7px 10px",
+                    borderRadius: 8,
+                    border: "1px solid #F0F0F0",
+                    background: "#FAFAFA",
+                    cursor: "pointer",
+                  }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <p
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        color: "#BBB",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                        margin: "0 0 1px",
+                      }}
+                    >
+                      Team
+                    </p>
+                    <p
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: "#111",
+                        margin: 0,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      {activeTeamEntry?.teamName || "Select team"}
                     </p>
                   </div>
                   <svg
@@ -5447,163 +5470,70 @@ Be specific. Reference actual elements visible. No generic advice.`;
                       boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
                       zIndex: 50,
                       overflow: "hidden",
-                      maxHeight: 260,
+                      maxHeight: 220,
                       overflowY: "auto",
                     }}
                   >
-                    {activeOrg.clients.map((c) => (
-                      <div key={c.clientId}>
-                        <div
+                    {activeClient.teams.map((t) => (
+                      <div
+                        key={t.teamId}
+                        onClick={() => {
+                          handleTeamChange(activeOrgId!, t.teamId);
+                          setTeamDropdownOpen(false);
+                        }}
+                        style={{
+                          padding: "9px 12px",
+                          cursor: "pointer",
+                          background:
+                            activeTeamId === t.teamId ? "#F5F3FF" : "#fff",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (activeTeamId !== t.teamId)
+                            (
+                              e.currentTarget as HTMLDivElement
+                            ).style.background = "#FAFAFA";
+                        }}
+                        onMouseLeave={(e) => {
+                          if (activeTeamId !== t.teamId)
+                            (
+                              e.currentTarget as HTMLDivElement
+                            ).style.background = "#fff";
+                        }}
+                      >
+                        <span
                           style={{
-                            padding: "6px 12px 3px",
-                            fontSize: 10,
-                            fontWeight: 700,
-                            color: "#BBB",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.05em",
-                            background: "#FAFAFA",
-                            borderBottom: "1px solid #F5F5F5",
+                            fontSize: 13,
+                            fontWeight: activeTeamId === t.teamId ? 600 : 500,
+                            color:
+                              activeTeamId === t.teamId ? "#6366F1" : "#333",
                           }}
                         >
-                          {c.clientName}
-                        </div>
-                        {c.teams.map((t) => (
-                          <div
-                            key={t.teamId}
-                            onClick={() =>
-                              handleTeamChange(activeOrgId!, t.teamId)
-                            }
-                            style={{
-                              padding: "9px 12px 9px 20px",
-                              cursor: "pointer",
-                              background:
-                                activeTeamId === t.teamId ? "#F5F3FF" : "#fff",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                            }}
-                            onMouseEnter={(e) => {
-                              if (activeTeamId !== t.teamId)
-                                (
-                                  e.currentTarget as HTMLDivElement
-                                ).style.background = "#FAFAFA";
-                            }}
-                            onMouseLeave={(e) => {
-                              if (activeTeamId !== t.teamId)
-                                (
-                                  e.currentTarget as HTMLDivElement
-                                ).style.background = "#fff";
-                            }}
+                          {t.teamName}
+                        </span>
+                        {activeTeamId === t.teamId && (
+                          <svg
+                            width="12"
+                            height="12"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="#6366F1"
+                            strokeWidth="2.5"
                           >
-                            <span
-                              style={{
-                                fontSize: 12,
-                                fontWeight:
-                                  activeTeamId === t.teamId ? 600 : 400,
-                                color:
-                                  activeTeamId === t.teamId
-                                    ? "#6366F1"
-                                    : "#333",
-                              }}
-                            >
-                              {t.teamName}
-                            </span>
-                            {activeTeamId === t.teamId && (
-                              <svg
-                                width="12"
-                                height="12"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="#6366F1"
-                                strokeWidth="2.5"
-                              >
-                                <polyline points="20 6 9 17 4 12" />
-                              </svg>
-                            )}
-                          </div>
-                        ))}
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        )}
                       </div>
                     ))}
-                    {activeOrg.internalTeams.length > 0 && (
-                      <div>
-                        <div
-                          style={{
-                            padding: "6px 12px 3px",
-                            fontSize: 10,
-                            fontWeight: 700,
-                            color: "#BBB",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.05em",
-                            background: "#FAFAFA",
-                            borderBottom: "1px solid #F5F5F5",
-                          }}
-                        >
-                          Internal
-                        </div>
-                        {activeOrg.internalTeams.map((t) => (
-                          <div
-                            key={t.teamId}
-                            onClick={() =>
-                              handleTeamChange(activeOrgId!, t.teamId)
-                            }
-                            style={{
-                              padding: "9px 12px 9px 20px",
-                              cursor: "pointer",
-                              background:
-                                activeTeamId === t.teamId ? "#F5F3FF" : "#fff",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                            }}
-                            onMouseEnter={(e) => {
-                              if (activeTeamId !== t.teamId)
-                                (
-                                  e.currentTarget as HTMLDivElement
-                                ).style.background = "#FAFAFA";
-                            }}
-                            onMouseLeave={(e) => {
-                              if (activeTeamId !== t.teamId)
-                                (
-                                  e.currentTarget as HTMLDivElement
-                                ).style.background = "#fff";
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: 12,
-                                fontWeight:
-                                  activeTeamId === t.teamId ? 600 : 400,
-                                color:
-                                  activeTeamId === t.teamId
-                                    ? "#6366F1"
-                                    : "#333",
-                              }}
-                            >
-                              {t.teamName}
-                            </span>
-                            {activeTeamId === t.teamId && (
-                              <svg
-                                width="12"
-                                height="12"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="#6366F1"
-                                strokeWidth="2.5"
-                              >
-                                <polyline points="20 6 9 17 4 12" />
-                              </svg>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
             )}
 
-            {/* ── Single team pill ── */}
-            {activeOrg && allTeamsInOrg.length === 1 && (
+            {/* Single team pill — client has only 1 team */}
+            {activeClient && activeClient.teams.length === 1 && (
               <div
                 style={{
                   padding: "6px 10px",
@@ -5626,7 +5556,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                       margin: "0 0 1px",
                     }}
                   >
-                    {activeTeamClient ? "Client · Team" : "Team"}
+                    Team
                   </p>
                   <p
                     style={{
@@ -5636,15 +5566,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                       margin: 0,
                     }}
                   >
-                    {(() => {
-                      const singleTeam = allTeamsInOrg[0];
-                      const singleClient = activeOrg?.clients.find((c) =>
-                        c.teams.some((t) => t.teamId === singleTeam.teamId),
-                      )?.clientName;
-                      return singleClient
-                        ? `${singleClient} · ${singleTeam.teamName}`
-                        : singleTeam.teamName;
-                    })()}
+                    {activeClient.teams[0].teamName}
                   </p>
                 </div>
                 <span
@@ -5657,10 +5579,64 @@ Be specific. Reference actual elements visible. No generic advice.`;
                     color: "#fff",
                   }}
                 >
-                  {allTeamsInOrg[0].role.toUpperCase()}
+                  {activeClient.teams[0].role.toUpperCase()}
                 </span>
               </div>
             )}
+
+            {/* Internal team pill — when no client is active but internal team is */}
+            {!activeClient &&
+              activeOrg.internalTeams.length > 0 &&
+              activeTeamEntry && (
+                <div
+                  style={{
+                    padding: "6px 10px",
+                    borderRadius: 8,
+                    background: "#F5F3FF",
+                    border: "1px solid #E0DBFF",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <div>
+                    <p
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        color: "#BBB",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                        margin: "0 0 1px",
+                      }}
+                    >
+                      Team
+                    </p>
+                    <p
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: "#6366F1",
+                        margin: 0,
+                      }}
+                    >
+                      {activeTeamEntry.teamName}
+                    </p>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      padding: "2px 7px",
+                      borderRadius: 20,
+                      background: "#6366F1",
+                      color: "#fff",
+                    }}
+                  >
+                    {activeTeamEntry.role.toUpperCase()}
+                  </span>
+                </div>
+              )}
           </div>
         )}
       </div>
