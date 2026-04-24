@@ -107,6 +107,19 @@ interface AnalysedCreative extends CreativeFile {
   index: number;
 }
 
+// ─── Org/Team types ──────────────────────────────────────────
+interface OrgTeam {
+  teamId: string;
+  teamName: string;
+  role: string;
+  creditsPool: number;
+}
+interface OrgGroup {
+  orgId: string;
+  orgName: string;
+  teams: OrgTeam[];
+}
+
 function scoreColor(s: number) {
   return s >= 75 ? "#22C55E" : s >= 50 ? "#F59E0B" : "#EF4444";
 }
@@ -345,6 +358,7 @@ function HeatmapCanvas({ dataUrl, zones }: { dataUrl: string; zones: Zone[] }) {
   );
 }
 
+// ─── FILE PREVIEW MODAL ──────────────────────────────────────
 function FilePreviewModal({
   file,
   onClose,
@@ -354,33 +368,23 @@ function FilePreviewModal({
 }) {
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
   const isImage = file.type?.startsWith("image/");
   const isPdf = file.type === "application/pdf";
-  const isDoc =
-    file.type ===
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
   useEffect(() => {
-    // If we already have a dataUrl (images loaded inline), use it directly
     if (file.dataUrl) {
       setObjectUrl(file.dataUrl);
       return;
     }
-    // Otherwise fetch from Supabase storage (PDFs, docx stored by path)
     if (!file.storagePath) return;
     setLoading(true);
     supabase.storage
       .from("brand-assets")
       .download(file.storagePath)
       .then(({ data, error }) => {
-        if (data && !error) {
-          const url = URL.createObjectURL(data);
-          setObjectUrl(url);
-        }
+        if (data && !error) setObjectUrl(URL.createObjectURL(data));
         setLoading(false);
       });
-    // Revoke object URL on unmount to avoid memory leaks
     return () => {
       if (objectUrl && !objectUrl.startsWith("data:"))
         URL.revokeObjectURL(objectUrl);
@@ -415,7 +419,6 @@ function FilePreviewModal({
           boxShadow: "0 24px 64px rgba(0,0,0,0.3)",
         }}
       >
-        {/* Header */}
         <div
           style={{
             display: "flex",
@@ -484,8 +487,6 @@ function FilePreviewModal({
             ✕
           </button>
         </div>
-
-        {/* Body */}
         <div
           style={{
             flex: 1,
@@ -595,14 +596,11 @@ function FilePreviewModal({
                 Preview not available
               </p>
               <p style={{ fontSize: 13, color: "#AAA", margin: 0 }}>
-                This file could not be loaded. It may have been moved or
-                deleted.
+                This file could not be loaded.
               </p>
             </div>
           )}
         </div>
-
-        {/* Footer */}
         <div
           style={{
             padding: "12px 18px",
@@ -658,14 +656,16 @@ function BrandManager({
   const [editing, setEditing] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
   const [previewFile, setPreviewFile] = useState<BrandFile | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     loadBrandsFromSupabase(userId, teamId).then((b) => {
       setBrands(b);
       onUpdated(b);
     });
   }, [userId, teamId]);
+
   const handleFileUpload = async (f: File) => {
     setUploading(true);
     try {
@@ -688,6 +688,7 @@ function BrandManager({
     } catch {}
     setUploading(false);
   };
+
   const commit = async () => {
     if (!name.trim() || saving) return;
     setSaving(true);
@@ -756,6 +757,7 @@ function BrandManager({
     }
     setSaving(false);
   };
+
   const del = async (n: string) => {
     const brand = brands[n];
     if (!brand?.id) return;
@@ -770,12 +772,14 @@ function BrandManager({
     onUpdated(updated);
     if (selectedBrand === n) onSelect("", "", []);
   };
+
   const edit = (n: string) => {
     setEditing(n);
     setName(n);
     setNotes(brands[n].notes);
     setFiles(brands[n].files || []);
   };
+
   const removeFile = async (idx: number) => {
     const f = files[idx];
     if (f.id) {
@@ -785,8 +789,23 @@ function BrandManager({
     }
     setFiles((prev) => prev.filter((_, i) => i !== idx));
   };
+
   const fileIcon = (type: string) =>
     type.startsWith("image/") ? "🖼️" : type === "application/pdf" ? "📄" : "📝";
+  const eyeIcon = (
+    <svg
+      width="9"
+      height="9"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+    >
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+
   const content = (
     <div
       style={{
@@ -794,7 +813,7 @@ function BrandManager({
         borderRadius: 18,
         padding: "1.5rem",
         width: "100%",
-        maxWidth: isModal ? 1000 : 2000,
+        maxWidth: isModal ? 480 : 900,
         maxHeight: isModal ? "85vh" : "auto",
         overflowY: "auto",
         boxShadow: isModal ? "0 20px 60px rgba(0,0,0,0.2)" : "none",
@@ -961,18 +980,8 @@ function BrandManager({
                       }}
                     >
                       {fileIcon(f.type)}{" "}
-                      {f.name.length > 20 ? f.name.slice(0, 20) + "…" : f.name}
-                      <svg
-                        width="9"
-                        height="9"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                      >
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                        <circle cx="12" cy="12" r="3" />
-                      </svg>
+                      {f.name.length > 20 ? f.name.slice(0, 20) + "…" : f.name}{" "}
+                      {eyeIcon}
                     </span>
                   ))}
                 </div>
@@ -1105,18 +1114,8 @@ function BrandManager({
                   }}
                 >
                   {fileIcon(f.type)}{" "}
-                  {f.name.length > 22 ? f.name.slice(0, 22) + "…" : f.name}
-                  <svg
-                    width="9"
-                    height="9"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                  >
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                    <circle cx="12" cy="12" r="3" />
-                  </svg>
+                  {f.name.length > 22 ? f.name.slice(0, 22) + "…" : f.name}{" "}
+                  {eyeIcon}
                 </span>
                 {f.extractedText && (
                   <span style={{ color: "#10B981", fontSize: 9 }}>
@@ -1186,6 +1185,7 @@ function BrandManager({
       </div>
     </div>
   );
+
   if (!isModal) return content;
   return (
     <div
@@ -2854,7 +2854,7 @@ function ABResults({
                                 {diff}
                               </span>
                             );
-                          })}{" "}
+                          })}
                           <span
                             style={{
                               fontSize: 11,
@@ -2899,7 +2899,7 @@ function ABResults({
                       </p>
                     </div>
                   );
-                })}{" "}
+                })}
               </div>
             );
           })()}
@@ -2925,33 +2925,31 @@ function ABResults({
   );
 }
 
-// ─── TEAM MANAGER (full page, Chatling-style) ────────────────
-// Replace the entire TeamManager function in App.tsx with this:
-
-function TeamManager({ session }: { session: any }) {
+// ─── TEAM MANAGER ────────────────────────────────────────────
+function TeamManager({
+  session,
+  activeTeamId,
+}: {
+  session: any;
+  activeTeamId?: string;
+}) {
   const [teams, setTeams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(
+    activeTeamId || null,
+  );
   const [teamView, setTeamView] = useState<"members" | "credits" | "invite">(
     "members",
   );
-
-  // Create form
   const [showCreate, setShowCreate] = useState(false);
   const [orgName, setOrgName] = useState("");
   const [teamName, setTeamName] = useState("");
   const [creating, setCreating] = useState(false);
-
-  // Members
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [memberSearch, setMemberSearch] = useState("");
   const [loadingMembers, setLoadingMembers] = useState(false);
-
-  // Credits
   const [allocAmount, setAllocAmount] = useState("");
   const [allocating, setAllocating] = useState(false);
-
-  // Invite
   const [inviteExpiration, setInviteExpiration] = useState<
     "never" | "24h" | "7d"
   >("never");
@@ -2966,6 +2964,9 @@ function TeamManager({ session }: { session: any }) {
   useEffect(() => {
     fetchMyTeams();
   }, []);
+  useEffect(() => {
+    if (activeTeamId && !selectedTeamId) setSelectedTeamId(activeTeamId);
+  }, [activeTeamId]);
 
   const fetchMyTeams = async () => {
     setLoading(true);
@@ -2982,31 +2983,31 @@ function TeamManager({ session }: { session: any }) {
         .eq("user_id", session.user.id);
       if (!fallback.error && fallback.data) {
         setTeams(fallback.data);
-        if (!activeTeamId && fallback.data.length > 0)
-          setActiveTeamId((fallback.data[0].teams as any).id);
+        if (!selectedTeamId && fallback.data.length > 0)
+          setSelectedTeamId((fallback.data[0].teams as any).id);
       }
     } else if (data) {
       setTeams(data);
-      if (!activeTeamId && data.length > 0)
-        setActiveTeamId((data[0].teams as any).id);
+      if (!selectedTeamId && data.length > 0)
+        setSelectedTeamId((data[0].teams as any).id);
     }
     setLoading(false);
   };
 
   const activeTeamData = teams.find(
-    (t) => (t.teams as any).id === activeTeamId,
+    (t) => (t.teams as any).id === selectedTeamId,
   );
   const isAdmin = activeTeamData?.role === "admin";
 
   useEffect(() => {
-    if (!activeTeamId) return;
-    loadMembers(activeTeamId);
+    if (!selectedTeamId) return;
+    loadMembers(selectedTeamId);
     setActiveInviteLink("");
     setInviteStatus(null);
     setInviteEmail("");
     setAllocAmount("");
     setTeamView("members");
-  }, [activeTeamId]);
+  }, [selectedTeamId]);
 
   const loadMembers = async (teamId: string) => {
     setLoadingMembers(true);
@@ -3048,10 +3049,10 @@ function TeamManager({ session }: { session: any }) {
 
   const removeMember = async (memberId: string, userId: string) => {
     if (userId === session.user.id) {
-      alert("You cannot remove yourself from the team.");
+      alert("You cannot remove yourself.");
       return;
     }
-    if (!window.confirm("Remove this member from the team?")) return;
+    if (!window.confirm("Remove this member?")) return;
     await supabase.from("team_members").delete().eq("id", memberId);
     setTeamMembers((prev) => prev.filter((m) => m.id !== memberId));
   };
@@ -3161,7 +3162,6 @@ function TeamManager({ session }: { session: any }) {
 
   return (
     <div>
-      {/* Page header */}
       <div
         style={{
           display: "flex",
@@ -3202,7 +3202,6 @@ function TeamManager({ session }: { session: any }) {
         </button>
       </div>
 
-      {/* Create form */}
       {showCreate && (
         <div
           style={{
@@ -3403,7 +3402,6 @@ function TeamManager({ session }: { session: any }) {
             alignItems: "start",
           }}
         >
-          {/* ── LEFT: Team list ── */}
           <div
             style={{
               background: "#fff",
@@ -3434,11 +3432,11 @@ function TeamManager({ session }: { session: any }) {
             <div style={{ padding: "6px" }}>
               {teams.map((t, i) => {
                 const team = t.teams as any;
-                const isActive = team.id === activeTeamId;
+                const isActive = team.id === selectedTeamId;
                 return (
                   <button
                     key={i}
-                    onClick={() => setActiveTeamId(team.id)}
+                    onClick={() => setSelectedTeamId(team.id)}
                     style={{
                       display: "flex",
                       flexDirection: "column",
@@ -3477,10 +3475,8 @@ function TeamManager({ session }: { session: any }) {
             </div>
           </div>
 
-          {/* ── RIGHT: Team detail ── */}
           {activeTeamData ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-              {/* Team header card */}
               <div
                 style={{
                   background: "#fff",
@@ -3565,7 +3561,6 @@ function TeamManager({ session }: { session: any }) {
                 </div>
               </div>
 
-              {/* Sub-nav tabs */}
               <div
                 style={{
                   display: "flex",
@@ -3576,20 +3571,18 @@ function TeamManager({ session }: { session: any }) {
                   marginBottom: 16,
                 }}
               >
-                {(
-                  [
-                    ["members", "Members"],
-                    ...(isAdmin
-                      ? [
-                          ["credits", "Credits"],
-                          ["invite", "Invite"],
-                        ]
-                      : []),
-                  ] as [typeof teamView, string][]
-                ).map(([view, label]) => (
+                {[
+                  ["members", "Members"],
+                  ...(isAdmin
+                    ? [
+                        ["credits", "Credits"],
+                        ["invite", "Invite"],
+                      ]
+                    : []),
+                ].map(([view, label]) => (
                   <button
                     key={view}
-                    onClick={() => setTeamView(view)}
+                    onClick={() => setTeamView(view as typeof teamView)}
                     style={{
                       flex: 1,
                       padding: "8px 0",
@@ -3611,7 +3604,6 @@ function TeamManager({ session }: { session: any }) {
                 ))}
               </div>
 
-              {/* ── MEMBERS ── */}
               {teamView === "members" && (
                 <div
                   style={{
@@ -3857,7 +3849,6 @@ function TeamManager({ session }: { session: any }) {
                 </div>
               )}
 
-              {/* ── CREDITS ── */}
               {teamView === "credits" && isAdmin && (
                 <div
                   style={{
@@ -4030,7 +4021,6 @@ function TeamManager({ session }: { session: any }) {
                 </div>
               )}
 
-              {/* ── INVITE ── */}
               {teamView === "invite" && isAdmin && (
                 <div
                   style={{ display: "flex", flexDirection: "column", gap: 12 }}
@@ -4175,7 +4165,6 @@ function TeamManager({ session }: { session: any }) {
                       </div>
                     )}
                   </div>
-
                   <div
                     style={{
                       background: "#fff",
@@ -4315,14 +4304,13 @@ export default function App({
 }: {
   session: import("@supabase/supabase-js").Session;
 }) {
-  const [activeTeam, setActiveTeam] = useState<{
-    id: string;
-    name: string;
-    org_id: string;
-    org_name: string;
-  } | null>(null);
-  const [userTeams, setUserTeams] = useState<any[]>([]);
-  const [teamSwitcherOpen, setTeamSwitcherOpen] = useState(false);
+  // Org/team state
+  const [orgGroups, setOrgGroups] = useState<OrgGroup[]>([]);
+  const [activeOrgId, setActiveOrgId] = useState<string | null>(null);
+  const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
+  const [orgDropdownOpen, setOrgDropdownOpen] = useState(false);
+  const [teamDropdownOpen, setTeamDropdownOpen] = useState(false);
+
   const [currentView, setCurrentView] = useState<
     "analyzer" | "dashboard" | "brands" | "profile" | "teams"
   >("analyzer");
@@ -4362,6 +4350,43 @@ export default function App({
   const [analyserPreviewFile, setAnalyserPreviewFile] =
     useState<BrandFile | null>(null);
 
+  // Derived
+  const activeOrg = orgGroups.find((o) => o.orgId === activeOrgId);
+  const activeTeam = activeOrg?.teams.find((t) => t.teamId === activeTeamId);
+
+  const loadOrgTeams = async () => {
+    const { data } = await supabase
+      .from("team_members")
+      .select(
+        `role, teams(id, name, credits_pool, org_id, organisations(id, name))`,
+      )
+      .eq("user_id", session.user.id);
+    if (!data) return;
+    // Group by org
+    const map: Record<string, OrgGroup> = {};
+    for (const row of data) {
+      const team = row.teams as any;
+      const org = team?.organisations;
+      if (!org || !team) continue;
+      if (!map[org.id])
+        map[org.id] = { orgId: org.id, orgName: org.name, teams: [] };
+      map[org.id].teams.push({
+        teamId: team.id,
+        teamName: team.name,
+        role: row.role,
+        creditsPool: team.credits_pool || 0,
+      });
+    }
+    const groups = Object.values(map);
+    setOrgGroups(groups);
+    // Auto-select first org + first team
+    if (groups.length > 0 && !activeOrgId) {
+      setActiveOrgId(groups[0].orgId);
+      if (groups[0].teams.length > 0)
+        setActiveTeamId(groups[0].teams[0].teamId);
+    }
+  };
+
   const fetchUserData = async () => {
     const { data: prof } = await supabase
       .from("profiles")
@@ -4377,7 +4402,7 @@ export default function App({
       .from("analyses")
       .select("*")
       .order("created_at", { ascending: false });
-    if (activeTeam?.id) histQuery = histQuery.eq("team_id", activeTeam.id);
+    if (activeTeamId) histQuery = histQuery.eq("team_id", activeTeamId);
     else histQuery = histQuery.eq("user_id", session.user.id);
     const { data: hist } = await histQuery;
     if (hist) setAnalysesHistory(hist);
@@ -4385,23 +4410,7 @@ export default function App({
 
   useEffect(() => {
     if (!session?.user?.id) return;
-    const loadTeams = async () => {
-      const { data } = await supabase
-        .from("team_members")
-        .select(`role, teams(id, name, org_id, organisations(name))`)
-        .eq("user_id", session.user.id);
-      if (data && data.length > 0) {
-        setUserTeams(data);
-        const first = data[0].teams as any;
-        setActiveTeam({
-          id: first.id,
-          name: first.name,
-          org_id: first.org_id,
-          org_name: first.organisations?.name || "—",
-        });
-      }
-    };
-    loadTeams();
+    loadOrgTeams();
     fetchUserData();
     const params = new URLSearchParams(window.location.search);
     const inviteToken = params.get("invite");
@@ -4421,20 +4430,31 @@ export default function App({
 
   useEffect(() => {
     if (!session?.user?.id) return;
-    loadBrandsFromSupabase(session.user.id, activeTeam?.id).then((b) =>
-      setBrands(b),
+    loadBrandsFromSupabase(session.user.id, activeTeamId || undefined).then(
+      (b) => setBrands(b),
     );
     fetchUserData();
-  }, [activeTeam?.id]);
+  }, [activeTeamId]);
+
+  // When switching org, auto-select first team of new org
+  const handleOrgSelect = (orgId: string) => {
+    setActiveOrgId(orgId);
+    const org = orgGroups.find((o) => o.orgId === orgId);
+    if (org && org.teams.length > 0) setActiveTeamId(org.teams[0].teamId);
+    else setActiveTeamId(null);
+    setOrgDropdownOpen(false);
+  };
+
+  const handleTeamSelect = (teamId: string) => {
+    setActiveTeamId(teamId);
+    setTeamDropdownOpen(false);
+  };
 
   const handleSaveProfile = async () => {
     setSavingProfile(true);
     const { error } = await supabase
       .from("profiles")
-      .update({
-        full_name: editName,
-        company: editCompany,
-      })
+      .update({ full_name: editName, company: editCompany })
       .eq("id", session.user.id);
     if (!error) {
       setProfile({ ...profile, full_name: editName, company: editCompany });
@@ -4650,8 +4670,8 @@ Be specific. Reference actual elements visible. No generic advice.`;
       MODELS.find((m) => m.id === selectedModel)?.credits || 1;
     await supabase.from("analyses").insert({
       user_id: session.user.id,
-      team_id: activeTeam?.id || null,
-      org_id: activeTeam?.org_id || null,
+      team_id: activeTeamId || null,
+      org_id: activeOrgId || null,
       client: client || "Unnamed Analysis",
       platform: platform || "Unknown",
       industry: industry || "Unknown",
@@ -4713,71 +4733,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
     }
     setAbAnalysing(null);
   };
-
-  const exportReport = async (
-    items: AnalysedCreative[],
-    creative: CreativeFile | null = null,
-  ) => {
-    try {
-      // Single creative export
-      if (items.length === 1) {
-        const item = items[0];
-        const heatmap = await generateHeatmapCanvas(
-          creative || item,
-          item.result.attention_zones || [],
-        );
-        await generatePDF({
-          creative: creative || item,
-          result: item.result,
-          heatmapDataUrl: heatmap,
-          client: client || "Unnamed",
-          platform: platform || "—",
-          industry: industry || "—",
-          threshold,
-          model: selectedModel,
-          date: new Date().toLocaleDateString("en-GB"),
-        });
-      } else {
-        // A/B: export each creative as a separate PDF page set
-        // For multi-creative, export winner first then others sequentially
-        for (const item of items) {
-          const heatmap = await generateHeatmapCanvas(
-            item,
-            item.result.attention_zones || [],
-          );
-          await generatePDF({
-            creative: item,
-            result: item.result,
-            heatmapDataUrl: heatmap,
-            client: `${client || "Unnamed"} — Creative ${LABELS[item.index]}`,
-            platform: platform || "—",
-            industry: industry || "—",
-            threshold,
-            model: selectedModel,
-            date: new Date().toLocaleDateString("en-GB"),
-          });
-        }
-      }
-    } catch (err) {
-      console.error("Export failed:", err);
-      alert("Export failed. Check the console for details.");
-    }
-  };
-
-  const brandList = Object.keys(brands);
-  const analysedCreatives = creatives
-    .map((c, i) =>
-      c && (c as AnalysedCreative).result
-        ? ({ ...c, index: i } as AnalysedCreative)
-        : null,
-    )
-    .filter((c): c is AnalysedCreative => c !== null);
-  const winner =
-    analysedCreatives.length > 1
-      ? analysedCreatives.reduce((a, b) =>
-          a.result.overall_score > b.result.overall_score ? a : b,
-        )
-      : null;
 
   const generateHeatmapCanvas = async (
     creative: CreativeFile | null,
@@ -4862,6 +4817,69 @@ Be specific. Reference actual elements visible. No generic advice.`;
     return canvas.toDataURL("image/png");
   };
 
+  const exportReport = async (
+    items: AnalysedCreative[],
+    creative: CreativeFile | null = null,
+  ) => {
+    try {
+      if (items.length === 1) {
+        const item = items[0];
+        const heatmap = await generateHeatmapCanvas(
+          creative || item,
+          item.result.attention_zones || [],
+        );
+        await generatePDF({
+          creative: creative || item,
+          result: item.result,
+          heatmapDataUrl: heatmap,
+          client: client || "Unnamed",
+          platform: platform || "—",
+          industry: industry || "—",
+          threshold,
+          model: selectedModel,
+          date: new Date().toLocaleDateString("en-GB"),
+        });
+      } else {
+        for (const item of items) {
+          const heatmap = await generateHeatmapCanvas(
+            item,
+            item.result.attention_zones || [],
+          );
+          await generatePDF({
+            creative: item,
+            result: item.result,
+            heatmapDataUrl: heatmap,
+            client: `${client || "Unnamed"} — Creative ${LABELS[item.index]}`,
+            platform: platform || "—",
+            industry: industry || "—",
+            threshold,
+            model: selectedModel,
+            date: new Date().toLocaleDateString("en-GB"),
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Export failed:", err);
+      alert("Export failed. Check the console for details.");
+    }
+  };
+
+  const brandList = Object.keys(brands);
+  const analysedCreatives = creatives
+    .map((c, i) =>
+      c && (c as AnalysedCreative).result
+        ? ({ ...c, index: i } as AnalysedCreative)
+        : null,
+    )
+    .filter((c): c is AnalysedCreative => c !== null);
+  const winner =
+    analysedCreatives.length > 1
+      ? analysedCreatives.reduce((a, b) =>
+          a.result.overall_score > b.result.overall_score ? a : b,
+        )
+      : null;
+
+  // ─── SIDEBAR ────────────────────────────────────────────────
   const Sidebar = () => (
     <aside
       style={{
@@ -4879,6 +4897,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
         zIndex: 100,
       }}
     >
+      {/* Logo */}
       <div style={{ borderBottom: "1px solid #EFEFEF" }}>
         <div
           style={{
@@ -4923,125 +4942,347 @@ Be specific. Reference actual elements visible. No generic advice.`;
           </div>
         </div>
 
-        {/* Team switcher */}
-        {isSidebarOpen && userTeams.length > 0 && (
-          <div style={{ padding: "0 0.75rem 0.75rem" }}>
-            <div
-              onClick={() => setTeamSwitcherOpen((o) => !o)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "8px 10px",
-                borderRadius: 8,
-                border: "1px solid #F0F0F0",
-                background: "#FAFAFA",
-                cursor: "pointer",
-              }}
-            >
-              <div style={{ minWidth: 0 }}>
-                <p
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: "#AAA",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.06em",
-                    margin: "0 0 1px",
-                  }}
-                >
-                  {activeTeam?.org_name || "Personal"}
-                </p>
-                <p
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: "#111",
-                    margin: 0,
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                  }}
-                >
-                  {activeTeam?.name || "My team"}
-                </p>
-              </div>
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#AAA"
-                strokeWidth="2.5"
-                style={{
-                  flexShrink: 0,
-                  marginLeft: 8,
-                  transform: teamSwitcherOpen
-                    ? "rotate(180deg)"
-                    : "rotate(0deg)",
-                  transition: "transform 0.2s",
-                }}
-              >
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </div>
-            {teamSwitcherOpen && (
+        {/* Org + Team selectors */}
+        {isSidebarOpen && orgGroups.length > 0 && (
+          <div
+            style={{
+              padding: "0 0.75rem 0.75rem",
+              display: "flex",
+              flexDirection: "column",
+              gap: 6,
+            }}
+          >
+            {/* Org selector */}
+            <div style={{ position: "relative" }}>
               <div
+                onClick={() => {
+                  setOrgDropdownOpen((o) => !o);
+                  setTeamDropdownOpen(false);
+                }}
                 style={{
-                  marginTop: 4,
-                  background: "#fff",
-                  border: "1px solid #EFEFEF",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "7px 10px",
                   borderRadius: 8,
-                  boxShadow: "0 4px 16px rgba(0,0,0,0.07)",
-                  overflow: "hidden",
+                  border: "1px solid #F0F0F0",
+                  background: "#FAFAFA",
+                  cursor: "pointer",
                 }}
               >
-                <div style={{ padding: "4px" }}>
-                  {userTeams.map((t, i) => {
-                    const team = t.teams as any;
-                    const isCurrent = team.id === activeTeam?.id;
-                    return (
-                      <div
-                        key={i}
-                        onClick={() => {
-                          setActiveTeam({
-                            id: team.id,
-                            name: team.name,
-                            org_id: team.org_id,
-                            org_name: team.organisations?.name || "—",
-                          });
-                          setTeamSwitcherOpen(false);
-                        }}
-                        style={{
-                          padding: "8px 10px",
-                          borderRadius: 6,
-                          cursor: "pointer",
-                          background: isCurrent ? "#F5F3FF" : "transparent",
-                        }}
-                      >
+                <div style={{ minWidth: 0 }}>
+                  <p
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: "#BBB",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                      margin: "0 0 1px",
+                    }}
+                  >
+                    Organisation
+                  </p>
+                  <p
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: "#111",
+                      margin: 0,
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {activeOrg?.orgName || "Select org"}
+                  </p>
+                </div>
+                <svg
+                  width="11"
+                  height="11"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#BBB"
+                  strokeWidth="2.5"
+                  style={{
+                    flexShrink: 0,
+                    marginLeft: 6,
+                    transform: orgDropdownOpen
+                      ? "rotate(180deg)"
+                      : "rotate(0deg)",
+                    transition: "transform 0.2s",
+                  }}
+                >
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </div>
+              {orgDropdownOpen && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "calc(100% + 4px)",
+                    left: 0,
+                    right: 0,
+                    background: "#fff",
+                    border: "1px solid #EFEFEF",
+                    borderRadius: 8,
+                    boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
+                    zIndex: 50,
+                    overflow: "hidden",
+                  }}
+                >
+                  {orgGroups.map((org) => (
+                    <div
+                      key={org.orgId}
+                      onClick={() => handleOrgSelect(org.orgId)}
+                      style={{
+                        padding: "9px 12px",
+                        cursor: "pointer",
+                        background:
+                          activeOrgId === org.orgId ? "#F5F3FF" : "#fff",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                      }}
+                      onMouseEnter={(e) => {
+                        if (activeOrgId !== org.orgId)
+                          (e.currentTarget as HTMLDivElement).style.background =
+                            "#FAFAFA";
+                      }}
+                      onMouseLeave={(e) => {
+                        if (activeOrgId !== org.orgId)
+                          (e.currentTarget as HTMLDivElement).style.background =
+                            "#fff";
+                      }}
+                    >
+                      <div>
                         <p
                           style={{
-                            fontSize: 12,
-                            fontWeight: isCurrent ? 600 : 500,
-                            color: isCurrent ? "#6366F1" : "#222",
+                            fontSize: 13,
+                            fontWeight: activeOrgId === org.orgId ? 600 : 500,
+                            color:
+                              activeOrgId === org.orgId ? "#6366F1" : "#222",
                             margin: 0,
                           }}
                         >
-                          {team.name}
+                          {org.orgName}
                         </p>
-                        <p
-                          style={{
-                            fontSize: 10,
-                            color: isCurrent ? "#6366F1" : "#AAA",
-                            margin: 0,
-                          }}
-                        >
-                          {team.organisations?.name}
+                        <p style={{ fontSize: 10, color: "#BBB", margin: 0 }}>
+                          {org.teams.length} team
+                          {org.teams.length !== 1 ? "s" : ""}
                         </p>
                       </div>
-                    );
-                  })}
+                      {activeOrgId === org.orgId && (
+                        <svg
+                          width="13"
+                          height="13"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#6366F1"
+                          strokeWidth="2.5"
+                        >
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                    </div>
+                  ))}
                 </div>
+              )}
+            </div>
+
+            {/* Team selector — only shown if org has multiple teams */}
+            {activeOrg && activeOrg.teams.length > 1 && (
+              <div style={{ position: "relative" }}>
+                <div
+                  onClick={() => {
+                    setTeamDropdownOpen((o) => !o);
+                    setOrgDropdownOpen(false);
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "7px 10px",
+                    borderRadius: 8,
+                    border: "1px solid #F0F0F0",
+                    background: "#FAFAFA",
+                    cursor: "pointer",
+                  }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <p
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        color: "#BBB",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                        margin: "0 0 1px",
+                      }}
+                    >
+                      Team
+                    </p>
+                    <p
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: "#111",
+                        margin: 0,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      {activeTeam?.teamName || "Select team"}
+                    </p>
+                  </div>
+                  <svg
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#BBB"
+                    strokeWidth="2.5"
+                    style={{
+                      flexShrink: 0,
+                      marginLeft: 6,
+                      transform: teamDropdownOpen
+                        ? "rotate(180deg)"
+                        : "rotate(0deg)",
+                      transition: "transform 0.2s",
+                    }}
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </div>
+                {teamDropdownOpen && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "calc(100% + 4px)",
+                      left: 0,
+                      right: 0,
+                      background: "#fff",
+                      border: "1px solid #EFEFEF",
+                      borderRadius: 8,
+                      boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
+                      zIndex: 50,
+                      overflow: "hidden",
+                    }}
+                  >
+                    {activeOrg.teams.map((team) => (
+                      <div
+                        key={team.teamId}
+                        onClick={() => handleTeamSelect(team.teamId)}
+                        style={{
+                          padding: "9px 12px",
+                          cursor: "pointer",
+                          background:
+                            activeTeamId === team.teamId ? "#F5F3FF" : "#fff",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (activeTeamId !== team.teamId)
+                            (
+                              e.currentTarget as HTMLDivElement
+                            ).style.background = "#FAFAFA";
+                        }}
+                        onMouseLeave={(e) => {
+                          if (activeTeamId !== team.teamId)
+                            (
+                              e.currentTarget as HTMLDivElement
+                            ).style.background = "#fff";
+                        }}
+                      >
+                        <div>
+                          <p
+                            style={{
+                              fontSize: 13,
+                              fontWeight:
+                                activeTeamId === team.teamId ? 600 : 500,
+                              color:
+                                activeTeamId === team.teamId
+                                  ? "#6366F1"
+                                  : "#222",
+                              margin: 0,
+                            }}
+                          >
+                            {team.teamName}
+                          </p>
+                          <p style={{ fontSize: 10, color: "#BBB", margin: 0 }}>
+                            {team.role}
+                          </p>
+                        </div>
+                        {activeTeamId === team.teamId && (
+                          <svg
+                            width="13"
+                            height="13"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="#6366F1"
+                            strokeWidth="2.5"
+                          >
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Single team pill — no dropdown needed */}
+            {activeOrg && activeOrg.teams.length === 1 && (
+              <div
+                style={{
+                  padding: "6px 10px",
+                  borderRadius: 8,
+                  background: "#F5F3FF",
+                  border: "1px solid #E0DBFF",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <div>
+                  <p
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: "#BBB",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                      margin: "0 0 1px",
+                    }}
+                  >
+                    Team
+                  </p>
+                  <p
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: "#6366F1",
+                      margin: 0,
+                    }}
+                  >
+                    {activeOrg.teams[0].teamName}
+                  </p>
+                </div>
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    padding: "2px 7px",
+                    borderRadius: 20,
+                    background: "#6366F1",
+                    color: "#fff",
+                  }}
+                >
+                  {activeOrg.teams[0].role.toUpperCase()}
+                </span>
               </div>
             )}
           </div>
@@ -5171,7 +5412,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
         })}
       </nav>
 
-      {/* Bottom — credits + toggle */}
+      {/* Bottom */}
       <div
         style={{
           padding: "0.75rem 0.5rem",
@@ -5307,6 +5548,10 @@ Be specific. Reference actual elements visible. No generic advice.`;
         background: "#FAFAFA",
         minHeight: "100vh",
       }}
+      onClick={() => {
+        setOrgDropdownOpen(false);
+        setTeamDropdownOpen(false);
+      }}
     >
       <Sidebar />
       {analyserPreviewFile && (
@@ -5318,7 +5563,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
       {showBrandMgr && (
         <BrandManager
           userId={session.user.id}
-          teamId={activeTeam?.id}
+          teamId={activeTeamId || undefined}
           selectedBrand={selectedBrand}
           onSelect={(n, notes, files) => {
             setSelectedBrand(n);
@@ -5341,7 +5586,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
         }}
       >
         <div style={{ maxWidth: 900 }}>
-          {/* ── ANALYSER VIEW ── */}
+          {/* ── ANALYSER ── */}
           {currentView === "analyzer" && (
             <div>
               <div style={{ marginBottom: "1.75rem" }}>
@@ -5351,24 +5596,16 @@ Be specific. Reference actual elements visible. No generic advice.`;
                     fontWeight: 600,
                     color: "#111",
                     margin: "0 0 4px",
-                    textAlign: "left",
                   }}
                 >
                   Creative Analyser
                 </h1>
-                <p
-                  style={{
-                    fontSize: 13,
-                    color: "#999",
-                    margin: 0,
-                    textAlign: "left",
-                  }}
-                >
+                <p style={{ fontSize: 13, color: "#999", margin: 0 }}>
                   Pre-flight analysis powered by behavioural science
+                  {activeTeam ? ` · ${activeTeam.teamName}` : ""}
                 </p>
               </div>
 
-              {/* Config panel */}
               {!(
                 singleResult ||
                 (mode === "ab" && analysedCreatives.length > 0)
@@ -5472,7 +5709,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
                           Manage brands
                         </button>
                       </div>
-                      {/* Brand preview card — only shows when a brand is selected */}
                       {selectedBrand && brands[selectedBrand] && (
                         <div
                           style={{
@@ -5899,7 +6135,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
                 </div>
               )}
 
-              {/* Mode toggle */}
               {!(
                 singleResult ||
                 (mode === "ab" && analysedCreatives.length > 0)
@@ -5944,7 +6179,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
                 </div>
               )}
 
-              {/* Single mode */}
               {mode === "single" && !singleResult && !singleAnalysing && (
                 <div
                   style={{ display: "flex", flexDirection: "column", gap: 12 }}
@@ -6003,7 +6237,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
                 />
               )}
 
-              {/* A/B mode */}
               {mode === "ab" && analysedCreatives.length === 0 && (
                 <div
                   style={{ display: "flex", flexDirection: "column", gap: 12 }}
@@ -6096,9 +6329,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
               {mode === "ab" && analysedCreatives.length > 0 && (
                 <div>
                   <button
-                    onClick={() => {
-                      setCreatives([null, null]);
-                    }}
+                    onClick={() => setCreatives([null, null])}
                     style={{
                       marginBottom: 12,
                       padding: "8px 14px",
@@ -6121,7 +6352,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
                   />
                 </div>
               )}
-
               {error && (
                 <div
                   style={{
@@ -6140,7 +6370,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
             </div>
           )}
 
-          {/* ── HISTORY / DASHBOARD VIEW ── */}
+          {/* ── HISTORY ── */}
           {currentView === "dashboard" && (
             <div>
               <div style={{ marginBottom: "1.75rem" }}>
@@ -6150,21 +6380,14 @@ Be specific. Reference actual elements visible. No generic advice.`;
                     fontWeight: 600,
                     color: "#111",
                     margin: "0 0 4px",
-                    textAlign: "left",
                   }}
                 >
                   Analysis history
                 </h1>
-                <p
-                  style={{
-                    fontSize: 13,
-                    color: "#999",
-                    margin: 0,
-                    textAlign: "left",
-                  }}
-                >
+                <p style={{ fontSize: 13, color: "#999", margin: 0 }}>
                   {analysesHistory.length} report
                   {analysesHistory.length !== 1 ? "s" : ""} saved
+                  {activeTeam ? ` · ${activeTeam.teamName}` : ""}
                 </p>
               </div>
               {viewingHistoryItem ? (
@@ -6363,33 +6586,28 @@ Be specific. Reference actual elements visible. No generic advice.`;
             </div>
           )}
 
-          {/* ── BRANDS VIEW ── */}
+          {/* ── BRANDS ── */}
           {currentView === "brands" && (
-            <div style={{ marginBottom: "1.75rem" }}>
-              <h1
-                style={{
-                  fontSize: 22,
-                  fontWeight: 600,
-                  color: "#111",
-                  margin: "0 0 4px",
-                  textAlign: "left",
-                }}
-              >
-                Brand guidelines
-              </h1>
-              <p
-                style={{
-                  fontSize: 13,
-                  color: "#999",
-                  margin: 0,
-                  textAlign: "left",
-                }}
-              >
-                Manage your brand assets and guidelines for analysis.
-              </p>
+            <div>
+              <div style={{ marginBottom: "1.75rem" }}>
+                <h1
+                  style={{
+                    fontSize: 22,
+                    fontWeight: 600,
+                    color: "#111",
+                    margin: "0 0 4px",
+                  }}
+                >
+                  Brand guidelines
+                </h1>
+                <p style={{ fontSize: 13, color: "#999", margin: 0 }}>
+                  Manage your brand assets and guidelines for analysis
+                  {activeTeam ? ` · ${activeTeam.teamName}` : ""}
+                </p>
+              </div>
               <BrandManager
                 userId={session.user.id}
-                teamId={activeTeam?.id}
+                teamId={activeTeamId || undefined}
                 isModal={false}
                 selectedBrand={selectedBrand}
                 onSelect={(n, notes, files) => {
@@ -6404,10 +6622,15 @@ Be specific. Reference actual elements visible. No generic advice.`;
             </div>
           )}
 
-          {/* ── TEAMS VIEW ── */}
-          {currentView === "teams" && <TeamManager session={session} />}
+          {/* ── TEAMS ── */}
+          {currentView === "teams" && (
+            <TeamManager
+              session={session}
+              activeTeamId={activeTeamId || undefined}
+            />
+          )}
 
-          {/* ── PROFILE VIEW ── */}
+          {/* ── PROFILE ── */}
           {currentView === "profile" && (
             <div>
               <div style={{ marginBottom: "1.75rem" }}>
@@ -6417,19 +6640,11 @@ Be specific. Reference actual elements visible. No generic advice.`;
                     fontWeight: 600,
                     color: "#111",
                     margin: "0 0 4px",
-                    textAlign: "left",
                   }}
                 >
                   Profile
                 </h1>
-                <p
-                  style={{
-                    fontSize: 13,
-                    color: "#999",
-                    margin: 0,
-                    textAlign: "left",
-                  }}
-                >
+                <p style={{ fontSize: 13, color: "#999", margin: 0 }}>
                   Manage your account settings.
                 </p>
               </div>
