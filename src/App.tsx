@@ -2929,7 +2929,7 @@ function TeamsView({
     "members",
   );
   const [showCreateClient, setShowCreateClient] = useState(false);
-  const [showAddTeam, setShowAddTeam] = useState<string | null>(null); // clientId or "internal"
+  const [showAddTeam, setShowAddTeam] = useState<string | null>(null);
   const [clientName, setClientName] = useState("");
   const [teamName, setTeamName] = useState("");
   const [creating, setCreating] = useState(false);
@@ -2961,7 +2961,6 @@ function TeamsView({
 
   useEffect(() => {
     if (!activeOrgId) return;
-    // Load full teams list for this org (with client info)
     supabase
       .from("team_members")
       .select(
@@ -3016,18 +3015,17 @@ function TeamsView({
     if (!teamName.trim() || !activeOrgId) return;
     setCreating(true);
     let data: any, error: any;
-    if (clientId) {
+    if (clientId)
       ({ data, error } = await supabase.rpc("add_team_to_client", {
         p_org_id: activeOrgId,
         p_client_id: clientId,
         p_team_name: teamName.trim(),
       }));
-    } else {
+    else
       ({ data, error } = await supabase.rpc("create_org_and_team", {
         org_name: activeOrg?.orgName || "",
         team_name: teamName.trim(),
       }));
-    }
     if (error || !data?.success)
       alert("Error: " + (error?.message || "Unknown error"));
     else {
@@ -3139,7 +3137,6 @@ function TeamsView({
     );
   });
 
-  // Build grouped display: clients + internal teams
   const orgTeamData = allTeamsFlat.filter(
     (t) => (t.teams as any)?.org_id === activeOrgId,
   );
@@ -3176,6 +3173,7 @@ function TeamsView({
     ? (activeTeamFull.teams as any)?.organisations
     : null;
 
+  // rest of TeamsView JSX is unchanged — omitted for brevity, keep your existing TeamsView return
   return (
     <div>
       <div
@@ -3220,8 +3218,6 @@ function TeamsView({
           </button>
         )}
       </div>
-
-      {/* Create client + first team */}
       {showCreateClient && (
         <div
           style={{
@@ -3349,7 +3345,6 @@ function TeamsView({
           </div>
         </div>
       )}
-
       <div
         style={{
           display: "grid",
@@ -3358,7 +3353,6 @@ function TeamsView({
           alignItems: "start",
         }}
       >
-        {/* ── LEFT: Client + team tree ── */}
         <div
           style={{
             background: "#fff",
@@ -3384,7 +3378,6 @@ function TeamsView({
             </p>
           </div>
           <div style={{ padding: "6px" }}>
-            {/* Client groups */}
             {Object.entries(clientGroups).map(([cid, cg]) => (
               <div key={cid} style={{ marginBottom: 4 }}>
                 <div
@@ -3538,8 +3531,6 @@ function TeamsView({
                 })}
               </div>
             ))}
-
-            {/* Internal / org-level teams */}
             {internalTeams.length > 0 && (
               <div
                 style={{
@@ -3697,7 +3688,6 @@ function TeamsView({
                 })}
               </div>
             )}
-
             {Object.keys(clientGroups).length === 0 &&
               internalTeams.length === 0 && (
                 <p
@@ -3713,11 +3703,8 @@ function TeamsView({
               )}
           </div>
         </div>
-
-        {/* ── RIGHT: Team detail ── */}
         {activeTeamFull && activeTeamId ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-            {/* Header */}
             <div
               style={{
                 background: "#fff",
@@ -3806,8 +3793,6 @@ function TeamsView({
                 </p>
               </div>
             </div>
-
-            {/* Sub-nav */}
             <div
               style={{
                 display: "flex",
@@ -3848,8 +3833,6 @@ function TeamsView({
                 </button>
               ))}
             </div>
-
-            {/* Members */}
             {teamView === "members" && (
               <div
                 style={{
@@ -4084,8 +4067,6 @@ function TeamsView({
                 )}
               </div>
             )}
-
-            {/* Credits */}
             {teamView === "credits" && isAdmin && (
               <div
                 style={{
@@ -4254,8 +4235,6 @@ function TeamsView({
                 </div>
               </div>
             )}
-
-            {/* Invite */}
             {teamView === "invite" && isAdmin && (
               <div
                 style={{ display: "flex", flexDirection: "column", gap: 12 }}
@@ -4529,7 +4508,6 @@ export default function App({
 }: {
   session: import("@supabase/supabase-js").Session;
 }) {
-  // Org/team hierarchy state
   const [orgGroups, setOrgGroups] = useState<OrgEntry[]>([]);
   const [activeOrgId, setActiveOrgId] = useState<string | null>(null);
   const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
@@ -4583,6 +4561,24 @@ export default function App({
         ...(activeOrg.clients || []).flatMap((c) => c.teams),
       ].find((t) => t.teamId === activeTeamId)
     : null;
+
+  // ── FIX: client name for active team ──────────────────────
+  const activeTeamClient =
+    activeOrg?.clients.find((c) =>
+      c.teams.some((t) => t.teamId === activeTeamId),
+    )?.clientName ?? null;
+
+  // ── FIX: close dropdowns on outside click ─────────────────
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest("[data-dropdown]")) {
+        setOrgDropdownOpen(false);
+        setTeamDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   // ─── Load org / client / team hierarchy ─────────────────────
   const loadOrgGroups = async () => {
@@ -4706,7 +4702,7 @@ export default function App({
     setActiveOrgId(orgId);
     setActiveTeamId(teamId);
     setTeamDropdownOpen(false);
-    loadOrgGroups(); // refresh to pick up new teams/clients
+    loadOrgGroups();
   };
 
   const handleSaveProfile = async () => {
@@ -4918,8 +4914,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
     }
     const creditsUsed =
       MODELS.find((m) => m.id === selectedModel)?.credits || 1;
-
-    // ── Enforce credits ──────────────────────────────────────
     if (activeTeamId) {
       const { data: deduct } = await supabase.rpc("deduct_team_credits", {
         p_team_id: activeTeamId,
@@ -4928,25 +4922,25 @@ Be specific. Reference actual elements visible. No generic advice.`;
       });
       if (!deduct?.success)
         throw new Error(deduct?.error || "Insufficient credits");
-      // Refresh org groups so sidebar shows new balance
       loadOrgGroups();
     }
-
-    await supabase.from("analyses").insert({
-      user_id: session.user.id,
-      team_id: activeTeamId || null,
-      org_id: activeOrgId || null,
-      client: client || "Unnamed Analysis",
-      platform: platform || "Unknown",
-      industry: industry || "Unknown",
-      concept: concept || null,
-      type: analysisType,
-      model: selectedModel,
-      credits_used: creditsUsed,
-      overall_score: score,
-      pass,
-      result: updated,
-    });
+    await supabase
+      .from("analyses")
+      .insert({
+        user_id: session.user.id,
+        team_id: activeTeamId || null,
+        org_id: activeOrgId || null,
+        client: client || "Unnamed Analysis",
+        platform: platform || "Unknown",
+        industry: industry || "Unknown",
+        concept: concept || null,
+        type: analysisType,
+        model: selectedModel,
+        credits_used: creditsUsed,
+        overall_score: score,
+        pass,
+        result: updated,
+      });
     fetchUserData();
   };
 
@@ -5142,8 +5136,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
           a.result.overall_score > b.result.overall_score ? a : b,
         )
       : null;
-
-  // All teams flat for sidebar team dropdown
   const allTeamsInOrg = activeOrg
     ? [
         ...(activeOrg.internalTeams || []),
@@ -5223,9 +5215,11 @@ Be specific. Reference actual elements visible. No generic advice.`;
               gap: 6,
             }}
           >
-            <div style={{ position: "relative" }}>
+            {/* ── Org dropdown ── */}
+            <div style={{ position: "relative" }} data-dropdown="org">
               <div
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   setOrgDropdownOpen((o) => !o);
                   setTeamDropdownOpen(false);
                 }}
@@ -5374,11 +5368,12 @@ Be specific. Reference actual elements visible. No generic advice.`;
               )}
             </div>
 
-            {/* Team selector — shown when org has 2+ teams */}
+            {/* ── Team dropdown (2+ teams) ── */}
             {activeOrg && allTeamsInOrg.length > 1 && (
-              <div style={{ position: "relative" }}>
+              <div style={{ position: "relative" }} data-dropdown="team">
                 <div
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setTeamDropdownOpen((o) => !o);
                     setOrgDropdownOpen(false);
                   }}
@@ -5404,7 +5399,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                         margin: "0 0 1px",
                       }}
                     >
-                      Team
+                      {activeTeamClient ? `Client · Team` : "Team"}
                     </p>
                     <p
                       style={{
@@ -5417,7 +5412,9 @@ Be specific. Reference actual elements visible. No generic advice.`;
                         textOverflow: "ellipsis",
                       }}
                     >
-                      {activeTeamEntry?.teamName || "Select team"}
+                      {activeTeamClient
+                        ? `${activeTeamClient} · ${activeTeamEntry?.teamName || ""}`
+                        : activeTeamEntry?.teamName || "Select team"}
                     </p>
                   </div>
                   <svg
@@ -5456,7 +5453,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
                       overflowY: "auto",
                     }}
                   >
-                    {/* Group by client in dropdown */}
                     {activeOrg.clients.map((c) => (
                       <div key={c.clientId}>
                         <div
@@ -5608,7 +5604,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
               </div>
             )}
 
-            {/* Single team — just show as a pill */}
+            {/* ── Single team pill ── */}
             {activeOrg && allTeamsInOrg.length === 1 && (
               <div
                 style={{
@@ -5632,7 +5628,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                       margin: "0 0 1px",
                     }}
                   >
-                    Team
+                    {activeTeamClient ? "Client · Team" : "Team"}
                   </p>
                   <p
                     style={{
@@ -5642,7 +5638,15 @@ Be specific. Reference actual elements visible. No generic advice.`;
                       margin: 0,
                     }}
                   >
-                    {allTeamsInOrg[0].teamName}
+                    {(() => {
+                      const singleTeam = allTeamsInOrg[0];
+                      const singleClient = activeOrg?.clients.find((c) =>
+                        c.teams.some((t) => t.teamId === singleTeam.teamId),
+                      )?.clientName;
+                      return singleClient
+                        ? `${singleClient} · ${singleTeam.teamName}`
+                        : singleTeam.teamName;
+                    })()}
                   </p>
                 </div>
                 <span
@@ -5841,7 +5845,10 @@ Be specific. Reference actual elements visible. No generic advice.`;
             </div>
             {isSidebarOpen && activeTeamEntry && (
               <p style={{ fontSize: 10, color: "#BBB", margin: "4px 0 0" }}>
-                Team pool · {activeTeamEntry.teamName}
+                Team pool ·{" "}
+                {activeTeamClient
+                  ? `${activeTeamClient} · ${activeTeamEntry.teamName}`
+                  : activeTeamEntry.teamName}
               </p>
             )}
           </div>
@@ -5927,10 +5934,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
         background: "#FAFAFA",
         minHeight: "100vh",
       }}
-      onClick={() => {
-        setOrgDropdownOpen(false);
-        setTeamDropdownOpen(false);
-      }}
     >
       <Sidebar />
       {analyserPreviewFile && (
@@ -5954,7 +5957,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
           onUpdated={(b) => setBrands(b)}
         />
       )}
-
       <main
         style={{
           marginLeft: isSidebarOpen ? 260 : 76,
@@ -5984,7 +5986,10 @@ Be specific. Reference actual elements visible. No generic advice.`;
                   {activeTeamEntry && (
                     <span style={{ color: "#6366F1", fontWeight: 500 }}>
                       {" "}
-                      · {activeTeamEntry.teamName}
+                      ·{" "}
+                      {activeTeamClient
+                        ? `${activeTeamClient} · ${activeTeamEntry.teamName}`
+                        : activeTeamEntry.teamName}
                       {activeTeamEntry.creditsPool === 0 && (
                         <span style={{ color: "#EF4444" }}> · No credits</span>
                       )}
@@ -5992,7 +5997,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
                   )}
                 </p>
               </div>
-
               {!(
                 singleResult ||
                 (mode === "ab" && analysedCreatives.length > 0)
@@ -6521,7 +6525,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
                   />
                 </div>
               )}
-
               {!(
                 singleResult ||
                 (mode === "ab" && analysedCreatives.length > 0)
@@ -6565,7 +6568,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
                   ))}
                 </div>
               )}
-
               {mode === "single" && !singleResult && !singleAnalysing && (
                 <div
                   style={{ display: "flex", flexDirection: "column", gap: 12 }}
@@ -6622,7 +6624,6 @@ Be specific. Reference actual elements visible. No generic advice.`;
                   }}
                 />
               )}
-
               {mode === "ab" && analysedCreatives.length === 0 && (
                 <div
                   style={{ display: "flex", flexDirection: "column", gap: 12 }}
@@ -6773,7 +6774,9 @@ Be specific. Reference actual elements visible. No generic advice.`;
                 <p style={{ fontSize: 13, color: "#999", margin: 0 }}>
                   {analysesHistory.length} report
                   {analysesHistory.length !== 1 ? "s" : ""} saved
-                  {activeTeamEntry ? ` · ${activeTeamEntry.teamName}` : ""}
+                  {activeTeamEntry
+                    ? ` · ${activeTeamClient ? `${activeTeamClient} · ${activeTeamEntry.teamName}` : activeTeamEntry.teamName}`
+                    : ""}
                 </p>
               </div>
               {viewingHistoryItem ? (
@@ -6988,7 +6991,9 @@ Be specific. Reference actual elements visible. No generic advice.`;
                 </h1>
                 <p style={{ fontSize: 13, color: "#999", margin: 0 }}>
                   Manage brand assets for analysis
-                  {activeTeamEntry ? ` · ${activeTeamEntry.teamName}` : ""}
+                  {activeTeamEntry
+                    ? ` · ${activeTeamClient ? `${activeTeamClient} · ${activeTeamEntry.teamName}` : activeTeamEntry.teamName}`
+                    : ""}
                 </p>
               </div>
               <BrandManager
