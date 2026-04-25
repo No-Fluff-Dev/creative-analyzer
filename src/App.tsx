@@ -2840,8 +2840,6 @@ function ABResults({
 }
 
 // ─── TEAMS VIEW ──────────────────────────────────────────────
-// CHANGE 4: Teams page now has a project (client) selector on the left,
-// and the right panel shows team list for the selected project.
 function TeamsView({
   session,
   activeOrgId,
@@ -2858,15 +2856,18 @@ function TeamsView({
   const [selectedProjectId, setSelectedProjectId] = useState<
     string | "internal" | null
   >(null);
+  const [projectDropdownOpen, setProjectDropdownOpen] = useState(false);
+  const [showCreateProject, setShowCreateProject] = useState(false);
   const [teamView, setTeamView] = useState<"members" | "credits" | "invite">(
     "members",
   );
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
-  const [showCreateClient, setShowCreateClient] = useState(false);
-  const [showAddTeam, setShowAddTeam] = useState<string | null>(null);
+  const [showAddTeam, setShowAddTeam] = useState(false);
   const [clientName, setClientName] = useState("");
-  const [teamName, setTeamName] = useState("");
+  const [newTeamName, setNewTeamName] = useState("");
+  const [addTeamName, setAddTeamName] = useState("");
   const [creating, setCreating] = useState(false);
+  const [teamSearch, setTeamSearch] = useState("");
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [memberSearch, setMemberSearch] = useState("");
   const [loadingMembers, setLoadingMembers] = useState(false);
@@ -2883,10 +2884,10 @@ function TeamsView({
     msg: string;
   } | null>(null);
   const [allTeamsFlat, setAllTeamsFlat] = useState<any[]>([]);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const activeOrg = orgGroups.find((o) => o.orgId === activeOrgId);
 
-  // Determine teams to show in the right panel based on selected project
   const projectTeams: TeamEntry[] =
     selectedProjectId === "internal"
       ? activeOrg?.internalTeams || []
@@ -2895,9 +2896,34 @@ function TeamsView({
             ?.teams || []
         : [];
 
+  const filteredTeams = projectTeams.filter(
+    (t) =>
+      !teamSearch.trim() ||
+      t.teamName.toLowerCase().includes(teamSearch.toLowerCase()),
+  );
+
+  const selectedProjectName =
+    selectedProjectId === "internal"
+      ? "Internal"
+      : activeOrg?.clients.find((c) => c.clientId === selectedProjectId)
+          ?.clientName || "Select project";
+
   const selectedTeamEntry =
     projectTeams.find((t) => t.teamId === selectedTeamId) || null;
   const isAdmin = selectedTeamEntry?.role === "admin";
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const h = (e: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      )
+        setProjectDropdownOpen(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
 
   useEffect(() => {
     if (!activeOrgId) return;
@@ -2922,7 +2948,6 @@ function TeamsView({
     setTeamView("members");
   }, [selectedTeamId]);
 
-  // Auto-select first project when org changes
   useEffect(() => {
     if (!activeOrg) return;
     if (activeOrg.clients.length > 0) {
@@ -2944,43 +2969,44 @@ function TeamsView({
     setLoadingMembers(false);
   };
   const handleCreateClient = async () => {
-    if (!clientName.trim() || !teamName.trim() || !activeOrgId) return;
+    if (!clientName.trim() || !newTeamName.trim() || !activeOrgId) return;
     setCreating(true);
     const { data, error } = await supabase.rpc("create_client_and_team", {
       p_org_id: activeOrgId,
       p_client_name: clientName.trim(),
-      p_team_name: teamName.trim(),
+      p_team_name: newTeamName.trim(),
     });
     if (error || !data?.success)
       alert("Error: " + (error?.message || "Unknown error"));
     else {
       setClientName("");
-      setTeamName("");
-      setShowCreateClient(false);
+      setNewTeamName("");
+      setShowCreateProject(false);
+      setProjectDropdownOpen(false);
       onTeamChange(activeOrgId, data.team_id);
     }
     setCreating(false);
   };
-  const handleAddTeam = async (clientId: string | null) => {
-    if (!teamName.trim() || !activeOrgId) return;
+  const handleAddTeam = async () => {
+    if (!addTeamName.trim() || !activeOrgId) return;
     setCreating(true);
     let data: any, error: any;
-    if (clientId)
+    if (selectedProjectId && selectedProjectId !== "internal")
       ({ data, error } = await supabase.rpc("add_team_to_client", {
         p_org_id: activeOrgId,
-        p_client_id: clientId,
-        p_team_name: teamName.trim(),
+        p_client_id: selectedProjectId,
+        p_team_name: addTeamName.trim(),
       }));
     else
       ({ data, error } = await supabase.rpc("create_org_and_team", {
         org_name: activeOrg?.orgName || "",
-        team_name: teamName.trim(),
+        team_name: addTeamName.trim(),
       }));
     if (error || !data?.success)
       alert("Error: " + (error?.message || "Unknown error"));
     else {
-      setTeamName("");
-      setShowAddTeam(null);
+      setAddTeamName("");
+      setShowAddTeam(false);
       if (data.team_id) onTeamChange(activeOrgId!, data.team_id);
     }
     setCreating(false);
@@ -3090,504 +3116,286 @@ function TeamsView({
 
   return (
     <div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          marginBottom: "1.75rem",
-        }}
-      >
-        <div>
-          <h1
-            style={{
-              fontSize: 22,
-              fontWeight: 600,
-              color: "#111",
-              margin: "0 0 4px",
-            }}
-          >
-            Teams
-          </h1>
-          <p style={{ fontSize: 13, color: "#999", margin: 0 }}>
-            Manage projects, teams, members and credits
-            {activeOrg ? ` · ${activeOrg.orgName}` : ""}
-          </p>
-        </div>
-        {activeOrg && (
-          <button
-            onClick={() => setShowCreateClient((s) => !s)}
-            style={{
-              padding: "9px 16px",
-              borderRadius: 8,
-              border: "none",
-              background: "#111",
-              color: "#fff",
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            + New project
-          </button>
-        )}
-      </div>
-
-      {showCreateClient && (
-        <div
+      <div style={{ marginBottom: "1.75rem" }}>
+        <h1
           style={{
-            background: "#fff",
-            border: "1px solid #EFEFEF",
-            borderRadius: 14,
-            padding: "1.25rem",
-            marginBottom: "1.25rem",
+            fontSize: 22,
+            fontWeight: 600,
+            color: "#111",
+            margin: "0 0 4px",
           }}
         >
-          <p
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              color: "#111",
-              margin: "0 0 14px",
-            }}
-          >
-            Add new project
-          </p>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 10,
-              marginBottom: 12,
-            }}
-          >
-            <div>
-              <label
-                style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: "#888",
-                  display: "block",
-                  marginBottom: 5,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.06em",
-                }}
-              >
-                Project name
-              </label>
-              <input
-                value={clientName}
-                onChange={(e) => setClientName(e.target.value)}
-                placeholder="e.g. ZeroGrid"
-                style={{
-                  width: "100%",
-                  padding: "9px 12px",
-                  border: "1px solid #EFEFEF",
-                  borderRadius: 8,
-                  fontSize: 13,
-                  outline: "none",
-                  boxSizing: "border-box" as any,
-                  color: "#111",
-                }}
-              />
-            </div>
-            <div>
-              <label
-                style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: "#888",
-                  display: "block",
-                  marginBottom: 5,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.06em",
-                }}
-              >
-                First team name
-              </label>
-              <input
-                value={teamName}
-                onChange={(e) => setTeamName(e.target.value)}
-                placeholder="e.g. Marketing"
-                style={{
-                  width: "100%",
-                  padding: "9px 12px",
-                  border: "1px solid #EFEFEF",
-                  borderRadius: 8,
-                  fontSize: 13,
-                  outline: "none",
-                  boxSizing: "border-box" as any,
-                  color: "#111",
-                }}
-              />
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              onClick={handleCreateClient}
-              disabled={creating || !clientName.trim() || !teamName.trim()}
-              style={{
-                padding: "9px 18px",
-                borderRadius: 8,
-                border: "none",
-                background:
-                  clientName.trim() && teamName.trim() ? "#6366F1" : "#F0F0F0",
-                color: clientName.trim() && teamName.trim() ? "#fff" : "#AAA",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor:
-                  clientName.trim() && teamName.trim()
-                    ? "pointer"
-                    : "not-allowed",
-              }}
-            >
-              {creating ? "Creating…" : "Create"}
-            </button>
-            <button
-              onClick={() => setShowCreateClient(false)}
-              style={{
-                padding: "9px 18px",
-                borderRadius: 8,
-                border: "1px solid #EFEFEF",
-                background: "#fff",
-                color: "#555",
-                fontSize: 13,
-                cursor: "pointer",
-              }}
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
+          Teams
+        </h1>
+        <p style={{ fontSize: 13, color: "#999", margin: 0 }}>
+          Manage projects, teams, members and credits
+          {activeOrg ? ` · ${activeOrg.orgName}` : ""}
+        </p>
+      </div>
 
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "220px 1fr",
+          gridTemplateColumns: "280px 1fr",
           gap: 16,
           alignItems: "start",
         }}
       >
-        {/* LEFT PANEL: Project list */}
-        <div
-          style={{
-            background: "#fff",
-            border: "1px solid #EFEFEF",
-            borderRadius: 14,
-            overflow: "hidden",
-          }}
-        >
-          <div
-            style={{ padding: "12px 14px", borderBottom: "1px solid #F5F5F5" }}
-          >
-            <p
+        {/* LEFT PANEL: Project dropdown + teams list */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {/* Project selector dropdown */}
+          <div ref={dropdownRef} style={{ position: "relative" }}>
+            <div
+              onClick={() => {
+                setProjectDropdownOpen((o) => !o);
+                setShowCreateProject(false);
+              }}
               style={{
-                fontSize: 10,
-                fontWeight: 700,
-                color: "#BBB",
-                textTransform: "uppercase",
-                letterSpacing: "0.07em",
-                margin: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "10px 12px",
+                borderRadius: 10,
+                border: `1px solid ${projectDropdownOpen ? "#6366F1" : "#EFEFEF"}`,
+                background: "#fff",
+                cursor: "pointer",
+                boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
               }}
             >
-              Projects
-            </p>
-          </div>
-          <div style={{ padding: "6px" }}>
-            {(activeOrg?.clients || []).map((c) => {
-              const isActive = selectedProjectId === c.clientId;
-              return (
-                <button
-                  key={c.clientId}
-                  onClick={() => {
-                    setSelectedProjectId(c.clientId);
-                    setSelectedTeamId(c.teams[0]?.teamId || null);
-                  }}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    width: "100%",
-                    padding: "9px 10px",
-                    borderRadius: 8,
-                    border: "none",
-                    background: isActive ? "#F5F3FF" : "transparent",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    marginBottom: 2,
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      minWidth: 0,
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 22,
-                        height: 22,
-                        borderRadius: 6,
-                        background: isActive ? "#6366F1" : "#E5E7EB",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        flexShrink: 0,
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: 10,
-                          fontWeight: 800,
-                          color: isActive ? "#fff" : "#888",
-                        }}
-                      >
-                        {c.clientName[0].toUpperCase()}
-                      </span>
-                    </div>
-                    <span
-                      style={{
-                        fontSize: 13,
-                        fontWeight: isActive ? 600 : 500,
-                        color: isActive ? "#6366F1" : "#333",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {c.clientName}
-                    </span>
-                  </div>
-                  <span
-                    style={{
-                      fontSize: 10,
-                      color: isActive ? "#A5B4FC" : "#CCC",
-                      flexShrink: 0,
-                      marginLeft: 4,
-                    }}
-                  >
-                    {c.teams.length} team{c.teams.length !== 1 ? "s" : ""}
-                  </span>
-                </button>
-              );
-            })}
-            {(activeOrg?.internalTeams || []).length > 0 && (
-              <>
-                <div
-                  style={{
-                    height: 1,
-                    background: "#F5F5F5",
-                    margin: "6px 4px",
-                  }}
-                />
-                <button
-                  onClick={() => {
-                    setSelectedProjectId("internal");
-                    setSelectedTeamId(
-                      activeOrg?.internalTeams[0]?.teamId || null,
-                    );
-                  }}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    width: "100%",
-                    padding: "9px 10px",
-                    borderRadius: 8,
-                    border: "none",
-                    background:
-                      selectedProjectId === "internal"
-                        ? "#F5F3FF"
-                        : "transparent",
-                    cursor: "pointer",
-                    textAlign: "left",
-                  }}
-                >
-                  <div
-                    style={{ display: "flex", alignItems: "center", gap: 8 }}
-                  >
-                    <div
-                      style={{
-                        width: 22,
-                        height: 22,
-                        borderRadius: 6,
-                        background:
-                          selectedProjectId === "internal"
-                            ? "#6366F1"
-                            : "#E5E7EB",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: 10,
-                          fontWeight: 800,
-                          color:
-                            selectedProjectId === "internal" ? "#fff" : "#888",
-                        }}
-                      >
-                        N
-                      </span>
-                    </div>
-                    <span
-                      style={{
-                        fontSize: 13,
-                        fontWeight:
-                          selectedProjectId === "internal" ? 600 : 500,
-                        color:
-                          selectedProjectId === "internal" ? "#6366F1" : "#555",
-                      }}
-                    >
-                      Internal
-                    </span>
-                  </div>
-                  <span
-                    style={{
-                      fontSize: 10,
-                      color:
-                        selectedProjectId === "internal" ? "#A5B4FC" : "#CCC",
-                    }}
-                  >
-                    {activeOrg?.internalTeams.length} team
-                    {(activeOrg?.internalTeams.length || 0) !== 1 ? "s" : ""}
-                  </span>
-                </button>
-              </>
-            )}
-            {(activeOrg?.clients || []).length === 0 &&
-              (activeOrg?.internalTeams || []).length === 0 && (
-                <p
-                  style={{
-                    fontSize: 12,
-                    color: "#CCC",
-                    textAlign: "center",
-                    padding: "1.5rem 0",
-                  }}
-                >
-                  No projects yet
-                </p>
-              )}
-          </div>
-        </div>
-
-        {/* RIGHT PANEL: Teams for selected project + detail */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {selectedProjectId && projectTeams.length > 0 ? (
-            <>
-              {/* Team selector within project */}
               <div
                 style={{
-                  background: "#fff",
-                  border: "1px solid #EFEFEF",
-                  borderRadius: 14,
-                  overflow: "hidden",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  minWidth: 0,
                 }}
               >
                 <div
                   style={{
-                    padding: "12px 14px",
-                    borderBottom: "1px solid #F5F5F5",
+                    width: 28,
+                    height: 28,
+                    borderRadius: 7,
+                    background: "#6366F1",
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: "space-between",
+                    justifyContent: "center",
+                    flexShrink: 0,
                   }}
                 >
+                  <span
+                    style={{ fontSize: 12, fontWeight: 800, color: "#fff" }}
+                  >
+                    {selectedProjectName[0]?.toUpperCase() || "P"}
+                  </span>
+                </div>
+                <div style={{ minWidth: 0 }}>
                   <p
                     style={{
                       fontSize: 10,
                       fontWeight: 700,
                       color: "#BBB",
                       textTransform: "uppercase",
-                      letterSpacing: "0.07em",
-                      margin: 0,
+                      letterSpacing: "0.06em",
+                      margin: "0 0 1px",
                     }}
                   >
-                    Teams in{" "}
-                    {selectedProjectId === "internal"
-                      ? "Internal"
-                      : activeOrg?.clients.find(
-                          (c) => c.clientId === selectedProjectId,
-                        )?.clientName || "project"}
+                    Project
                   </p>
-                  {isAdmin && (
-                    <button
-                      onClick={() => {
-                        setShowAddTeam(selectedProjectId);
-                        setTeamName("");
-                      }}
+                  <p
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: "#111",
+                      margin: 0,
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {selectedProjectName}
+                  </p>
+                </div>
+              </div>
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#BBB"
+                strokeWidth="2.5"
+                style={{
+                  flexShrink: 0,
+                  transform: projectDropdownOpen
+                    ? "rotate(180deg)"
+                    : "rotate(0deg)",
+                  transition: "transform 0.2s",
+                }}
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </div>
+
+            {projectDropdownOpen && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "calc(100% + 6px)",
+                  left: 0,
+                  right: 0,
+                  background: "#fff",
+                  border: "1px solid #EFEFEF",
+                  borderRadius: 10,
+                  boxShadow: "0 8px 24px rgba(0,0,0,0.1)",
+                  zIndex: 50,
+                  overflow: "hidden",
+                }}
+              >
+                {/* + New project — first item */}
+                {!showCreateProject ? (
+                  <div
+                    onClick={() => setShowCreateProject(true)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: "10px 12px",
+                      cursor: "pointer",
+                      borderBottom: "1px solid #F5F5F5",
+                      background: "#FAFAFA",
+                    }}
+                    onMouseEnter={(e) =>
+                      ((e.currentTarget as HTMLDivElement).style.background =
+                        "#F5F3FF")
+                    }
+                    onMouseLeave={(e) =>
+                      ((e.currentTarget as HTMLDivElement).style.background =
+                        "#FAFAFA")
+                    }
+                  >
+                    <div
                       style={{
-                        fontSize: 10,
-                        padding: "2px 8px",
-                        borderRadius: 5,
-                        border: "1px solid #E0DBFF",
-                        background: "#F5F3FF",
-                        color: "#6366F1",
-                        cursor: "pointer",
-                        fontWeight: 600,
+                        width: 24,
+                        height: 24,
+                        borderRadius: 6,
+                        border: "1.5px dashed #6366F1",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
                       }}
                     >
-                      + Team
-                    </button>
-                  )}
-                </div>
-                {showAddTeam === selectedProjectId && (
-                  <div
-                    style={{
-                      padding: "10px 14px",
-                      background: "#FAFAFA",
-                      borderBottom: "1px solid #F5F5F5",
-                    }}
-                  >
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <input
-                        value={teamName}
-                        onChange={(e) => setTeamName(e.target.value)}
-                        placeholder="Team name…"
+                      <span
                         style={{
-                          flex: 1,
-                          padding: "8px 10px",
-                          border: "1px solid #EFEFEF",
-                          borderRadius: 6,
-                          fontSize: 12,
-                          outline: "none",
-                          color: "#111",
-                        }}
-                      />
-                      <button
-                        onClick={() =>
-                          handleAddTeam(
-                            selectedProjectId === "internal"
-                              ? null
-                              : selectedProjectId,
-                          )
-                        }
-                        disabled={creating || !teamName.trim()}
-                        style={{
-                          padding: "0 14px",
-                          borderRadius: 6,
-                          border: "none",
-                          background: teamName.trim() ? "#6366F1" : "#F0F0F0",
-                          color: teamName.trim() ? "#fff" : "#AAA",
-                          fontSize: 12,
-                          fontWeight: 600,
-                          cursor: teamName.trim() ? "pointer" : "not-allowed",
+                          fontSize: 14,
+                          color: "#6366F1",
+                          lineHeight: 1,
                         }}
                       >
-                        {creating ? "…" : "Add"}
+                        +
+                      </span>
+                    </div>
+                    <span
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: "#6366F1",
+                      }}
+                    >
+                      New project
+                    </span>
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      padding: "12px",
+                      borderBottom: "1px solid #F5F5F5",
+                      background: "#F5F3FF",
+                    }}
+                  >
+                    <p
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: "#6366F1",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                        margin: "0 0 8px",
+                      }}
+                    >
+                      Create project
+                    </p>
+                    <input
+                      value={clientName}
+                      onChange={(e) => setClientName(e.target.value)}
+                      placeholder="Project name"
+                      autoFocus
+                      style={{
+                        width: "100%",
+                        padding: "8px 10px",
+                        border: "1px solid #E0DBFF",
+                        borderRadius: 7,
+                        fontSize: 12,
+                        outline: "none",
+                        marginBottom: 6,
+                        boxSizing: "border-box" as any,
+                        color: "#111",
+                        background: "#fff",
+                      }}
+                    />
+                    <input
+                      value={newTeamName}
+                      onChange={(e) => setNewTeamName(e.target.value)}
+                      placeholder="First team name"
+                      style={{
+                        width: "100%",
+                        padding: "8px 10px",
+                        border: "1px solid #E0DBFF",
+                        borderRadius: 7,
+                        fontSize: 12,
+                        outline: "none",
+                        marginBottom: 8,
+                        boxSizing: "border-box" as any,
+                        color: "#111",
+                        background: "#fff",
+                      }}
+                    />
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button
+                        onClick={handleCreateClient}
+                        disabled={
+                          creating || !clientName.trim() || !newTeamName.trim()
+                        }
+                        style={{
+                          flex: 1,
+                          padding: "7px",
+                          borderRadius: 7,
+                          border: "none",
+                          background:
+                            clientName.trim() && newTeamName.trim()
+                              ? "#6366F1"
+                              : "#E0DBFF",
+                          color: "#fff",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor:
+                            clientName.trim() && newTeamName.trim()
+                              ? "pointer"
+                              : "not-allowed",
+                        }}
+                      >
+                        {creating ? "Creating…" : "Create"}
                       </button>
                       <button
-                        onClick={() => setShowAddTeam(null)}
+                        onClick={() => {
+                          setShowCreateProject(false);
+                          setClientName("");
+                          setNewTeamName("");
+                        }}
                         style={{
-                          padding: "0 10px",
-                          borderRadius: 6,
-                          border: "1px solid #EFEFEF",
+                          padding: "7px 12px",
+                          borderRadius: 7,
+                          border: "1px solid #E0DBFF",
                           background: "#fff",
-                          fontSize: 11,
+                          fontSize: 12,
                           color: "#888",
                           cursor: "pointer",
                         }}
@@ -3597,8 +3405,372 @@ function TeamsView({
                     </div>
                   </div>
                 )}
-                <div style={{ padding: "6px" }}>
-                  {projectTeams.map((team) => {
+
+                {/* Project list */}
+                <div style={{ maxHeight: 240, overflowY: "auto" }}>
+                  {(activeOrg?.clients || []).map((c) => {
+                    const isActive = selectedProjectId === c.clientId;
+                    return (
+                      <div
+                        key={c.clientId}
+                        onClick={() => {
+                          setSelectedProjectId(c.clientId);
+                          setSelectedTeamId(c.teams[0]?.teamId || null);
+                          setProjectDropdownOpen(false);
+                          setTeamSearch("");
+                        }}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          padding: "10px 12px",
+                          cursor: "pointer",
+                          background: isActive ? "#F5F3FF" : "#fff",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isActive)
+                            (
+                              e.currentTarget as HTMLDivElement
+                            ).style.background = "#FAFAFA";
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isActive)
+                            (
+                              e.currentTarget as HTMLDivElement
+                            ).style.background = "#fff";
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: 26,
+                              height: 26,
+                              borderRadius: 6,
+                              background: isActive ? "#6366F1" : "#E5E7EB",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              flexShrink: 0,
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 800,
+                                color: isActive ? "#fff" : "#888",
+                              }}
+                            >
+                              {c.clientName[0].toUpperCase()}
+                            </span>
+                          </div>
+                          <div>
+                            <p
+                              style={{
+                                fontSize: 13,
+                                fontWeight: isActive ? 600 : 500,
+                                color: isActive ? "#6366F1" : "#222",
+                                margin: 0,
+                              }}
+                            >
+                              {c.clientName}
+                            </p>
+                            <p
+                              style={{ fontSize: 10, color: "#BBB", margin: 0 }}
+                            >
+                              {c.teams.length} team
+                              {c.teams.length !== 1 ? "s" : ""}
+                            </p>
+                          </div>
+                        </div>
+                        {isActive && (
+                          <svg
+                            width="13"
+                            height="13"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="#6366F1"
+                            strokeWidth="2.5"
+                          >
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {(activeOrg?.internalTeams || []).length > 0 && (
+                    <div
+                      onClick={() => {
+                        setSelectedProjectId("internal");
+                        setSelectedTeamId(
+                          activeOrg?.internalTeams[0]?.teamId || null,
+                        );
+                        setProjectDropdownOpen(false);
+                        setTeamSearch("");
+                      }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "10px 12px",
+                        cursor: "pointer",
+                        background:
+                          selectedProjectId === "internal" ? "#F5F3FF" : "#fff",
+                        borderTop: "1px solid #F5F5F5",
+                      }}
+                      onMouseEnter={(e) => {
+                        if (selectedProjectId !== "internal")
+                          (e.currentTarget as HTMLDivElement).style.background =
+                            "#FAFAFA";
+                      }}
+                      onMouseLeave={(e) => {
+                        if (selectedProjectId !== "internal")
+                          (e.currentTarget as HTMLDivElement).style.background =
+                            "#fff";
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 26,
+                            height: 26,
+                            borderRadius: 6,
+                            background:
+                              selectedProjectId === "internal"
+                                ? "#6366F1"
+                                : "#E5E7EB",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 800,
+                              color:
+                                selectedProjectId === "internal"
+                                  ? "#fff"
+                                  : "#888",
+                            }}
+                          >
+                            N
+                          </span>
+                        </div>
+                        <div>
+                          <p
+                            style={{
+                              fontSize: 13,
+                              fontWeight:
+                                selectedProjectId === "internal" ? 600 : 500,
+                              color:
+                                selectedProjectId === "internal"
+                                  ? "#6366F1"
+                                  : "#555",
+                              margin: 0,
+                            }}
+                          >
+                            Internal
+                          </p>
+                          <p style={{ fontSize: 10, color: "#BBB", margin: 0 }}>
+                            {activeOrg?.internalTeams.length} team
+                            {(activeOrg?.internalTeams.length || 0) !== 1
+                              ? "s"
+                              : ""}
+                          </p>
+                        </div>
+                      </div>
+                      {selectedProjectId === "internal" && (
+                        <svg
+                          width="13"
+                          height="13"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#6366F1"
+                          strokeWidth="2.5"
+                        >
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                    </div>
+                  )}
+                  {(activeOrg?.clients || []).length === 0 &&
+                    (activeOrg?.internalTeams || []).length === 0 && (
+                      <p
+                        style={{
+                          fontSize: 12,
+                          color: "#CCC",
+                          textAlign: "center",
+                          padding: "1.5rem 0",
+                        }}
+                      >
+                        No projects yet — create one above
+                      </p>
+                    )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Teams list for selected project */}
+          {selectedProjectId && (
+            <div
+              style={{
+                background: "#fff",
+                border: "1px solid #EFEFEF",
+                borderRadius: 14,
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  padding: "12px 14px",
+                  borderBottom: "1px solid #F5F5F5",
+                }}
+              >
+                {/* Search */}
+                <div
+                  style={{
+                    position: "relative",
+                    marginBottom: isAdmin ? 8 : 0,
+                  }}
+                >
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#CCC"
+                    strokeWidth="2.5"
+                    style={{
+                      position: "absolute",
+                      left: 9,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                    }}
+                  >
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                  <input
+                    value={teamSearch}
+                    onChange={(e) => setTeamSearch(e.target.value)}
+                    placeholder="Search teams…"
+                    style={{
+                      width: "100%",
+                      padding: "7px 10px 7px 28px",
+                      border: "1px solid #EFEFEF",
+                      borderRadius: 7,
+                      fontSize: 12,
+                      outline: "none",
+                      background: "#FAFAFA",
+                      color: "#111",
+                      boxSizing: "border-box" as any,
+                    }}
+                  />
+                </div>
+                {isAdmin && !showAddTeam && (
+                  <button
+                    onClick={() => {
+                      setShowAddTeam(true);
+                      setAddTeamName("");
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      fontSize: 11,
+                      padding: "5px 10px",
+                      borderRadius: 6,
+                      border: "1px solid #E0DBFF",
+                      background: "#F5F3FF",
+                      color: "#6366F1",
+                      cursor: "pointer",
+                      fontWeight: 600,
+                      width: "100%",
+                    }}
+                  >
+                    <span>+</span> Add team to {selectedProjectName}
+                  </button>
+                )}
+                {showAddTeam && (
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <input
+                      value={addTeamName}
+                      onChange={(e) => setAddTeamName(e.target.value)}
+                      placeholder="Team name…"
+                      autoFocus
+                      style={{
+                        flex: 1,
+                        padding: "7px 10px",
+                        border: "1px solid #E0DBFF",
+                        borderRadius: 6,
+                        fontSize: 12,
+                        outline: "none",
+                        color: "#111",
+                        background: "#fff",
+                      }}
+                    />
+                    <button
+                      onClick={handleAddTeam}
+                      disabled={creating || !addTeamName.trim()}
+                      style={{
+                        padding: "0 12px",
+                        borderRadius: 6,
+                        border: "none",
+                        background: addTeamName.trim() ? "#6366F1" : "#F0F0F0",
+                        color: addTeamName.trim() ? "#fff" : "#AAA",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: addTeamName.trim() ? "pointer" : "not-allowed",
+                      }}
+                    >
+                      {creating ? "…" : "Add"}
+                    </button>
+                    <button
+                      onClick={() => setShowAddTeam(false)}
+                      style={{
+                        padding: "0 8px",
+                        borderRadius: 6,
+                        border: "1px solid #EFEFEF",
+                        background: "#fff",
+                        fontSize: 11,
+                        color: "#888",
+                        cursor: "pointer",
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div style={{ padding: "6px" }}>
+                {filteredTeams.length === 0 ? (
+                  <p
+                    style={{
+                      fontSize: 12,
+                      color: "#CCC",
+                      textAlign: "center",
+                      padding: "1.5rem 0",
+                    }}
+                  >
+                    {teamSearch
+                      ? "No teams match your search"
+                      : "No teams in this project"}
+                  </p>
+                ) : (
+                  filteredTeams.map((team) => {
                     const isSel = team.teamId === selectedTeamId;
                     return (
                       <button
@@ -3623,6 +3795,7 @@ function TeamsView({
                             display: "flex",
                             alignItems: "center",
                             gap: 8,
+                            minWidth: 0,
                           }}
                         >
                           <div
@@ -3631,6 +3804,7 @@ function TeamsView({
                               height: 8,
                               borderRadius: "50%",
                               background: isSel ? "#6366F1" : "#DDD",
+                              flexShrink: 0,
                             }}
                           />
                           <span
@@ -3638,6 +3812,9 @@ function TeamsView({
                               fontSize: 13,
                               fontWeight: isSel ? 600 : 500,
                               color: isSel ? "#6366F1" : "#333",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
                             }}
                           >
                             {team.teamName}
@@ -3647,7 +3824,8 @@ function TeamsView({
                           style={{
                             display: "flex",
                             alignItems: "center",
-                            gap: 8,
+                            gap: 6,
+                            flexShrink: 0,
                           }}
                         >
                           <span
@@ -3673,10 +3851,17 @@ function TeamsView({
                         </div>
                       </button>
                     );
-                  })}
-                </div>
+                  })
+                )}
               </div>
+            </div>
+          )}
+        </div>
 
+        {/* RIGHT PANEL: Team detail */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {selectedProjectId && projectTeams.length > 0 ? (
+            <>
               {/* Team detail */}
               {selectedTeamEntry && activeTeamFull ? (
                 <div
