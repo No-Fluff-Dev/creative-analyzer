@@ -993,12 +993,12 @@ function BrandManager({
             marginBottom: 10,
           }}
         >
-          {editing ? "Edit brand" : "Add new brand"}
+          {editing ? "Edit asset" : "Add new asset"}
         </p>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Brand / client name"
+          placeholder="Asset name"
           style={{
             width: "100%",
             padding: "10px 12px",
@@ -4832,23 +4832,21 @@ Be specific. Reference actual elements visible. No generic advice.`;
         throw new Error(deduct?.error || "Insufficient credits");
       loadOrgGroups();
     }
-    await supabase
-      .from("analyses")
-      .insert({
-        user_id: session.user.id,
-        team_id: activeTeamId || null,
-        org_id: activeOrgId || null,
-        client: client || "Unnamed Analysis",
-        platform: platform || "Unknown",
-        industry: industry || "Unknown",
-        concept: concept || null,
-        type: analysisType,
-        model: selectedModel,
-        credits_used: creditsUsed,
-        overall_score: score,
-        pass,
-        result: updated,
-      });
+    await supabase.from("analyses").insert({
+      user_id: session.user.id,
+      team_id: activeTeamId || null,
+      org_id: activeOrgId || null,
+      client: client || "Unnamed Analysis",
+      platform: platform || "Unknown",
+      industry: industry || "Unknown",
+      concept: concept || null,
+      type: analysisType,
+      model: selectedModel,
+      credits_used: creditsUsed,
+      overall_score: score,
+      pass,
+      result: updated,
+    });
     fetchUserData();
   };
 
@@ -5154,7 +5152,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                         margin: "0 0 1px",
                       }}
                     >
-                      Client
+                      Project
                     </p>
                     <p
                       style={{
@@ -6961,7 +6959,7 @@ Be specific. Reference actual elements visible. No generic advice.`;
                     margin: "0 0 4px",
                   }}
                 >
-                  Brand guidelines
+                  Assets
                 </h1>
                 <p style={{ fontSize: 13, color: "#999", margin: 0 }}>
                   Manage brand assets for analysis
